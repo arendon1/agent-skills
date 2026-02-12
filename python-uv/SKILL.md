@@ -1,5 +1,5 @@
 ---
-name: uv-ruff-python-tools
+name: python-uv
 description: Modern Python development with uv (10-100x faster package manager) and ruff (extremely fast linter/formatter). Use when managing Python projects, dependencies, virtual environments, installing packages, linting code, or formatting Python files. Triggers on phrases like "uv install", "ruff check", "python package manager", "format python code", or working with pyproject.toml files.
 license: Apache-2.0
 metadata:

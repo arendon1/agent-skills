@@ -7,5 +7,5 @@ node_modules/
 *.tmp
 
 # Skills with their own repositories
-notebooklm-skill/
-google-ai-mode-skill/
+notebooklm-skill/.git
+google-ai-mode-skill/.git

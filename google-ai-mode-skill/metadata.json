@@ -1,0 +1,14 @@
+{
+    "name": "google-ai-mode-skill",
+    "version": "1.0.0",
+    "description": "Query Google AI Search with source-grounded citations",
+    "author": "arendon1/agent-skills",
+    "category": "research",
+    "tags": [
+        "google",
+        "search",
+        "ai-mode",
+        "python"
+    ],
+    "archetype": "cli-reference"
+}

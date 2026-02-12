@@ -18,6 +18,18 @@ Combines three authoritative sources into a unified approach:
 2. **Community best practices** - Token hierarchy, archetypes, advanced patterns
 3. **Official documentation** - Current API fields, latest features
 
+## Cross-Platform Compatibility
+
+Skills following this specification work across:
+
+- **Claude Code** (Anthropic)
+- **Codex CLI** (OpenAI)
+- **Cursor** (Anysphere)
+- **Amp** (Sourcegraph)
+- **Letta** (memGPT)
+
+Non-compliant skills may break silently or fail validation on these platforms.
+
 ## Mental Model: How Skills Actually Work
 
 Skills use **pure LLM reasoning** for selection - no embeddings or keyword matching. Claude evaluates all skill descriptions via natural language understanding, making description quality critical.
@@ -54,12 +66,14 @@ See [references/archetypes.md](references/archetypes.md) for detailed templates.
 ### 2. Write the Description (Most Critical)
 
 **Rules:**
+
 - Third person always ("Processes files" not "I help you")
 - Include WHAT it does AND WHEN to trigger
 - Specific trigger phrases users would say
 - Max 1024 characters
 
 **Template:**
+
 ```yaml
 description: >-
   [What it does - actions, capabilities].
@@ -67,6 +81,7 @@ description: >-
 ```
 
 **Good examples:**
+
 ```yaml
 # Specific + triggers
 description: >-
@@ -96,6 +111,7 @@ skill-name/
 ```
 
 **Critical rules:**
+
 - Keep references ONE level deep from SKILL.md
 - No chains: SKILL.md -> advanced.md -> details.md (Claude may partial-read)
 - Long files (>100 lines): include TOC at top
@@ -103,12 +119,14 @@ skill-name/
 ### 4. Write the Body
 
 **Style:**
+
 - Imperative/infinitive form (verb-first): "Extract the data", "Run validation"
 - NOT second person: avoid "You should extract..."
 - Concise - assume Claude is intelligent
 - Challenge each line: "Does Claude need this?"
 
 **Bad (~150 tokens):**
+
 ```markdown
 PDF (Portable Document Format) files are a common file format that
 contains text, images, and other content. To extract text from a PDF,
@@ -116,6 +134,7 @@ you'll need to use a library. There are many libraries available...
 ```
 
 **Good (~50 tokens):**
+
 ```markdown
 ## Extract PDF text
 Use pdfplumber:
@@ -129,14 +148,17 @@ with pdfplumber.open("file.pdf") as pdf:
 
 | Field | Required | Constraints |
 |-------|----------|-------------|
-| `name` | Yes | Max 64 chars, `[a-z0-9-]` only, no "anthropic"/"claude" |
-| `description` | Yes | Max 1024 chars, non-empty, no XML tags |
+| `name` | Yes | `[a-z0-9-]+`, no leading/trailing `-`, max 64 chars |
+| `description` | Yes | Max 1024 chars, no `<` or `>`, must include WHEN to use |
 
 ## Optional Frontmatter Fields
 
 | Field | Purpose | Example |
 |-------|---------|---------|
-| `allowed-tools` | Limit tool access | `Read, Grep, Glob` |
+| `license` | Legal usage (Optional) | `Apache-2.0` |
+| `compatibility` | Env requirements (Optional) | `Requires git`, `Requires MCP` |
+| `metadata` | Custom fields (Optional) | `version: "1.0"`, `author: name` |
+| `allowed-tools` | Limit tool access (Exp.) | `Read, Grep, Glob` |
 | `model` | Specific model | `claude-sonnet-4-20250514` |
 | `context` | Isolation | `fork` for separate context |
 | `agent` | Subagent type | `Explore`, `Plan`, custom |
@@ -159,6 +181,29 @@ Match specificity to task fragility:
 **Analogy:** Narrow bridge with cliffs = low freedom (exact guardrails). Open field = high freedom (general direction).
 
 ## Advanced Patterns
+
+### Semantic Versioning in Metadata
+
+Standardize versioning using the `metadata` field:
+
+```yaml
+metadata:
+  version: "2.1.0"
+  breaking-changes: "v2.0 changed API"
+```
+
+### Triadic Classification (GF(3))
+
+For plurigrid/asi skills, use triadic classification to balance verification vs generation:
+
+```yaml
+metadata:
+  trit: -1   # MINUS: verification, constraint, safety
+  trit: 0    # ERGODIC: balance, mediation
+  trit: +1   # PLUS: generation, exploration
+```
+
+Conservation: `Σ trits ≡ 0 (mod 3)` across compositions.
 
 ### THE EXACT PROMPT Pattern
 
@@ -222,6 +267,21 @@ See [references/advanced-patterns.md](references/advanced-patterns.md) for more 
 9. **Validate** - Use skill-reviewer or plugin-validator agents
 10. **Package for distribution** - Use `package_skill.py` to create zip
 
+## Validation Commands
+
+Ensure your skill is valid using these standard tools:
+
+```bash
+# Official validator (Standard)
+skills-ref validate ./my-skill
+
+# Codex-rs validator
+python3 codex-rs/core/src/skills/assets/samples/skill-creator/scripts/quick_validate.py ./my-skill
+
+# Batch validate
+for d in skills/*/; do skills-ref validate "$d"; done
+```
+
 ## Utility Scripts
 
 This skill includes two utility scripts in `scripts/`:
@@ -237,6 +297,7 @@ python scripts/init_skill.py database-tool --path .claude/skills
 ```
 
 Creates a complete skill directory structure:
+
 - `SKILL.md` with template and TODO placeholders
 - `scripts/` directory with example script
 - `references/` directory with example reference
@@ -253,6 +314,7 @@ python scripts/package_skill.py ./my-skill ./dist
 ```
 
 Validates the skill and creates a distributable zip file:
+
 - Checks frontmatter format and required fields
 - Validates naming conventions
 - Ensures no TODO placeholders remain

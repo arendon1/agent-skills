@@ -12,7 +12,7 @@ This guide provides comprehensive frameworks for analyzing industries, markets, 
 
 **Structure:**
 
-```
+```plain
               Positive Factors          Negative Factors
 Internal    |     Strengths         |     Weaknesses     |
 External    |    Opportunities       |      Threats       |

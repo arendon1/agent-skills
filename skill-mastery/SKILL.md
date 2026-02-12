@@ -17,6 +17,22 @@ Combines three authoritative sources into a unified approach:
 1. **Official plugin-dev toolkit** - Validation, patterns, AI-assisted creation
 2. **Community best practices** - Token hierarchy, archetypes, advanced patterns
 3. **Official documentation** - Current API fields, latest features
+4. **Skillfish Manager** - Standard for distribution, installation, and management
+
+## Installation & Management
+
+We recommend using **[skillfish](https://github.com/knoxgraeme/skillfish)** to manage your skills. It handles installation across multiple agent environments (Claude, Cursor, etc.).
+
+```bash
+# Install skillfish globally
+npm install -g skillfish
+
+# Install a skill from a GitHub repository
+skillfish add owner/repo
+
+# Create a new skill structure
+skillfish init
+```
 
 ## Cross-Platform Compatibility
 
@@ -258,14 +274,31 @@ See [references/advanced-patterns.md](references/advanced-patterns.md) for more 
 
 1. **Identify the archetype** - CLI, methodology, safety, or orchestration?
 2. **Write description first** - This determines if skill ever triggers
-3. **Initialise with script** - Use `init_skill.py` to scaffold structure
+3. **Initialize with Skillfish** - Use `skillfish init` to scaffold standard structure
 4. **Draft SKILL.md** - Core guidance only (<500 lines)
 5. **Extract to references** - Detailed docs, API specs, schemas
 6. **Add examples** - Working code that demonstrates usage
 7. **Create scripts** - Utilities that execute (not load into context)
 8. **Test with fresh instance** - Does it trigger? Apply rules correctly?
 9. **Validate** - Use skill-reviewer or plugin-validator agents
-10. **Package for distribution** - Use `package_skill.py` to create zip
+10. **Publish** -  Push to GitHub and use `skillfish submit`
+
+## Distribution
+
+To make your skill installable via `skillfish add owner/repo`:
+
+1. Ensure your repository has a `SKILL.md` at the root, OR
+2. Place multiple skills in subdirectories (e.g., `skills/my-skill/SKILL.md`).
+
+Users can then install:
+
+```bash
+# Install root skill
+skillfish add your-username/your-repo
+
+# Install specific skill from monorepo advice
+skillfish add your-username/your-repo skill-name
+```
 
 ## Validation Commands
 
@@ -286,7 +319,10 @@ for d in skills/*/; do skills-ref validate "$d"; done
 
 This skill includes two utility scripts in `scripts/`:
 
-### init_skill.py - Scaffold New Skills
+### init_skill.py - Scaffold New Skills (Legacy)
+
+> [!NOTE]
+> We recommend using `skillfish init` instead of this script for better compatibility.
 
 ```bash
 python scripts/init_skill.py <skill-name> --path <location>

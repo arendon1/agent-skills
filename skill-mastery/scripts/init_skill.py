@@ -14,6 +14,9 @@ Examples:
 import sys
 from pathlib import Path
 
+print("\033[93mWARNING: This script is legacy. We recommend using 'skillfish init' for better compatibility.\033[0m")
+print("\033[93mSupport for this script may be removed in future versions.\033[0m\n")
+
 
 SKILL_TEMPLATE = """---
 name: {skill_name}

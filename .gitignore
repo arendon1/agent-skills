@@ -5,7 +5,3 @@ node_modules/
 .vscode/
 .idea/
 *.tmp
-
-# Skills with their own repositories
-notebooklm-skill/.git
-google-ai-mode-skill/.git

@@ -1,0 +1,14 @@
+{
+    "name": "deep-research",
+    "version": "1.0.0",
+    "description": "Multi-source research with academic paper discovery and company analysis",
+    "author": "arendon1/agent-skills",
+    "category": "research",
+    "tags": [
+        "research",
+        "academic",
+        "company-analysis",
+        "typescript"
+    ],
+    "archetype": "cli-reference"
+}

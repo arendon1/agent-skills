@@ -1,0 +1,14 @@
+{
+    "name": "skill-mastery",
+    "version": "1.0.0",
+    "description": "Master-level guidance for creating exceptional Claude skills",
+    "author": "arendon1/agent-skills",
+    "category": "meta",
+    "tags": [
+        "skill-creation",
+        "best-practices",
+        "framework",
+        "education"
+    ],
+    "archetype": "methodology"
+}

@@ -1,0 +1,15 @@
+{
+    "name": "typst-writer",
+    "version": "1.0.0",
+    "description": "Typst document generation with APA 7 academic templates",
+    "author": "arendon1/agent-skills",
+    "category": "documentation",
+    "tags": [
+        "typst",
+        "academic",
+        "apa",
+        "math",
+        "plotting"
+    ],
+    "archetype": "cli-reference"
+}

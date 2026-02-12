@@ -1,0 +1,14 @@
+{
+    "name": "agent-orchestration",
+    "version": "1.0.0",
+    "description": "Scientific delegation framework for multi-agent coordination",
+    "author": "arendon1/agent-skills",
+    "category": "orchestration",
+    "tags": [
+        "agents",
+        "delegation",
+        "methodology",
+        "sub-agents"
+    ],
+    "archetype": "methodology"
+}

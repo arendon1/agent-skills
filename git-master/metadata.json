@@ -1,0 +1,14 @@
+{
+    "name": "git-master",
+    "version": "1.0.0",
+    "description": "Complete Git operations with safety guardrails",
+    "author": "arendon1/agent-skills",
+    "category": "version-control",
+    "tags": [
+        "git",
+        "safety",
+        "version-control",
+        "workflow"
+    ],
+    "archetype": "safety-tool"
+}

@@ -1,0 +1,14 @@
+{
+    "name": "scientific-schematics",
+    "version": "1.0.0",
+    "description": "AI-powered publication-quality scientific diagrams",
+    "author": "arendon1/agent-skills",
+    "category": "visualization",
+    "tags": [
+        "diagrams",
+        "scientific",
+        "ai-generation",
+        "python"
+    ],
+    "archetype": "cli-reference"
+}

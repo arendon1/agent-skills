@@ -1,9 +1,13 @@
 ---
 name: agent-orchestration
 description: >-
-  Delegates tasks to specialist sub-agents using scientific framework.
-  Provides world-building context (WHERE, WHAT, WHY) while preserving autonomy.
-  Use when coordinating multi-agent workflows or structuring sub-agent prompts.
+  Delegates tasks to specialist sub-agents using scientific framework (WHERE, WHAT, WHY).
+  Use when breaking down complex tasks, coordinating multi-agent workflows, or creating sub-agents.
+license: Apache-2.0
+metadata:
+  version: "1.0.0"
+  trit: 0
+  author: agent-builder
 ---
 
 # Agent Orchestration

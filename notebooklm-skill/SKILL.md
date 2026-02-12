@@ -1,10 +1,14 @@
 ---
 name: notebooklm-skill
 description: >-
-  Queries Google NotebookLM notebooks for source-grounded AI answers from uploaded PDFs, docs, and web content.
-  Manages notebook library and authentication via browser automation.
-  Use when analyzing research papers, extracting insights from documentation,
-  synthesizing multi-source reports, or querying uploaded knowledge bases.
+  Queries Google NotebookLM for source-grounded answers from uploaded PDFs, docs, and web content.
+  Use when analyzing large documents, synthesizing reports from multiple sources, or querying knowledge bases.
+license: Apache-2.0
+metadata:
+  version: "1.0.0"
+  trit: 0
+  author: agent-builder
+compatibility: Requires browser for authentication
 ---
 
 # NotebookLM Research Assistant

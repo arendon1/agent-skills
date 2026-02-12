@@ -1,7 +1,13 @@
 ---
 name: office
-description: |
-  Generate Office documents (DOCX, XLSX, PDF, PPTX) with TypeScript. Pure JS libraries that work everywhere: Claude Code CLI, Cloudflare Workers, browsers. Uses docx, xlsx, pdf-lib, pptxgenjs.
+description: >-
+  Generates Office documents (DOCX, XLSX, PDF, PPTX) using pure TypeScript libraries.
+  Use when creating reports, spreadsheets, presentations, or PDFs from data.
+license: Apache-2.0
+metadata:
+  version: "1.0.0"
+  trit: 1
+  author: agent-builder
 allowed-tools: [Read, Write, Edit, Bash]
 ---
 

@@ -1,6 +1,13 @@
 ---
 name: git-master
-description: "Complete Git expertise system for ALL git operations. PROACTIVELY activate for: (1) ANY Git task (basic/advanced/dangerous), (2) Repository management, (3) Branch strategies and workflows, (4) Conflict resolution, (5) History rewriting/recovery. Provides expert guidance, safety guardrails, and platform best practices."
+description: >-
+  Provides expert Git operations with safety guardrails, conflict resolution, and best practices.
+  Use when user asks to commit, push, merge, rebase, or fix git issues.
+license: Apache-2.0
+metadata:
+  version: "1.0.0"
+  trit: -1
+  author: agent-builder
 ---
 
 # Git Master

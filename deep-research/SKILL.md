@@ -1,10 +1,15 @@
 ---
 name: deep-research
 description: >-
-  Executes deep market, company, and ACADEMIC research using automated browser agents, Google AI, and Perplexity.
-  Use when researching companies, analyzing competitors, finding academic papers,
-  evaluating software tools, or gathering comprehensive market intelligence.
+  Orchestrates multi-step deeply recursive research using browser agents, Google AI, and Perplexity.
+  Use when simple search is insufficient and verified citations, market intelligence, or academic papers are required.
+license: Apache-2.0
+metadata:
+  version: "1.0.0"
+  trit: 1
+  author: agent-builder
 allowed-tools: [Read, Write, Edit, Bash]
+compatibility: Requires Python 3.10+ and Bun for scripts
 ---
 
 # Deep Research Professional

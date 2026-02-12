@@ -1,7 +1,14 @@
----
 name: academic-author
-description: Orchestrates the creation of high-quality academic and scientific documents. Manages the full lifecycle from research design to writing, citation, diagramming, and publishing.
+description: >-
+  Orchestrates specialized sub-agents to research, write, and refine high-quality academic publications.
+  Use when user wants to write a paper, needs IMRaD structure, or requests "write a research document".
+license: Apache-2.0
+metadata:
+  version: "1.0.0"
+  trit: 0
+  author: agent-builder
 allowed-tools: [Read, Write, Edit, Bash]
+compatibility: Requires agent-orchestration skill
 ---
 
 # Academic Author

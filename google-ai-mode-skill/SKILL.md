@@ -1,9 +1,14 @@
 ---
 name: google-ai-mode-skill
 description: >-
-  Query Google's AI Search mode to retrieve comprehensive, source-grounded answers 
-  from across the web. Returns markdown with inline citations [1][2].
-  Use for post-cutoff knowledge, API documentation, and implementation patterns.
+  Retrieves comprehensive, source-grounded answers from Google's AI Search with inline citations.
+  Use when needing post-cutoff knowledge, API documentation, or real-time implementation patterns.
+license: Apache-2.0
+metadata:
+  version: "1.0.0"
+  trit: 1
+  author: agent-builder
+compatibility: Requires python scripts/run.py wrapper
 ---
 
 # Google AI Mode Skill

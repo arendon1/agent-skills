@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "office",
+  "owner": "jezweb",
+  "repo": "claude-skills",
+  "path": "skills/office",
+  "branch": "main",
+  "sha": "26def7fad84b2258864dd9df9f1728536cf6f866",
+  "source": "manual"
+}

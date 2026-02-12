@@ -3,6 +3,7 @@
 Integrate drawings and charts using the `cetz` package (CeTZ: Creative Typst Zee).
 
 ## Setup
+
 Import the core package and the plot module (if needed).
 
 ```typst
@@ -72,6 +73,7 @@ Use the `plot` module for data visualization.
 | `bezier(start, end, ...)` | `control` | Draws bezier curves |
 
 ## Tips
+
 - Use `name` parameter to label nodes for connecting lines later.
 - Use `anchor` to position content relative to points.
 - Combine with Typst loops for procedural generation.

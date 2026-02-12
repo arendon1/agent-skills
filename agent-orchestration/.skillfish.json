@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "agent-orchestration",
+  "owner": "bbgnsurftech",
+  "repo": "claude-skills-collection",
+  "path": "community/jamie-bitflight-claude-skills/agent-orchestration",
+  "branch": "main",
+  "sha": "a319a3e3a3e29368ef31801b12ff24c252c73094",
+  "source": "manual"
+}

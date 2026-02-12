@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "skill-mastery",
+  "owner": "henkisdabro",
+  "repo": "wookstar-claude-plugins",
+  "path": "plugins/ultimate-skill-creator/skills/skill-mastery",
+  "branch": "main",
+  "sha": "a873223296dab350ebcfe03c6ae88daef7389ed6",
+  "source": "manual"
+}

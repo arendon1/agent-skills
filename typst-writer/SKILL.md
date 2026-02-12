@@ -1,6 +1,10 @@
 ---
 name: typst-writer
-description: Write correct and idiomatic Typst code. Defaults to `versatile-apa` (Spanish). Covers scripting, layout, math, and data loading.
+description: >-
+  Generates publication-ready documents using Typst typesetting language.
+  Supports academic papers (APA 7), mathematical notation, CeTZ plotting, and data visualization.
+  Use when creating research papers, formatting documents with complex math, generating plots,
+  or converting markdown to professional PDFs. Defaults to versatile-apa template (Spanish).
 ---
 
 # Typst Writer
@@ -39,23 +43,26 @@ description: Write correct and idiomatic Typst code. Defaults to `versatile-apa`
 ## 🛠️ Common Patterns
 
 **Defined Functions:**
+
 ```typst
 #let note(body) = rect(fill: yellow, body)
 ```
 
 **State Management:**
+
 ```typst
 #let counter = state("cnt", 0)
 #context counter.get()
 ```
 
 **Loops:**
+
 ```typst
 #for item in items [ - #item ]
 ```
 
 ## 🔍 Troubleshooting
 
-*   **"expected content, found..."**: You are in code mode but need markup. Wrap in `[]`.
-*   **"expected expression..."**: You are in markup but need code. Add `#`.
-*   **Unknown font**: Typst will fallback. Check font name.
+* **"expected content, found..."**: You are in code mode but need markup. Wrap in `[]`.
+* **"expected expression..."**: You are in markup but need code. Add `#`.
+* **Unknown font**: Typst will fallback. Check font name.

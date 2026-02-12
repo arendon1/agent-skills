@@ -9,12 +9,13 @@ Expert Git operations with built-in safety rails and best practices.
 
 ## 🚨 CRITICAL RULES
 
-1.  **Safety First**: Before ANY destructive operation (`reset --hard`, `force push`, `filter-repo`), you MUST:
-    *   Explicitly warn the user.
-    *   Offer to create a backup branch.
-    *   Ask for confirmation.
-2.  **User Preference**: At the start of a task, ask: "Do you want automatic commits or manual control?"
-3.  **Windows Paths**: Always use backslashes (`\`) for file paths in Windows environments.
+1. **Safety First**: Before ANY destructive operation (`reset --hard`, `force push`, `filter-repo`), you MUST:
+    * Explicitly warn the user.
+    * Offer to create a backup branch.
+    * Ask for confirmation.
+2. **User Preference**: At the start of a task, ask: "Do you want automatic commits or manual control?"
+3. **Cross-platform Paths**: Use forward slashes (`/`) in examples for cross-platform compatibility.
+    Windows git handles forward slashes correctly.
 
 ## 📚 References
 
@@ -31,6 +32,7 @@ Load these specific references based on the valid user task:
 ## 🛠️ Quick Reference
 
 ### Safety Check Pattern
+
 ```bash
 # Before dangerous ops
 git status
@@ -41,17 +43,20 @@ git branch backup-$(date +%Y%m%d-%H%M%S)
 ### Most Common Operations
 
 **Status & Log**
+
 ```bash
 git status
 git log --oneline --graph --all
 ```
 
 **Undo Last Commit (Keep Changes)**
+
 ```bash
 git reset --soft HEAD~1
 ```
 
 **Emergency Recovery**
+
 ```bash
 git reflog
 # Find the hash before the mistake, then:
@@ -61,8 +66,8 @@ git reflog
 
 ## 🔍 When to Use
 
-*   **Repository Setup**: Init, clone, config.
-*   **Daily Work**: Commit, push, pull, branch, merge.
-*   **Fixing Issues**: Conflicts, detached HEAD, wrong branch.
-*   **Advanced**: Interactive rebase, stash, submodules, worktrees.
-*   **Disaster Recovery**: Reflog, fsck, filter-repo.
+* **Repository Setup**: Init, clone, config.
+* **Daily Work**: Commit, push, pull, branch, merge.
+* **Fixing Issues**: Conflicts, detached HEAD, wrong branch.
+* **Advanced**: Interactive rebase, stash, submodules, worktrees.
+* **Disaster Recovery**: Reflog, fsck, filter-repo.

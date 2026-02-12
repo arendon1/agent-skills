@@ -1,6 +1,9 @@
 ---
 name: agent-orchestration
-description: This skill should be used when the model's ROLE_TYPE is orchestrator and needs to delegate tasks to specialist sub-agents. Provides scientific delegation framework ensuring world-building context (WHERE, WHAT, WHY) while preserving agent autonomy in implementation decisions (HOW). Use when planning task delegation, structuring sub-agent prompts, or coordinating multi-agent workflows.
+description: >-
+  Delegates tasks to specialist sub-agents using scientific framework.
+  Provides world-building context (WHERE, WHAT, WHY) while preserving autonomy.
+  Use when coordinating multi-agent workflows or structuring sub-agent prompts.
 ---
 
 # Agent Orchestration
@@ -102,25 +105,31 @@ AVAILABLE RESOURCES:
 ## Specialized Agent Assignments
 
 **For Context Gathering:**
+
 - Use `context-gathering` sub-agent to gather context without polluting orchestrator's context window
 
 **For Python Development:**
+
 - Use `python-cli-architect` sub-agent to write Python code
 - Use `python-pytest-architect` sub-agent to plan and write Python tests
 - Use `python-code-reviewer` sub-agent for post-write code review
 
 **For Bash Development:**
+
 - Use `bash-script-developer` sub-agent to write bash scripts
 - Use `bash-script-auditor` sub-agent for post-write script review
 
 **For Documentation:**
+
 - Use `documentation-expert` sub-agent to write user-facing documentation
 
 **For Architecture:**
+
 - Use `system-architect` sub-agent for system architecture documentation
 - For Python architecture, use `python-cli-architect` instead
 
 **For Linting Issues:**
+
 - Use `linting-root-cause-resolver` sub-agent for pre-commit, ruff, mypy, pytest issues
 
 **Critical Rule:**

@@ -111,16 +111,85 @@ python scripts/clickup_client.py get-task --task-id <TASK_ID>
 python scripts/clickup_client.py create-task --list-id <LIST_ID> --name "Task Name" --description "Task details"
 ```
 
-### Update Status
-
+### Update Task
+  
 ```bash
-python scripts/clickup_client.py update-status --task-id <TASK_ID> --status "in progress"
+# Update multiple fields at once
+python scripts/clickup_client.py update-task --task-id <TASK_ID> --priority 1 --status "Doing" --description "New description"
 ```
 
 ### Post Comment
 
 ```bash
 python scripts/clickup_client.py post-comment --task-id <TASK_ID> --content "Work started on this item."
+```
+
+### List Members
+
+Retrieve people available for assignment.
+
+```bash
+python scripts/clickup_client.py list-members --list-id <LIST_ID>
+```
+
+### Custom Fields
+
+```bash
+# List available custom fields for a list
+python scripts/clickup_client.py list-custom-fields --list-id <LIST_ID>
+
+# Set value (supports strings and JSON for complex types)
+python scripts/clickup_client.py set-custom-field --task-id <TASK_ID> --field-id <FIELD_ID> --value "high"
+```
+
+### Time Tracking
+
+```bash
+# Add 1 hour (3600000 ms) entry
+python scripts/clickup_client.py add-time-entry --task-id <TASK_ID> --duration-ms 3600000 --description "Analysis phase"
+```
+
+### Checklists
+
+```bash
+# Create a checklist
+python scripts/clickup_client.py manage-checklist create --task-id <TASK_ID> --name "Deployment Steps"
+
+# Add item to checklist
+python scripts/clickup_client.py manage-checklist add-item --checklist-id <CHECKLIST_ID> --name "Run migrations"
+```
+
+### Knowledge Management (Docs)
+
+Manage project documentation and SOPs across the workspace.
+
+```bash
+# List all docs in workspace
+python scripts/clickup_client.py list-docs
+
+# Create a new doc
+python scripts/clickup_client.py create-doc --name "Project Wiki"
+
+# Create a page in a doc
+python scripts/clickup_client.py create-page --doc-id <DOC_ID> --name "Architecture" --content "Details go here..." --content-format markdown
+
+# Update page content
+python scripts/clickup_client.py update-page --doc-id <DOC_ID> --page-id <PAGE_ID> --content "Updated architecture info" --edit-mode replace
+```
+
+### Webhooks (Event-Driven)
+
+Subscribe to workspace events to trigger external automations.
+
+```bash
+# List active webhooks
+python scripts/clickup_client.py list-webhooks
+
+# Create a webhook for task updates
+python scripts/clickup_client.py create-webhook --endpoint "https://your-api.com/webhook" --events "taskCreated,taskStatusUpdated"
+
+# Delete a webhook
+python scripts/clickup_client.py delete-webhook --webhook-id <WEBHOOK_ID>
 ```
 
 ## 📚 References

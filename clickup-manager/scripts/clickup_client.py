@@ -46,17 +46,17 @@ def format_output(data, format_type):
             # Try to find name/id/status in common list items
             summary = []
             for item in data:
-                entry = f"ID: {item.get('id', '?')} | Name: {item.get('name', 'Unknown')}"
+                entry = f"ID: {item.get('id', '?')} | Nombre: {item.get('name', 'Desconocido')}"
                 if 'status' in item:
                     status_val = item['status'].get('status') if isinstance(item['status'], dict) else item['status']
-                    entry += f" | Status: {status_val}"
+                    entry += f" | Estado: {status_val}"
                 summary.append(entry)
             print("\n".join(summary))
         elif isinstance(data, dict):
-            entry = f"ID: {data.get('id', '?')} | Name: {data.get('name', 'Unknown')}"
+            entry = f"ID: {data.get('id', '?')} | Nombre: {data.get('name', 'Desconocido')}"
             if 'status' in data:
                 status_val = data['status'].get('status') if isinstance(data['status'], dict) else data['status']
-                entry += f" | Status: {status_val}"
+                entry += f" | Estado: {status_val}"
             print(entry)
     else:
         print(json.dumps(data, indent=2))
@@ -150,6 +150,12 @@ def create_task(args):
         "name": args.name,
         "description": args.description
     }
+    if args.start_date:
+        payload["start_date"] = int(args.start_date)
+        payload["start_date_time"] = True
+    if args.due_date:
+        payload["due_date"] = int(args.due_date)
+        payload["due_date_time"] = True
     response = requests.post(url, json=payload, headers=HEADERS)
     if response.status_code == 200:
         format_output(response.json(), args.format)
@@ -189,9 +195,9 @@ def post_comment(args):
     payload = {"comment_text": args.content}
     response = requests.post(url, json=payload, headers=HEADERS)
     if response.status_code == 200:
-        print(f"Comment posted successfully to task {args.task_id}")
+        print(f"Comentario enviado con éxito a la tarea {args.task_id}")
     else:
-        print(f"Error posting comment: {response.status_code} - {response.text}")
+        print(f"Error al enviar comentario: {response.status_code} - {response.text}")
 
 def list_members(args):
     """Get members of a list or task"""
@@ -282,7 +288,12 @@ def update_task(args):
     if args.description: payload["description"] = args.description
     if args.priority: payload["priority"] = int(args.priority)
     if args.status: payload["status"] = args.status
-    if args.due_date: payload["due_date"] = int(args.due_date)
+    if args.start_date:
+        payload["start_date"] = int(args.start_date)
+        payload["start_date_time"] = True
+    if args.due_date:
+        payload["due_date"] = int(args.due_date)
+        payload["due_date_time"] = True
     
     if not payload:
         print("Error: No updates provided. Use --name, --description, --priority, etc.")
@@ -312,10 +323,10 @@ def create_doc(args):
     payload = {"name": args.name}
     response = requests.post(url, json=payload, headers=HEADERS)
     if response.status_code == 201 or response.status_code == 200:
-        print(f"Doc created successfully.")
+        print(f"Documento creado con éxito.")
         format_output(response.json().get('doc', response.json()), args.format)
     else:
-        print(f"Error creating doc: {response.status_code} - {response.text}")
+        print(f"Error al crear documento: {response.status_code} - {response.text}")
 
 def create_page(args):
     """Create a page in a Doc"""
@@ -560,6 +571,8 @@ def main():
     task_parser.add_argument("--list-id", default=os.getenv("CLICKUP_LIST_ID"), help="List ID. Defaults to CLICKUP_LIST_ID.")
     task_parser.add_argument("--name", required=True, help="Task Name")
     task_parser.add_argument("--description", help="Task Description")
+    task_parser.add_argument("--start-date", help="Start date in MS")
+    task_parser.add_argument("--due-date", help="Due date in MS")
     task_parser.set_defaults(func=create_task)
 
     # Create List
@@ -630,6 +643,7 @@ def main():
     update_task_parser.add_argument("--description", help="New description")
     update_task_parser.add_argument("--priority", help="New priority (1-4)")
     update_task_parser.add_argument("--status", help="New status")
+    update_task_parser.add_argument("--start-date", help="Start date in MS")
     update_task_parser.add_argument("--due-date", help="Due date in MS")
     update_task_parser.set_defaults(func=update_task)
 

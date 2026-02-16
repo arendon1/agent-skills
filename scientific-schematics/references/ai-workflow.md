@@ -1,24 +1,45 @@
-# AI Generation Workflow
+# Scientific Interactive Workflow (v2.3)
 
-## Smart Iterative Refinement
+This document defines the specialized refinement and rendering logic using @context-engineer methodology and the "Shadow Pipeline" for universal compatibility.
 
-The AI generation system uses **smart iteration** - it only regenerates if quality is below the threshold for your document type (Journal, Conference, Poster, etc.).
+## 1. The Decision Matrix
 
-### Workflow Steps
-1.  **Generate**: Nano Banana Pro creates initial image.
-2.  **Review**: Gemini 3 Pro evaluates quality (Accuracy, Clarity, Labels, Layout).
-3.  **Decision**:
-    *   **Score >= Threshold**: STOP (Success).
-    *   **Score < Threshold**: Improve prompt based on critique -> Regenerate.
-4.  **Repeat**: Until threshold met or max iterations reached.
+Depending on the environment and complexity:
 
-### Quality Thresholds
-| Document Type | Threshold |
-| :--- | :--- |
-| **Journal** | 8.5/10 |
-| **Conference** | 8.0/10 |
-| **Poster** | 7.0/10 |
-| **Presentation** | 6.5/10 |
+* **Complex Visuals** (e.g., biological signaling, 3D-like neural nets) → `generate_image`.
+* **Structural Logic** (e.g., flowcharts, system blocks, sequences) → **Mermaid/SVG Fallback**.
 
-### Review Log
-All iterations are saved with a JSON review log (`output_name.json`) containing scores, critiques, and early-stop reasoning.
+## 2. The "Shadow Pipeline" (Automated Fallback Rendering)
+
+To ensure the diagrams are usable even outside of the LLM context, we implement this automation:
+
+1. **Generation**:
+
+    ```mermaid
+    [Agent Logic] --> (.mmd file)
+    ```
+
+2. **Detection**: Agent checks for `node -v` and `npx -v`.
+3. **Rendering**:
+
+    ```bash
+    npx -p @mermaid-js/mermaid-cli mmdc -i input.mmd -o output.svg
+    npx -p @mermaid-js/mermaid-cli mmdc -i input.mmd -o output.png -s 2 -b transparent
+    ```
+
+4. **Cleaning**: The logic ensures no temporary files clutter the root; everything is moved to `./figures/`.
+
+## 3. Multi-Dimensional Rubric (Ref: context-engineer/evaluation.md)
+
+Every audit produces a numeric score based on these weights:
+
+* **Accuracy (30%)**: Correctness of the scientific model.
+* **Clarity (25%)**: Professional spacing and background.
+* **Labels (25%)**: Readability and size.
+* **Logic (20%)**: Flow direction and grouping.
+
+## 4. User Interaction & Hito de Decisión
+
+* **The Checkpoint**: Execution stops after a proposal (Pixel or Vector) is ready.
+* **The Question**: "Is this diagram accurate for your [Doc-Type]? Should I refine the logic or the rendering?"
+* **Centralized Storage**: All files are stored in `/figures/` for easy access.

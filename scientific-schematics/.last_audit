@@ -1,1 +1,15 @@
-2026-02-16
+2026-02-16 - Hybrid System Refactoring
+Status: FULLY COMPLIANT | UNIVERSAL
+Evolution: 
+ - Re-introduced FALLBACK layer (Mermaid/SVG).
+ - Added "Shadow Pipeline" using npx @mermaid-js/mermaid-cli for automated local rendering.
+ - Implemented Node/Npx environment detection logic.
+ - Centralized workspace organization: all visual assets now go into a `/figures/` folder.
+ - Integrated @context-engineer for prompt sharpening and evaluation rubrics.
+ - Added COMPATIBILITY.md for VS Code / Copilot users.
+ 
+Files Added:
+ - scripts/render_diagram.py (Automated CLI rendering)
+ - references/best-practices.md (Styling standards)
+ 
+Audit Signature: Antigravity-Audit-Bot

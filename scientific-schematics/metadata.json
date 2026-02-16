@@ -1,14 +1,17 @@
 {
     "name": "scientific-schematics",
-    "version": "1.0.0",
-    "description": "AI-powered publication-quality scientific diagrams",
-    "author": "arendon1/agent-skills",
-    "category": "visualization",
-    "tags": [
-        "diagrams",
-        "scientific",
-        "ai-generation",
-        "python"
+    "version": "2.0.0",
+    "description": "Scientific diagram generation via Antigravity internal tools",
+    "author": "Antigravity",
+    "capabilities": [
+        "diagram-generation",
+        "visual-review",
+        "scientific-refinement"
     ],
-    "archetype": "cli-reference"
+    "requirements": {
+        "internal_tools": [
+            "generate_image"
+        ],
+        "external_api": "none"
+    }
 }

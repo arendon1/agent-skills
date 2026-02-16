@@ -20,7 +20,9 @@ To use this skill, you must have a ClickUp Personal Access Token (PAT).
     - Generate a new API Token.
 2. **Set environment variable**:
     - Add `CLICKUP_PAT=pk_your_token_here` to your `.env` file.
-    - **Optional - Context Scoping**: Add default IDs to avoid repeating them:
+3. **Install dependencies**:
+    - Run `pip install -r requirements.txt`.
+4. **Optional - Context Scoping**: Add default IDs to avoid repeating them:
 
         ```bash
         CLICKUP_TEAM_ID=...
@@ -34,7 +36,7 @@ To use this skill, you must have a ClickUp Personal Access Token (PAT).
 
 ## ⚡ Features
 
-- **Token Efficient**: Use `--format brief` for concise outputs.
+- **Token Efficient**: Uses `--format brief` by default for concise outputs.
 - **Context Aware**: Auto-loads `.env` from workspace.
 - **Interactive Config**: Run `configure` to set up your defaults.
 

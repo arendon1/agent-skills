@@ -250,18 +250,21 @@ def configure_context(args):
     """Interactive wizard to set up context."""
     # Determine .env path (prioritize CWD)
     target_env = Path.cwd() / '.env'
-    if not target_env.exists():
-        # Fallback to skill root if CWD doesn't have one, or create new one in CWD?
-        # User requested automatic update. Let's stick to the one we loaded if possible, 
-        # or default to CWD for new setups.
-        # Let's check where we loaded from.
-        if (Path.cwd() / '.env').exists():
-            target_env = Path.cwd() / '.env'
-        elif (Path(__file__).parent.parent / '.env').exists():
-            target_env = Path(__file__).parent.parent / '.env'
-        else:
-            target_env = Path.cwd() / '.env' # Default to creating in CWD
     
+    # If arguments are provided, perform non-interactive update
+    if any([args.team_id, args.space_id, args.folder_id, args.list_id]):
+        print(f"Non-interactive configuration 🧙\nUpdating: {target_env}\n")
+        if args.team_id:
+            update_env_file(target_env, "CLICKUP_TEAM_ID", args.team_id)
+        if args.space_id:
+            update_env_file(target_env, "CLICKUP_SPACE_ID", args.space_id)
+        if args.folder_id:
+            update_env_file(target_env, "CLICKUP_FOLDER_ID", args.folder_id)
+        if args.list_id:
+            update_env_file(target_env, "CLICKUP_LIST_ID", args.list_id)
+        print("\nConfiguration updated! 🚀")
+        return
+
     print(f"Configuration Wizard 🧙\nSaving to: {target_env}\n")
 
     # 1. Select Team
@@ -310,12 +313,16 @@ def configure_context(args):
 
 def main():
     parser = argparse.ArgumentParser(description="ClickUp Manager CLI - Token Efficient")
-    parser.add_argument("--format", choices=['json', 'brief'], default='json', help="Output format")
+    parser.add_argument("--format", choices=['json', 'brief'], default='brief', help="Output format (default: brief)")
     
     subparsers = parser.add_subparsers(dest="command", help="Command to operations")
 
     # Configure
     config_parser = subparsers.add_parser("configure", help="Interactive setup wizard")
+    config_parser.add_argument("--team-id", help="Set CLICKUP_TEAM_ID")
+    config_parser.add_argument("--space-id", help="Set CLICKUP_SPACE_ID")
+    config_parser.add_argument("--folder-id", help="Set CLICKUP_FOLDER_ID")
+    config_parser.add_argument("--list-id", help="Set CLICKUP_LIST_ID")
     config_parser.set_defaults(func=configure_context)
 
     # List Teams

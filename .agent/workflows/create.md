@@ -12,20 +12,17 @@ description: Interactive scaffolding of a new skill from a vague idea
      - **Archetype**: Is it a CLI Reference, Methodology, Safety Tool, or Orchestration skill?
      - **Logic**: What parts require Python/Node scripts vs. LLM reasoning?
 
-2. **Conceptual Blueprinting with @[context-engineer]**
-   - Once the idea is solid, use `@context-engineer/references/fundamentals.md` and `tools.md` to design the system.
-   - Output a "Skill Design Spec" including:
-     - **Name**: `[a-z0-9-]+` compliant name.
-     - **Description**: Target <1024 chars, focusing on trigger phrases.
-     - **Resource Plan**: List of required scripts in `scripts/` and docs in `references/`.
+2. **Synthesize Scaffolding Manifest with @[context-engineer]**
+   - Once the user's idea is refined, use `@context-engineer/references/fundamentals.md` and `tools.md` to design the system.
+   - Craft a specialized "Scaffolding Prompt" for `@skill-mastery` that includes:
+     - **Architecture Spec**: Defining high-level logic vs. reference documentation.
+     - **Interface Design**: Suggested `description` (trigger-rich) and tool usage.
+     - **Resource Requirements**: Identifying necessary `scripts/` and `references/`.
 
-3. **Scaffolding with @[skill-mastery]**
-   - Use the `skillfish init` pattern described in `@[skill-mastery]` to create the directory at the workspace root.
-   - **Structure**:
-     - `{{skill-name}}/SKILL.md` (Core instructions with Token Loading Hierarchy Level 2).
-     - `{{skill-name}}/scripts/` (Logic/Automation).
-     - `{{skill-name}}/references/` (Deep-dive documentation).
-     - `{{skill-name}}/examples/` (Concrete usage samples).
+3. **Execute Scaffolding with @[skill-mastery]**
+   - Pass the synthesized manifest to the `skill-mastery` logic.
+   - Use the `skillfish init` pattern to create the directory structure at the workspace root.
+   - **Compliance Enforcement**: Ensure strict adherence to the Level 1-3 Token Hierarchy and frontmatter rules.
 
 4. **Security & Compliance Check**
    - Ensure `SKILL.md` includes explicit safety guardrails if the skill performs destructive actions.

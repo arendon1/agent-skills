@@ -10,18 +10,17 @@ description: Improve or implement a skill with token efficiency and compliance t
    - Inspect existing `SKILL.md` (if any), `scripts/`, and `references/`.
    - Identify if this is a "basic" definition that needs full implementation or an existing skill needing optimization.
 
-2. **Architectural Blueprinting with @[context-engineer]**
+2. **Synthesize Improvement Manifest with @[context-engineer]**
    - Reference `context-engineer/references/project-development.md` and `evaluation.md`.
-   - Generate a "Skill Improvement Blueprint" that focuses on:
-     - **Decomposition**: Identifying logic that should be moved from `SKILL.md` to `scripts/` to save tokens.
-     - **Progressive Disclosure**: Identifying detailed documentation to move to `references/`.
-     - **Dependency Strategy**: Defining how the skill will manage its own requirements (OS dependencies, Python/Node packages).
+   - Craft a specialized "Improvement Prompt" for `@skill-mastery` that includes:
+     - **Refactoring Goals**: Specific patterns for moving logic from `SKILL.md` to `scripts/`.
+     - **Token Targets**: Goals for reducing context overhead.
+     - **Dependency Requirements**: Instructions on how the skill should self-manage environment setup.
 
-3. **Compliance & Mastery Audit with @[skill-mastery]**
-   - Evaluate against the `skill-mastery` specification:
-     - **Metadata**: Ensure name and description follow the 1024-character limit and third-person trigger rules.
-     - **Hierarchy**: Validate compliance with the Levels 1-3 Token Loading Hierarchy.
-     - **Skillfish**: Ensure it can be installed via `skillfish add owner/repo`. Check for root `SKILL.md` or proper subdirectory structure.
+3. **Execute Refactoring with @[skill-mastery]**
+   - Pass the synthesized manifest to the `skill-mastery` logic.
+   - Evaluate the baseline against the specification and apply the refactoring guidelines.
+   - **Compliance Check**: Ensure metadata (name/description) and hierarchy load levels align with mastery standards.
 
 4. **Implementation Plan Presentation**
    - Present the summarized blueprint to the user.

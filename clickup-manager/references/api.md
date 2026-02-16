@@ -1,0 +1,121 @@
+# ClickUp API Reference
+
+## Authentication
+
+All requests must include the `Authorization` header with your Personal Access Token (PAT).
+
+Header format:
+`Authorization: pk_<your_token>`
+
+## Base URL
+
+`https://api.clickup.com/api/v2`
+
+## Endpoints
+
+### Get Authorized Teams (Workspaces)
+
+`GET /team`
+
+Returns the Workspaces available to the authenticated user.
+
+Response:
+
+```json
+{
+  "teams": [
+    {
+      "id": "1234",
+      "name": "My Workspace",
+      ...
+    }
+  ]
+}
+```
+
+### Get Spaces
+
+`GET /team/{team_id}/space?archived=false`
+
+Returns the Spaces available in a Workspace.
+
+Response:
+
+```json
+{
+  "spaces": [
+    {
+      "id": "5678",
+      "name": "Dev Space",
+      ...
+    }
+  ]
+}
+```
+
+### Get Folders
+
+`GET /space/{space_id}/folder?archived=false`
+
+Returns the Folders in a Space.
+
+Response:
+
+```json
+{
+  "folders": [
+    {
+      "id": "9012",
+      "name": "Sprints",
+      ...
+    }
+  ]
+}
+```
+
+### Get Lists
+
+`GET /folder/{folder_id}/list?archived=false`
+
+Returns the Lists in a Folder.
+
+Response:
+
+```json
+{
+  "lists": [
+    {
+      "id": "3456",
+      "name": "Sprint 1",
+      ...
+    }
+  ]
+}
+```
+
+### Create Task
+
+`POST /list/{list_id}/task`
+
+Body:
+
+```json
+{
+  "name": "Task Name",
+  "description": "Task Description",
+  "assignees": [123],
+  "status": "Open",
+  "priority": 3,
+  "due_date": 1508369194377
+}
+```
+
+Response:
+
+```json
+{
+  "id": "task_id",
+  "name": "Task Name",
+  ...
+}
+```

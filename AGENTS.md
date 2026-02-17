@@ -20,6 +20,7 @@ This repository is a **Centralized Skill Hub** designed to be mounted as a works
 - **@[git-master]**: Advanced git workflows and commit generation.
 - **@[markitdown]**: Converts various file formats to Markdown.
 - **@[scientific-schematics]**: Generates diagrams and schematics (Mermaid, SVG).
+- **@[stitch-ui-generator]**: (New) AI-powered UI generation via Google Stitch API (HTML/jQuery focus).
 
 ### Research & Information
 

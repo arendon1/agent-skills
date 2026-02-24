@@ -16,23 +16,23 @@ Allows LLM agents to manage ClickUp projects by interacting with the ClickUp API
 To use this skill, you must have a ClickUp Personal Access Token (PAT).
 
 1. **Get your PAT**:
-    - Go to ClickUp Settings -> Apps.
-    - Generate a new API Token.
+   - Go to ClickUp Settings -> Apps.
+   - Generate a new API Token.
 2. **Set environment variable**:
-    - Add `CLICKUP_PAT=pk_your_token_here` to your `.env` file.
+   - Add `CLICKUP_PAT=pk_your_token_here` to your `.env` file.
 3. **Install dependencies**:
-    - Run `pip install -r requirements.txt`.
+   - Run `pip install -r requirements.txt`.
 4. **Optional - Context Scoping**: Add default IDs to avoid repeating them:
 
-    ```bash
-    CLICKUP_TEAM_ID=...
-    CLICKUP_SPACE_ID=...
-    CLICKUP_FOLDER_ID=...
-    CLICKUP_LIST_ID=...
-    ```
+   ```bash
+   CLICKUP_TEAM_ID=...
+   CLICKUP_SPACE_ID=...
+   CLICKUP_FOLDER_ID=...
+   CLICKUP_LIST_ID=...
+   ```
 
-    - This allows you to run commands like `clickup_client.py list-tasks` without specifying the list ID every time.
-    - This ensures your token is secure and not committed to git.
+   - This allows you to run commands like `clickup_client.py list-tasks` without specifying the list ID every time.
+   - This ensures your token is secure and not committed to git.
 
 ## ⚡ Features
 
@@ -105,14 +105,25 @@ python scripts/clickup_client.py --format brief list-tasks --list-id <LIST_ID> -
 python scripts/clickup_client.py get-task --task-id <TASK_ID>
 ```
 
-### Create Task
+### Create Task (Natural Dates Supported)
+
+You can use numeric Epoch MS or human-readable dates (`DD/MM/YYYY`). Due dates default to 23:59:59.
 
 ```bash
-python scripts/clickup_client.py create-task --list-id <LIST_ID> --name "Task Name" --description "Task details"
+python scripts/clickup_client.py create-task --list-id <LIST_ID> --name "Task Name" --due-date "28/02/2026"
+```
+
+### Bulk Create Tasks
+
+Create multiple tasks from a JSON file.
+
+```bash
+# JSON format: [{"name": "Task 1", "due_date": "01/03/2026"}, {"name": "Task 2"}]
+python scripts/clickup_client.py bulk-create --list-id <LIST_ID> --file tasks.json
 ```
 
 ### Update Task
-  
+
 ```bash
 # Update multiple fields at once
 python scripts/clickup_client.py update-task --task-id <TASK_ID> --priority 1 --status "Doing" --description "New description"

@@ -8,13 +8,17 @@ from pathlib import Path
 def check_command(cmd):
     return shutil.which(cmd) is not None
 
-def run_mermaid_cli(input_file, output_prefix, theme="default"):
+def run_mermaid_cli(input_file, output_prefix, theme="neutral"):
     """
     Renders a mermaid file to SVG and PNG using npx.
     """
     try:
         # Use shell=True for Windows compatibility with npx
         is_windows = os.name == 'nt'
+        
+        # Ensure output directory exists
+        output_prefix_path = Path(output_prefix)
+        output_prefix_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 1. Render SVG
         svg_output = f"{output_prefix}.svg"
@@ -47,7 +51,7 @@ def main():
 
     input_file = Path(sys.argv[1])
     output_prefix = sys.argv[2]
-    theme = sys.argv[3] if len(sys.argv) > 3 else "default"
+    theme = sys.argv[3] if len(sys.argv) > 3 else "neutral"
 
     if not input_file.exists():
         print(f"[!] Input file {input_file} not found.")

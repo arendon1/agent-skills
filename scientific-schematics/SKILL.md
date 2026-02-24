@@ -11,60 +11,74 @@ metadata:
 allowed-tools: [generate_image, view_file, list_dir, write_to_file, run_command]
 ---
 
-# Scientific Schematics (Hybrid-Native)
+# Scientific Schematics (Mermaid-Native)
 
-**Expert-level scientific visualization with universal fallback automation.**
+**Precision scientific visualization focusing on structural accuracy and universal accessibility.**
 
-## 🧠 Brain-Power: @context-engineer Integration
+## 🧠 Brain-Power: Structural Visualization
 
-This skill applies "Signal-to-Noise" engineering to all diagrams:
+This skill prioritizes **Structural Code** (Mermaid) over raster images to ensure transparency, reproducibility, and high fidelity in technical environments.
 
-1. **Prompt Sharpening**: Structured manifests for `generate_image`.
-2. **Logic-First Fallback**: If pixels aren't an option, we use **Structural Code** (Mermaid/SVG).
+1. **Logic-First**: We use the appropriate Mermaid diagram for the scientific concept.
+2. **Hybrid Fallback**: `generate_image` is reserved for complex organic textures or artistic renderings that lack a structural schema.
 
 ## 🔄 The Master Workflow (Interactive)
 
-### Case A: Native Environment (Antigravity with Tools)
+### Case A: Structural Blueprint (Primary)
 
-1. **Generate**: I use `generate_image` for a high-fidelity proposal.
-2. **Audit**: Supervisor-eval against 4 dimensions (Accuracy, Clarity, Labels, Geometry).
-3. **Refine**: Auto-correction for scores < 8.5 (Journal).
-4. **Hito de Decisión**: Presentation to User for approval.
+When the concept can be modeled as a flow, hierarchy, or interaction:
 
-### Case B: Fallback Environment (VS Code / Copilot / CLI)
+1. **Selection**: Choose the optimal Mermaid type (see 📊 Mermaid Capability Map).
+2. **Generation**: I generate valid Mermaid.js code with scientific themes.
+3. **Shadow Pipeline (Zero-Configuration Rendering)**:
+    * Code saved to `figures/[name].mmd`.
+    * **Auto-Render**: I run `npx @mermaid-js/mermaid-cli` to generate **SVG** (Journal) and **PNG** (Presentation).
+4. **Validation**: I verify syntax and visual hierarchy.
 
-When visual tools are absent or Mermaid is preferred:
+### Case B: High-Fidelity Artistic Proposals (Secondary)
 
-1. **Mermaid Coding**: I generate valid Mermaid.js code with academic themes.
-2. **Shadow Pipeline (Zero-Configuration Rendering)**:
-    * I save the code to `figures/[name].mmd`.
-    * **Auto-Render**: I attempt to run `npx @mermaid-js/mermaid-cli` to generate **SVG** and **PNG** files automatically.
-    * **Organization**: Everything is organized in a centralized `figures/` directory within your workspace.
-3. **Manual Verification**: If Node/Npx is missing, I guide you to use VS Code's native Mermaid preview.
+When Mermaid cannot represent the complexity (e.g., a realistic anatomical heart):
+
+1. **Prompt Sharpening**: Structured manifests for `generate_image`.
+2. **Generation**: Create an image and store it in `figures/[name].png`.
+3. **Audit**: Evaluation against Accuracy and Clarity.
+
+## 📊 Mermaid Capability Map (Scientific Context)
+
+| Diagram Type | Best for... | Example |
+| :--- | :--- | :--- |
+| **Flowchart (graph TD)** | Decision trees, mechanisms, experimental protocols. | Enzyme-substrate interactions. |
+| **Sequence Diagram** | Cascades, signal transduction, multi-step protocols. | Phototransduction pathway. |
+| **Class Diagram** | Ontologies, taxonomies, data structures. | Phylogenetic trees or software architecture. |
+| **ER Diagram** | Relational data, chemical bonds, networks. | Metabolic network relationships. |
+| **State Diagram** | Cycle transitions, phase changes. | Cellular cycle or phase transitions. |
+| **Gantt / Timeline** | Study durations, historical milestones. | Clinical trial stages. |
+| **Mindmap** | Brainstorming, conceptual mapping. | Research field breakdown. |
+| **XY / Sankey** | Trends, resource/energy flux. | Energy distribution in ecosystems. |
+| **Block Diagram** | Modular architectures, lab setups. | Signal processing blocks. |
 
 ## 🏢 Workspace Organization
 
-All outputs follow this structure:
+Outputs should be placed in the project's target directory (e.g., `docs/assets/` or `assets/diagrams/`) to maintain context.
 
 ```text
-workspace/
-├── figures/                # Centralized directory for visuals
-│   ├── [name].mmd          # Source Mermaid code
-│   ├── [name].svg          # Vector output (for Journals)
-│   ├── [name].png          # Raster output (for Presentations)
+[project-root]/
+├── [target-dir]/            # Specified by task context
+│   ├── [name].mmd          # Source Mermaid code (Editable)
+│   ├── [name].svg          # Vector output (Publish Ready)
+│   ├── [name].png          # Raster output (Static)
 │   └── [name]_log.json     # Review & Metadata log
 ```
 
 ## 📊 Document Quality Standards
 
-| Type | Target Score | Logic |
+| Type | Target | Logic |
 | :--- | :--- | :--- |
-| **Journal** | 8.5+ | Peer-review ready. SVG preferred. High accuracy. |
-| **Conference** | 8.0+ | High clarity, transparent PNGs, professional palette. |
-| **Poster** | 7.0+ | Visual impact and readability at scale. |
-| **Presentation** | 6.5+ | Bold labels, high contrast for screen displays. |
+| **Journal** | 9.0+ | SVG required. Zero ambiguity. Structural accuracy over aesthetics. |
+| **Technical** | 8.0+ | High contrast, clear labels, academic palette (`--theme neutral`). |
 
-## 🌟 Guidelines for Antigravity (Supervisor)
+## 🌟 Guidelines for Antigravity
 
-* **Node Detection**: Always check if `node` and `npx` are available before attempting CLI rendering.
-* **Theme Injection**: Always inject `--theme default` or `--theme neutral` for scientific diagrams to avoid "noisy" default colors.
+* **Output Flex**: Prefer absolute paths or paths relative to the project root for outputs.
+* **Theme Enforcement**: Use `--theme neutral` as the default for scientific clarity.
+* **Node Detection**: Check for `node` and `npx` before rendering. If missing, provide the .mmd code for the user's VS Code preview.

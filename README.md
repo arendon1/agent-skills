@@ -1,39 +1,45 @@
 # LLM Agent Skills Repository
 
-This repository is a dynamic, evolving collection of skills for LLM-based agents (e.g., Claude, Gemini). These skills provide structured knowledge, workflows, and tools designed to enhance agent capabilities across various domains.
+This repository is a **Dynamic Orchestration Hub** for LLM-based agents. It is designed to host a modular, evolving collection of "Superpowers"—structured knowledge bases and deterministic toolsets that enable agents to perform complex, domain-specific tasks with high reliability and low token overhead.
 
-## 📂 Repository Structure
+## 🧠 Core Philosophy: The Skill-Forge Logic
 
-The skills are organized as independent modules at the root of the repository. Each skill follows a standardized format to ensure consistency and efficiency:
+The repository operates on the principle that AI agents are most effective when they follow a **Discovery-to-Execution** lifecycle, rather than having all context loaded at once.
 
-- **Modular Design:** Skills are categorized by function (e.g., version control, orchestration, file conversion).
-- **Direct Access:** Each subdirectory contains a `SKILL.md` file that serves as the entry point and primary instruction set for that specific capability.
-- **Dynamic Collection:** This repository integrates and removes skills based on evolving requirements and best practices. Explore the directories to see the current available toolset.
+### 1. Token-Efficient Hierarchy
 
-## 🚀 Getting Started
+To prevent context rot, the repository uses a tiered loading system:
 
-To use these skills with your AI agent:
+- **Global Indexing:** Agents first discover skills by listing directories or reading high-level summaries (`AGENTS.md`). Only the `name` and `description` are exposed initially.
+- **Progressive Disclosure:** Full instructions (`SKILL.md`) are only loaded once an agent determines a high alignment (e.g., >1% relevance) with the current task.
+- **Deep Context:** Massive documentation or specific schemas reside in `references/` or `resources/`, loaded only when the agent needs specific technical details.
 
-1. **Locate the Skill:** Navigate to the folder of the skill you wish to use.
-2. **Read the Instructions:** Open the `SKILL.md` file (and any reference files in `references/`) to understand the skill's capabilities and commands.
-3. **Load the Skill:** Provide the content of the skill files to your agent's context or configuration system.
+### 2. Deterministic Tooling vs. Probabilistic Reasoning
 
-## 🛠️ Creating New Skills
+Whenever possible, heavy logic is offloaded to Python scripts within each skill's `scripts/` directory. This ensures:
 
-We follow the **Skill Mastery** standard for all new additions. Please refer to [`skill-mastery/SKILL.md`](skill-mastery/SKILL.md) for detailed instructions on:
+- **Reliability:** The LLM manages the workflow; the code handles the execution.
+- **Consistency:** Complex operations (like file conversions or API syncs) follow a repeatable path regardless of the model's "mood."
 
-- **Structure:** Keeping `SKILL.md` concise (<500 lines) and using `references/` for detailed content.
-- **Format:** Using strict YAML frontmatter and clear markdown sections.
-- **Efficiency:** Optimizing for token usage and agent comprehension.
+### 3. The "Skill Forge" Standard
 
-## 🤝 Contributing
+New capabilities are added following the **Skill Forge** doctrine:
 
-Contributions are welcome! If you have a new skill to share or an improvement for an existing one:
+- **Audit-First:** Every skill must pass structural and security audits before deployment.
+- **TDD Optimization:** Descriptions and instructions are iteratively refined using trigger-evaluation scripts to ensure agents know exactly *when* to invoke the skill.
 
-1. Fork the repository.
-2. Create a new branch for your feature.
-3. Ensure your changes align with the `skill-mastery` guidelines.
-4. Submit a Pull Request.
+## 🛠️ Repository Mechanics
+
+### For Agents
+
+1. **Explore:** Use `list_dir` to see available folders. Folders are named after the capability.
+2. **Evaluate:** Read only the YAML frontmatter of a candidate skill to verify its trigger conditions.
+3. **Execute:** Follow the `SKILL.md` instructions, prioritizing the use of provided CLI tools or scripts.
+
+### For Developers
+
+- **Modularity:** Skills are self-contained. Deleting a directory removes the capability without breaking the repo's core orchestration.
+- **Slash Workflows:** Use project-level commands (`/skill-create`, `/skill-audit`) to scaffold and validate skills. These scripts handle the heavy lifting of repository maintenance.
 
 ---
-*Empowering AI agents with structured knowledge.*
+*Empowering AI agents through structured, deterministic capabilities.*

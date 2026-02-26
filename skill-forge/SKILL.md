@@ -47,15 +47,25 @@ Use this workflow to optimize a skill that is under-triggering or logically flaw
 
 ### 3. `/skill-audit` (Validation and Security)
 
-Use this workflow before finalizing and deploying a skill.
+Use this workflow before finalizing a skill.
 
-- **Behind the scenes**: It runs `scripts/validate_and_package.py`.
+- **Behind the scenes**: It runs `scripts/validate_and_audit.py`.
 - **What it checks**:
   - `SKILL.md` length (<500 lines).
   - Third-party prompt formatting ("Use when...").
   - Reference folder depth (max 1 level deep).
   - **Security Scan**: Statically analyzes `scripts/` for obvious bad practices (e.g., unfiltered `os.system()`, `eval()`).
-- **Next steps**: Retrieve the generated `.skill` archive from the `dist/` directory.
+
+### 4. `/skill-package` (Distribution)
+
+Use this workflow to zip one or many skills for sharing or distribution.
+
+- **Behind the scenes**: It runs `scripts/package_skills.py`.
+- **Functionality**:
+  - Packages the entire skill directory into a `.skill` (ZIP) format.
+  - Supports multiple skill paths at once.
+  - Automatically excludes junk like `__pycache__` and `.git`.
+- **Result**: Retrieve the generated archives from the `dist/` directory.
 
 ## Required Skill Frontmatter
 

@@ -4,47 +4,29 @@ This file serves as a high-level index for AI agents to understand the purpose a
 
 ## 🤖 Repository Purpose
 
-This repository is a **Centralized Skill Hub** designed to be mounted as a workspace where an agent can discover, learn, and execute specialized capabilities. It follows the **Skill Mastery** specification for token efficiency and progressive disclosure.
+This repository is a **Centralized Skill Hub** designed to be mounted as a workspace where an agent can discover, learn, and execute specialized capabilities. It follows the **Skill Forge** specification for token efficiency and progressive disclosure.
 
 ## 🎯 Primary Skills (Core Orchestration)
 
-- **@[skill-mastery]**: The "Source of Truth" for skill development. Use this to validate or build other skills.
+- **@[skill-forge]**: The definitive "Source of Truth" for skill development. Use this to scaffold, optimize via TDD loops, and audit skills for structural compliance.
 - **@[context-engineer]**: Expert in context management, evaluation rubrics, and system design.
 - **@[agent-orchestration]**: Manages multi-agent handoffs and complex task decomposition.
 
-## 🛠️ Functional Skill Categories
+## 🛠️ Capability Domains
 
-### Development & Tools
+The repository contains functional skills organized into broad domains. These folders appear and disappear based on current requirements:
 
-- **@[python-uv]**: Fast Python package and project management.
-- **@[git-master]**: Advanced git workflows and commit generation.
-- **@[markitdown]**: Converts various file formats to Markdown.
-- **@[scientific-schematics]**: Generates diagrams and schematics (Mermaid, SVG).
-- **@[stitch-ui-generator]**: (New) AI-powered UI generation via Google Stitch API (HTML/jQuery focus).
-
-### Research & Information
-
-- **@[deep-research]**: Comprehensive web and codebase exploration.
-- **@[notebooklm-skill]**: Integration with NotebookLM for deep content synthesis.
-- **@[google-ai-mode-skill]**: Specialized patterns for Google AI models.
-
-### Office & Automation
-
-- **@[office]**: Handling Word, Excel, and PowerPoint automation.
-- **@[clickup-manager]**: Project management and task tracking via ClickUp.
-- **@[monday-course-manager]**: Course and task management via Monday.com.
-- **@[moodle-navigator]**: Navigation and interaction with Moodle LMS.
-
-### Specialized
-
-- **@[academic-author]**: Scholarly writing and bibliography management (Typst, BibLaTeX).
+- **Development & Tools**: Python (uv/ruff) environments, advanced Git workflows, and build automation.
+- **Data & Conversion**: MarkItDown, PDF processing, and spreadsheet (xlsx) manipulation.
+- **Research & Synthesis**: Deep web research, codebase exploration, and specialized AI model tuning.
+- **Office & Automation**: ClickUp management, LMS navigation (Moodle), and document generation (docx/pptx).
 
 ## 🚀 Consumption Guidelines
 
-1. **Selection**: Read the `description` in the directory's frontmatter to decide if a skill is relevant.
-2. **Loading**: Trigger the skill by reading its root `SKILL.md`.
-3. **Execution**: Prefer using scripts in `scripts/` over raw LLM reasoning for repetitive or complex logic to minimize token costs and ensure reliability.
-4. **Validation**: Use `/audit` to verify skill compliance.
+1. **Discovery**: Use `list_dir` on the repository root to see the current available capability folders.
+2. **Alignment**: Read the frontmatter of a skill's `SKILL.md` to verify it matches your current task requirements.
+3. **Execution**: Follow the instruction logic inside the skill. Prioritize using the Python scripts in `scripts/` to ensure deterministic results.
+4. **Validation**: Use `/skill-audit` to verify a skill's compliance before relying on its output.
 
 ---
 *Created for autonomous and semi-autonomous AI agents.*

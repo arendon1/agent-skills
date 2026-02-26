@@ -4,7 +4,6 @@ from pathlib import Path
 # The standard directories where AI agents look for workflow/rule context
 TARGET_WORKFLOW_DIRS = [
     ".agents/workflows",
-    "agents/workflows",
     ".cursor/rules",
     ".github/workflows",
     ".gemini/workflows",
@@ -26,10 +25,19 @@ description: Validate a skill's token efficiency, check structural compliance, a
 ---
 ## Auditing a Skill
 
-1. **Invoke Validation**: Run `python {forge_script_dir}/validate_and_package.py <path-to-skill>`
+1. **Invoke Validation**: Run `python {forge_script_dir}/validate_and_audit.py <path-to-skill>`
 2. **Review Violations**: The script will check if `SKILL.md` is over 500 lines, if references are nested too deeply, or if the description misses the "Use when..." directive.
-3. **Security Scan**: The validation also statically analyzes the `scripts/` directory for obvious bad security practices, exploits, or malware before allowing the packaging.
-4. **Package Distribution**: If validation passes, retrieve the generated `.skill` archive for distribution via skillfish.
+3. **Security Scan**: The validation also statically analyzes the `scripts/` directory for obvious bad security practices, exploits, or malware.
+""",
+    "skill-package": """---
+description: Zip one or many skills for sharing or distribution
+---
+## Packaging Skills
+
+1. **Identify Skills**: Collect the directory paths of the skills you want to package.
+2. **Execute Packaging**: Run `python {forge_script_dir}/package_skills.py <path-to-skill1> [path-to-skill2] ...`
+3. **Optional Output**: You can specify an output directory with `--out <dir>`.
+4. **Collect Artifacts**: The scripts will generate `.skill` (ZIP) files in the `dist/` folder (or your specified output dir).
 """,
     "skill-improve": """---
 description: Execute Test-Driven Development loops to optimize a skill's description and test its agentic compliance against baselines

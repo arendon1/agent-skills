@@ -24,9 +24,35 @@ metadata:
 | `references/structured_data.md` | CSV, JSON, XML to Markdown tables |
 | `references/advanced_integrations.md` | Azure Doc Intelligence & LLM Image descriptions |
 
+## ⚙️ Setup & Validation
+
+Before using MarkItDown, you MUST ensure the environment is correctly configured. This repository uses **Deterministic Tooling** to manage dependencies.
+
+**Run the validation script:**
+
+```bash
+python scripts/ensure_markitdown.py
+```
+
+This script will:
+
+1. Check for an existing global installation.
+2. Check for the package in your current Python environment.
+3. If missing, automatically create a `.venv` and install `markitdown[all]` using `uv`.
+
 ## 🚀 Quick Start
 
-**Basic Conversion:**
+**Using the CLI (Preferred):**
+
+```bash
+# If using a local venv created by the setup script
+uv run markitdown document.pdf -o output.md
+
+# Or directly if in PATH
+markitdown document.pdf -o output.md
+```
+
+**Python Usage:**
 
 ```python
 from markitdown import MarkItDown
@@ -35,30 +61,12 @@ result = md.convert("document.pdf")
 print(result.text_content)
 ```
 
-**Command Line:**
+## 📦 Manual Installation
 
-```bash
-markitdown document.pdf -o output.md
-```
-
-**YouTube Transcript:**
-
-```python
-result = md.convert("https://youtube.com/watch?v=VIDEO_ID")
-```
-
-## 📦 Installation
-
-**Full installation:**
+While the `ensure_markitdown.py` script is preferred, you can install manually using `uv`:
 
 ```bash
 uv pip install 'markitdown[all]'
 ```
 
-**Modular installation:**
-
-```bash
-uv pip install 'markitdown[pdf]'    # PDF
-uv pip install 'markitdown[docx]'   # Word
-uv pip install 'markitdown[audio]'  # Audio
-```
+*Note: For Windows users, 'uv' is the recommended package manager for speed and reliability.*

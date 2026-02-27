@@ -1,4 +1,3 @@
-import os
 import sys
 from pathlib import Path
 
@@ -12,6 +11,7 @@ description: >-
   Use when [trigger phrases, contexts, file types].
 metadata:
   version: "1.0.0"
+  language: en # alternatives: es-CO
   trit: 0
   risk_tier: CAUTION
 ---

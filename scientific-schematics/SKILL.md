@@ -2,13 +2,12 @@
 name: scientific-schematics
 description: >-
   Advanced scientific diagram generator with AI-native iterative refinement.
-  Includes a Hybrid Rendering Fallback (SVG/PNG) for non-visual environments (VS Code/Copilot).
-  Integrates @context-engineer logic for high-fidelity technical visualization.
+  Use when creating Mermaid diagrams, scientific schematics, or technical visualizations.
 license: Apache-2.0
 metadata:
   version: "2.3.0"
+  language: en
   author: Antigravity
-allowed-tools: [generate_image, view_file, list_dir, write_to_file, run_command]
 ---
 
 # Scientific Schematics (Mermaid-Native)

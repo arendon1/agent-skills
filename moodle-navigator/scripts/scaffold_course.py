@@ -147,7 +147,9 @@ def scaffold(
             links = json.loads(sitemap_data)
             for item in links:
                 url = force_download_url(item["url"])
-                initial_sitemap.append(f"- [{item['name']}]({url})")
+                level = item.get("level", 0)
+                indent = "  " * level
+                initial_sitemap.append(f"{indent}- [{item['name']}]({url})")
         except Exception:
             pass
 

@@ -4,8 +4,8 @@ description: Modern Python development with uv (10-100x faster package manager) 
 license: Apache-2.0
 metadata:
   version: "1.0.0"
+  language: en
   author: agent-builder
-compatibility: Requires uv and ruff installed
 ---
 
 # UV & Ruff: Modern Python Development Tools

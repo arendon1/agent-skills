@@ -1,9 +1,11 @@
 ---
 name: context-engineer
 description: >-
-  Expert on AI context engineering, agent architecture, and system design.
-  Use when designing agents, debugging context issues, optimizing token usage,
-  or structuring multi-agent systems.
+  Designs, optimizes, and debugs AI agent systems by managing context effectively.
+  Use when planning agent architectures, debugging context limits, or optimizing prompt performance.
+metadata:
+  version: "1.0.0"
+  language: en
 ---
 
 # Context Engineering Expert

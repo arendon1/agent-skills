@@ -1,1 +1,6 @@
-
+.agents/
+.cursor/
+.gemini/
+.github/
+.vibecheck/
+.vscode/

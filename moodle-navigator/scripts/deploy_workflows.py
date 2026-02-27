@@ -23,11 +23,12 @@ description: auto inicializar un curso de Moodle capturando metadatos profundos
 
 1. **Descubrimiento (Opcional)**: Si no tienes el enlace, ve a `my/courses.php`.
 2. **Navegar al Curso Seleccionado**: Ve a la página principal del curso.
-3. **Extraer Datos Profundos**: Identifica PGA, Cronograma y Docente.
-4. **Heurística de Teams (Seguridad)**: Valida que los enlaces del cronograma apunten directamente a `teams.microsoft.com`. Por seguridad, **NO navegues ni captures** links que sean redirecciones de Moodle o acortadores. Si no es directo, busca un link válido en la introducción o marca como `[PENDIENTE]`.
-5. **Ejecutar Scaffolding**:
+3. **Extraer Datos Profundos**: Identifica PGA, Cronograma y Docente. Al navegar por secciones, si encuentras recursos tipo "Página" o "Contenido Interactivo H5P", explóralos para extraer enlaces de videos de YouTube incrustados.
+4. **Heurística de YouTube & H5P**: Crea un proxy HTML local para los H5P en `Unidad-X/materiales/`. Los recursos H5P DEBEN registrarse como **[Interactivo]** en el `sitemap.md` apuntando a dicho archivo HTML. Los videos hijos deben ir con sangría debajo de su recurso padre. En H5P, recorre las diapositivas para asegurar la captura completa.
+5. **Heurística de Teams (Seguridad)**: Valida que los enlaces del cronograma apunten directamente a `teams.microsoft.com`. Por seguridad, **NO navegues ni captures** links que sean redirecciones de Moodle o acortadores. Si no es directo, busca un link válido en la introducción o marca como `[PENDIENTE]`.
+6. **Ejecutar Scaffolding**:
    Run `python {skill_dir}/scripts/scaffold_course.py "[Nombre]" "[URL]" ...`
-6. **Poblar y Verificar Archivos**: Revisa `AGENTS.md` y `sitemap.md`. Es **CRÍTICO** que edites manualmente `AGENTS.md` para asegurarte de que ningún campo se quede con la plantilla `[PENDIENTE]`. Inserta la información faltante si el script no pudo hacerlo de forma automática.
+7. **Poblar y Verificar Archivos**: Revisa `AGENTS.md` y `sitemap.md`. Es **CRÍTICO** que edites manualmente `AGENTS.md` para asegurarte de que ningún campo se quede con la plantilla `[PENDIENTE]`. Inserta la información faltante si el script no pudo hacerlo de forma automática.
 """,
         "curso-sync": """---
 description: sincronizar curso, generar sitemap y navegar mediante enlaces permanentes
@@ -35,11 +36,12 @@ description: sincronizar curso, generar sitemap y navegar mediante enlaces perma
 ## Sincronización y Bloqueo de Navegación
 
 1. **Extracción de Barra Lateral (Mandatorio)**: Navega al curso, expande la barra lateral y recorre CADA unidad/sección para extraer su enlace directo. **IMPORTANTE**: Para enlaces de archivos (`pluginfile.php`), añade siempre `?forcedownload=1` para asegurar la descarga directa.
-2. **Formación de Sitemap**: Actualiza `sitemap.md` con estos enlaces en la sección `## 🌐 Moodle Sections`.
-3. **Descarga desde Sitemap**: Navega ÚNICAMENTE a través de los enlaces del sitemap para descargar materiales y organizarlos en `Unidad-X/materiales/`.
-4. **Ejecutar Tooling**:
+2. **Exploración de Páginas, H5P y Videos**: Visita los recursos tipo "Página" y "Contenido Interactivo H5P" para extraer enlaces de videos de YouTube. En H5P, navega por las diapositivas y CREA el proxy de Embed HTML.
+3. **Formación de Sitemap**: Actualiza `sitemap.md` con los enlaces en `## 🌐 Moodle Sections`. Etiqueta los H5P como **[Interactivo]** apuntando al HTML local creado. Los videos deben ir con sangría debajo.
+4. **Descarga desde Sitemap**: Navega ÚNICAMENTE a través de los enlaces del sitemap para descargar materiales y organizarlos en `Unidad-X/materiales/`.
+5. **Ejecutar Tooling**:
    Run `python {skill_dir}/scripts/sync_course.py "[Ruta del Curso]"`
-5. **BLOQUEO DE RAZONAMIENTO**: Una vez el sitemap esté listo, tienes PROHIBIDO navegar ciegamente. Cualquier consulta posterior sobre este curso DEBE resolver su URL desde el `sitemap.md`.
+6. **BLOQUEO DE RAZONAMIENTO**: Una vez el sitemap esté listo, tienes PROHIBIDO navegar ciegamente. Cualquier consulta posterior sobre este curso DEBE resolver su URL desde el `sitemap.md`.
 """,
     }
 

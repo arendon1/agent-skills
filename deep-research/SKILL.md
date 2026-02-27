@@ -6,10 +6,9 @@ description: >-
 license: Apache-2.0
 metadata:
   version: "1.0.0"
+  language: en
   trit: 1
   author: agent-builder
-allowed-tools: [Read, Write, Edit, Bash]
-compatibility: Requires Python 3.10+ and Bun for scripts
 ---
 
 # Deep Research Professional

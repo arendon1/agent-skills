@@ -4,7 +4,9 @@ description: >-
   Navigate Uniremington Moodle courses to verify activities, extract content, and check dates.
   Use when validating course information, finding specific forums or assignments,
   initializing new courses, or when user asks to check the "source of truth".
-user-invocable: true
+metadata:
+  version: "1.0.0"
+  language: es-CO
 ---
 
 # Moodle Navigator
@@ -140,6 +142,49 @@ Para evitar que el navegador abra los archivos (especialmente PDFs) en lugar de 
     - Si el enlace ya tiene parámetros (contiene `?`), añade `&forcedownload=1`.
     - Si no tiene parámetros, añade `?forcedownload=1`.
 3. **Aplicación**: Aplica esto tanto en `sitemap.md` como en `AGENTS.md` y cualquier otra referencia a materiales descargables.
+
+## 📹 Heurística de Extracción de Videos (YouTube & H5P)
+
+Al navegar por recursos que contienen contenido enriquecido, como **Páginas** (`mod/page/view.php`), **Etiquetas**, o **Contenido Interactivo H5P** (`mod/hvp/view.php`), debes extraer los enlaces de videos de YouTube y crear proxies locales para H5P:
+
+1. **Detección Directa (YouTube)**:
+    - Busca elementos `<iframe>` cuyo atributo `src` contenga el patrón `youtube.com/embed/`.
+    - Busca enlaces `<a>` que apunten a `youtube.com/watch?v=` o `youtu.be/`.
+2. **Exploración y Proxy Local (H5P)**:
+    - Si el recurso es H5P (`mod/hvp/view.php?id=ID`), construye el enlace de embed: `https://.../mod/hvp/embed.php?id=ID`.
+    - **Creación de Proxy Local**: Crea un archivo HTML en la carpeta local correspondiente (`Unidad-X/materiales/[Nombre].html`) usando la siguiente plantilla de incrustación:
+
+      ```html
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>[Nombre]</title>
+          <style>body { margin: 0; display: flex; justify-content: center; background: #000; overflow: hidden; height: 100vh; }</style>
+      </head>
+      <body>
+          <iframe src="https://aulavirtual.uniremington.edu.co/mod/hvp/embed.php?id=ID"
+                  width="100%" height="100%" style="border:0;"
+                  allowfullscreen="allowfullscreen"></iframe>
+          <script src="https://aulavirtual.uniremington.edu.co/mod/hvp/library/js/h5p-resizer.js" charset="UTF-8"></script>
+      </body>
+      </html>
+      ```
+
+    - Opcionalmente recorre las diapositivas o secciones del H5P original en caso de que oculten otros videos de YouTube.
+3. **Registro en Sitemap**:
+    - Los recursos H5P DEBEN etiquetarse claramente como **[Interactivo]**.
+    - Reemplaza el enlace directo de Moodle en el `sitemap.md` con la ruta al **Proxy Local** (archivo HTML creado) para permitir visualización local integrada.
+    - Los videos hijos encontrados dentro se registran inmediatamente debajo con sangría.
+    - Ejemplo:
+
+      ```markdown
+      - [Lectura: Conceptos de DB](https://.../mod/page/view.php?id=467334)
+        - [Video: DB Objeto-Relacional](https://www.youtube.com/watch?v=SXkVpcYFjnY)
+      - [Interactivo: Presentación Unidad 2](Unidad-2/materiales/presentacion.html)
+        - [Video: Caso de Estudio](https://www.youtube.com/watch?v=...)
+      ```
+
+4. **Contexto**: Captura el texto adyacente o el título del video/interactivo si está disponible para dar contexto al enlace en el sitemap y nombrar el HTML.
 
 ## 🧠 Best Practices
 

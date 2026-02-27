@@ -6,9 +6,9 @@ description: >-
 license: Apache-2.0
 metadata:
   version: "1.0.0"
+  language: en
   trit: 0
   author: agent-builder
-compatibility: Requires browser for authentication
 ---
 
 # NotebookLM Research Assistant

@@ -1,12 +1,11 @@
 ---
 name: academic-sync
 description: >-
-  Orchestrates Moodle Navigator and ClickUp Manager to synchronize academic courses.
-  Handles course initialization, metadata documentation (README/AGENTS), and smart task synchronization.
-dependencies:
-  - clickup-manager
-  - moodle-navigator
-user-invocable: true
+  Orquesta Moodle Navigator y ClickUp Manager para sincronizar cursos académicos.
+  Usa cuando necesites inicializar cursos, documentar metadatos (README/AGENTS) o sincronizar actividades académicas.
+metadata:
+  version: "1.0.0"
+  language: es-CO
 ---
 
 # 🎓 Academic Sync (Uniremington)

@@ -21,6 +21,7 @@ metadata:
 2. **Deterministic Process Logic**: We do not let agents "guess" how to test or validate skills. We execute python scripts to execute parallel baselines.
 3. **GF(3) / Triadic Classification**: Skills must declare their ontological purpose (`+1` generation, `-1` constraint, `0` mediation).
 4. **Environment Awareness**: Scripts dynamically adapt to Cursor, Claude Code, GitHub Actions, or local terminals.
+5. **Language Consistency**: Skills must be written ENTIRELY in English (`en`) or Spanish (`es-CO`). No mixing of languages is permitted within a single skill.
 
 ## Command Glossary (Project-Level Slash Workflows)
 
@@ -54,6 +55,7 @@ Use this workflow before finalizing a skill.
   - `SKILL.md` length (<500 lines).
   - Third-party prompt formatting ("Use when...").
   - Reference folder depth (max 1 level deep).
+  - **Language Audit**: Verifies that the skill is either English or Spanish and remains consistent throughout.
   - **Security Scan**: Statically analyzes `scripts/` for obvious bad practices (e.g., unfiltered `os.system()`, `eval()`).
 
 ### 4. `/skill-package` (Distribution)
@@ -79,6 +81,7 @@ description: >-
   Use when [Specific trigger phrases, contexts, error symptoms, file types].
 metadata:
   version: "1.0.0"
+  language: en # Options: en, es-CO
   trit: [1, 0, or -1]
   risk_tier: [CRITICAL, DANGEROUS, CAUTION]
 ---

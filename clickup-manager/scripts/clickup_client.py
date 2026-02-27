@@ -3,8 +3,11 @@ import sys
 import json
 import requests
 import argparse
+import time
 from datetime import datetime
 from pathlib import Path
+from collections import deque
+from tqdm import tqdm
 
 
 # Load .env file manually (Workspace > Skill Root)
@@ -24,9 +27,7 @@ load_env(skill_env)
 
 # 2. Workspace/CWD .env (Overrides)
 cwd_env = Path.cwd() / ".env"
-if (
-    cwd_env.resolve() != skill_env.resolve()
-):  # Avoid double loading if running from skill root
+if cwd_env.resolve() != skill_env.resolve():
     load_env(cwd_env)
 
 # Verify API Token
@@ -36,559 +37,646 @@ if not API_TOKEN:
     sys.exit(1)
 
 
-BASE_URL = "https://api.clickup.com/api/v2"
-BASE_URL_V3 = "https://api.clickup.com/api/v3"
-HEADERS = {"Authorization": API_TOKEN, "Content-Type": "application/json"}
+class CacheHandler:
+    """Tiered local caching for ClickUp API responses."""
 
+    def __init__(self, filename=".clickup_cache.json"):
+        self.filename = Path.cwd() / filename
+        self.discovery_ttl = 86400  # 24 hours
+        self.ops_ttl = 7200  # 2 hours
+        self.cache = self._load()
 
-def parse_date(date_str, is_due=False):
-    """Parse date from string to Epoch MS. Supports DD/MM/YYYY and YYYY-MM-DD."""
-    if not date_str:
-        return None
+    def _load(self):
+        if self.filename.exists():
+            try:
+                with open(self.filename, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
 
-    # If it's already an integer (string of digits), return as is
-    if date_str.isdigit():
-        return int(date_str)
-
-    formats = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]
-    for fmt in formats:
+    def _save(self):
         try:
-            dt = datetime.strptime(date_str, fmt)
-            if is_due:
-                dt = dt.replace(hour=23, minute=59, second=59)
-            else:
-                dt = dt.replace(hour=0, minute=0, second=0)
-            return int(dt.timestamp() * 1000)
-        except ValueError:
-            continue
+            with open(self.filename, "w") as f:
+                json.dump(self.cache, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Could not save cache: {e}")
 
-    # If no format matches, try to let it fail later or return None
-    return None
+    def _get_category(self, endpoint):
+        discovery_keywords = ["team", "space", "folder", "list"]
+        for kw in discovery_keywords:
+            if (
+                kw in endpoint.lower()
+                and "/task" not in endpoint.lower()
+                and "/tag" not in endpoint.lower()
+            ):
+                return "discovery"
+        return "ops"
+
+    def get(self, key, endpoint):
+        entry = self.cache.get(key)
+        if not entry:
+            return None
+
+        category = self._get_category(endpoint)
+        ttl = self.discovery_ttl if category == "discovery" else self.ops_ttl
+
+        if time.time() - entry["timestamp"] > ttl:
+            del self.cache[key]
+            self._save()
+            return None
+        return entry["data"]
+
+    def set(self, key, data):
+        self.cache[key] = {"timestamp": time.time(), "data": data}
+        self._save()
+
+    def invalidate(self, pattern=None):
+        if not pattern:
+            self.cache = {}
+        else:
+            # Simple invalidation: remove entries containing the pattern
+            self.cache = {k: v for k, v in self.cache.items() if pattern not in k}
+        self._save()
+
+    def clear(self):
+        if self.filename.exists():
+            self.filename.unlink()
+        self.cache = {}
 
 
-def format_output(data, format_type):
-    """Format output based on request."""
-    if format_type == "brief":
-        if isinstance(data, list):
-            # Try to find name/id/status in common list items
-            summary = []
-            for item in data:
-                entry = f"ID: {item.get('id', '?')} | Nombre: {item.get('name', 'Desconocido')}"
-                if "status" in item:
+class RateLimiter:
+    """Manages 100 RPM with a visual progress bar."""
+
+    def __init__(self, limit=100, period=60):
+        self.limit = limit
+        self.period = period
+        self.requests = deque()
+        self.pbar = None
+
+    def _init_pbar(self):
+        if self.pbar is None:
+            self.pbar = tqdm(
+                total=self.limit,
+                desc="ClickUp RPM",
+                bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} req/min",
+                leave=True,
+            )
+
+    def wait_if_needed(self):
+        self._init_pbar()
+        now = time.time()
+        # Remove requests older than the period
+        while self.requests and now - self.requests[0] > self.period:
+            self.requests.popleft()
+
+        # If limit reached, wait
+        if len(self.requests) >= self.limit:
+            wait_time = self.period - (now - self.requests[0])
+            if wait_time > 0:
+                self.pbar.set_description("RPM Limit - Sleeping 😴")
+                time.sleep(wait_time)
+                self.pbar.set_description("ClickUp RPM")
+                self.wait_if_needed()
+                return
+
+        self.requests.append(now)
+        self.pbar.n = len(self.requests)
+        self.pbar.refresh()
+
+
+class ClickUpClient:
+    def __init__(self, api_token):
+        self.headers = {"Authorization": api_token, "Content-Type": "application/json"}
+        self.base_url_v2 = "https://api.clickup.com/api/v2"
+        self.base_url_v3 = "https://api.clickup.com/api/v3"
+        self.limiter = RateLimiter()
+        self.cache = CacheHandler()
+
+    def _request(self, method, endpoint, version="v3", bypass_cache=False, **kwargs):
+        """Unified request handler with v3-default and v2-fallback logic + Caching."""
+        base_url = self.base_url_v3 if version == "v3" else self.base_url_v2
+        url = f"{base_url}/{endpoint.lstrip('/')}"
+
+        # Cache Key: Method + URL + Query Params
+        cache_params = kwargs.get("params", {})
+        cache_key = f"{method}:{url}:{json.dumps(cache_params, sort_keys=True)}"
+
+        if method == "GET" and not bypass_cache:
+            cached_data = self.cache.get(cache_key, endpoint)
+            if cached_data:
+
+                class MockResponse:
+                    def __init__(self, data):
+                        self._data = data
+                        self.status_code = 200
+
+                    def json(self):
+                        return self._data
+
+                return MockResponse(cached_data)
+
+        self.limiter.wait_if_needed()
+        try:
+            response = requests.request(method, url, headers=self.headers, **kwargs)
+
+            # Targeted Invalidation on Write
+            if method in ["POST", "PUT", "DELETE"]:
+                resource = endpoint.split("/")[0]
+                self.cache.invalidate(resource)
+
+            if response.status_code in [200, 201] and method == "GET":
+                self.cache.set(cache_key, response.json())
+
+            if (
+                version == "v3"
+                and response.status_code in [404, 405]
+                and method == "GET"
+            ):
+                return self._request(
+                    method, endpoint, version="v2", bypass_cache=bypass_cache, **kwargs
+                )
+            return response
+        except requests.exceptions.RequestException as e:
+            print(f"Error en la petición: {e}")
+            return None
+
+    def format_output(self, data, format_type):
+        """Format output based on request."""
+        if format_type == "silent":
+            return
+        if format_type == "brief":
+            if isinstance(data, list):
+                summary = []
+                for item in data:
+                    entry = f"ID: {item.get('id', '?')} | Nombre: {item.get('name', 'Desconocido')}"
+                    status = item.get("status")
+                    if status:
+                        status_val = (
+                            status.get("status") if isinstance(status, dict) else status
+                        )
+                        entry += f" | Estado: {status_val}"
+                    summary.append(entry)
+                print("\n".join(summary))
+            elif isinstance(data, dict):
+                entry = f"ID: {data.get('id', '?')} | Nombre: {data.get('name', 'Desconocido')}"
+                status = data.get("status")
+                if status:
                     status_val = (
-                        item["status"].get("status")
-                        if isinstance(item["status"], dict)
-                        else item["status"]
+                        status.get("status") if isinstance(status, dict) else status
                     )
                     entry += f" | Estado: {status_val}"
-                summary.append(entry)
-            print("\n".join(summary))
-        elif isinstance(data, dict):
-            entry = (
-                f"ID: {data.get('id', '?')} | Nombre: {data.get('name', 'Desconocido')}"
+                print(entry)
+        else:
+            print(json.dumps(data, indent=2))
+
+    def parse_date(self, date_str, is_due=False):
+        """Parse date from string to Epoch MS."""
+        if not date_str:
+            return None
+        if date_str.isdigit():
+            return int(date_str)
+        formats = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]
+        for fmt in formats:
+            try:
+                dt = datetime.strptime(date_str, fmt)
+                if is_due:
+                    dt = dt.replace(hour=23, minute=59, second=59)
+                else:
+                    dt = dt.replace(hour=0, minute=0, second=0)
+                return int(dt.timestamp() * 1000)
+            except ValueError:
+                continue
+        return None
+
+    # --- Discovery & Hierarchy ---
+    def list_workspaces(self, format_type="brief"):
+        response = self._request("GET", "team", version="v2")
+        if response and response.status_code == 200:
+            data = response.json().get("teams", [])
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    def list_spaces(self, team_id, format_type="brief"):
+        response = self._request(
+            "GET", f"team/{team_id}/space?archived=false", version="v2"
+        )
+        if response and response.status_code == 200:
+            data = response.json().get("spaces", [])
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    def list_folders(self, space_id, format_type="brief"):
+        response = self._request(
+            "GET", f"space/{space_id}/folder?archived=false", version="v2"
+        )
+        if response and response.status_code == 200:
+            data = response.json().get("folders", [])
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    def list_lists(self, folder_id=None, space_id=None, format_type="brief"):
+        endpoint = f"folder/{folder_id}/list" if folder_id else f"space/{space_id}/list"
+        response = self._request("GET", f"{endpoint}?archived=false", version="v2")
+        if response and response.status_code == 200:
+            data = response.json().get("lists", [])
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    # --- Task Management ---
+    def list_tasks(
+        self, list_id, status=None, assignee=None, search=None, format_type="brief"
+    ):
+        endpoint = f"list/{list_id}/task?archived=false"
+        if status:
+            endpoint += f"&statuses[]={status}"
+        if assignee:
+            endpoint += f"&assignees[]={assignee}"
+        response = self._request("GET", endpoint, version="v2")
+        if response and response.status_code == 200:
+            tasks = response.json().get("tasks", [])
+            if search:
+                term = search.lower()
+                tasks = [
+                    t
+                    for t in tasks
+                    if term in t.get("name", "").lower()
+                    or term in t.get("description", "").lower()
+                ]
+            self.format_output(tasks, format_type)
+            return tasks
+        return []
+
+    def get_task(self, task_id, format_type="brief"):
+        response = self._request("GET", f"task/{task_id}", version="v2")
+        if response and response.status_code == 200:
+            data = response.json()
+            self.format_output(data, format_type)
+            return data
+        return None
+
+    def find_task_by_name(self, list_id, name, parent=None, format_type="brief"):
+        """Search for a task by name in a list (exact match)."""
+        tasks = self.list_tasks(list_id, search=name, format_type="silent")
+        for t in tasks:
+            if t.get("name") == name:
+                # If parent specified, verify it matches
+                if parent and t.get("parent") != parent:
+                    continue
+                self.format_output(t, format_type)
+                return t
+        return None
+
+    def create_task(
+        self,
+        list_id,
+        name,
+        description=None,
+        start_date=None,
+        due_date=None,
+        parent=None,
+        check_exists=False,
+        format_type="brief",
+    ):
+        if check_exists:
+            existing = self.find_task_by_name(
+                list_id, name, parent=parent, format_type=format_type
             )
-            if "status" in data:
-                status_val = (
-                    data["status"].get("status")
-                    if isinstance(data["status"], dict)
-                    else data["status"]
-                )
-                entry += f" | Estado: {status_val}"
-            print(entry)
+            if existing:
+                print(f"Info: Tarea '{name}' ya existe. ID: {existing.get('id')}")
+                return existing
+
+        payload = {"name": name, "description": description or ""}
+        if parent:
+            payload["parent"] = parent
+        if start_date:
+            v = self.parse_date(start_date)
+            if v:
+                payload["start_date"] = v
+        if due_date:
+            v = self.parse_date(due_date, is_due=True)
+            if v:
+                payload["due_date"] = v
+        response = self._request(
+            "POST", f"list/{list_id}/task", json=payload, version="v2"
+        )
+        if response and response.status_code == 200:
+            data = response.json()
+            self.format_output(data, format_type)
+            return data
+        return None
+
+    def update_task(
+        self,
+        task_id,
+        name=None,
+        description=None,
+        priority=None,
+        status=None,
+        start_date=None,
+        due_date=None,
+    ):
+        payload = {}
+        if name:
+            payload["name"] = name
+        if description:
+            payload["description"] = description
+        if priority:
+            payload["priority"] = int(priority)
+        if status:
+            payload["status"] = status
+        if start_date:
+            payload["start_date"] = self.parse_date(start_date)
+        if due_date:
+            payload["due_date"] = self.parse_date(due_date, is_due=True)
+        response = self._request("PUT", f"task/{task_id}", json=payload, version="v2")
+        if response and response.status_code == 200:
+            print(f"Task {task_id} updated.")
+            return response.json()
+        return None
+
+    # --- Free Tier Features ---
+    def manage_tags(
+        self, action, space_id=None, task_id=None, tag_name=None, format_type="brief"
+    ):
+        if action == "list":
+            response = self._request("GET", f"space/{space_id}/tag", version="v2")
+            if response and response.status_code == 200:
+                data = response.json().get("tags", [])
+                self.format_output(data, format_type)
+                return data
+        elif action == "add":
+            # Check if tag already exists on the task to avoid redundancy
+            task = self.get_task(task_id, format_type="silent")
+            if task and tag_name in [t.get("name") for t in task.get("tags", [])]:
+                print(f"Info: Tag '{tag_name}' ya está presente en la tarea {task_id}.")
+                return None
+            return self._request("POST", f"task/{task_id}/tag/{tag_name}", version="v2")
+        elif action == "remove":
+            return self._request(
+                "DELETE", f"task/{task_id}/tag/{tag_name}", version="v2"
+            )
+        return None
+
+    def upload_attachment(self, task_id, file_path):
+        p = Path(file_path)
+        if not p.exists():
+            return None
+        self.limiter.wait_if_needed()
+        url = f"{self.base_url_v2}/task/{task_id}/attachment"
+        with open(p, "rb") as f:
+            files = {"attachment": (p.name, f)}
+            response = requests.post(
+                url,
+                headers={"Authorization": self.headers["Authorization"]},
+                files=files,
+            )
+            if response.status_code == 200:
+                print(f"Uploaded {p.name} to task {task_id}")
+                return response.json()
+        return None
+
+    def manage_dependencies(self, action, task_id, depends_on=None, dependency_id=None):
+        if action == "add":
+            return self._request(
+                "POST",
+                f"task/{task_id}/dependency",
+                json={"depends_on": depends_on},
+                version="v2",
+            )
+        elif action == "remove":
+            return self._request(
+                "DELETE",
+                f"task/{task_id}/dependency?dependency_id={dependency_id}",
+                version="v2",
+            )
+        return None
+
+    def list_goals(self, team_id, format_type="brief"):
+        response = self._request("GET", f"team/{team_id}/goal", version="v2")
+        if response and response.status_code == 200:
+            data = response.json().get("goals", [])
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    # --- Docs & Pages (v3) ---
+    def list_docs(self, team_id, format_type="brief"):
+        response = self._request("GET", f"workspaces/{team_id}/docs", version="v3")
+        if response and response.status_code == 200:
+            data = response.json().get("docs", [])
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    def create_doc(self, team_id, name, format_type="brief"):
+        response = self._request(
+            "POST", f"workspaces/{team_id}/docs", json={"name": name}, version="v3"
+        )
+        if response and response.status_code in [200, 201]:
+            data = response.json().get("doc", response.json())
+            self.format_output(data, format_type)
+            return data
+        return None
+
+    def create_page(self, team_id, doc_id, name, content, content_format="text"):
+        payload = {"name": name, "content": content, "content_format": content_format}
+        return self._request(
+            "POST",
+            f"workspaces/{team_id}/docs/{doc_id}/pages",
+            json=payload,
+            version="v3",
+        )
+
+    # --- Bulk & Misc ---
+    def bulk_create(self, list_id, tasks_data):
+        results = []
+        for t in tasks_data:
+            res = self.create_task(
+                list_id,
+                t.get("name"),
+                t.get("description"),
+                t.get("start_date"),
+                t.get("due_date"),
+            )
+            if res:
+                results.append(res)
+        return results
+
+
+# Global Client Logic (Lazy)
+_client_instance = None
+
+
+def get_client(bypass_cache=False):
+    global _client_instance
+    if _client_instance is None:
+        _client_instance = ClickUpClient(API_TOKEN, bypass_cache)
     else:
-        print(json.dumps(data, indent=2))
+        _client_instance.bypass_cache = bypass_cache
+    return _client_instance
 
 
+# Bridge Functions for CLI
 def list_teams(args):
-    """Get Authorized Teams (Workspaces)"""
-    url = f"{BASE_URL}/team"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("teams", []), args.format)
-    else:
-        print(f"Error fetching teams: {response.status_code} - {response.text}")
+    get_client().list_workspaces(args.format)
 
 
 def list_spaces(args):
-    """Get Spaces in a Workspace"""
-    url = f"{BASE_URL}/team/{args.team_id}/space?archived=false"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("spaces", []), args.format)
-    else:
-        print(f"Error fetching spaces: {response.status_code} - {response.text}")
+    get_client().list_spaces(args.team_id, args.format)
 
 
 def list_folders(args):
-    """Get Folders in a Space"""
-    url = f"{BASE_URL}/space/{args.space_id}/folder?archived=false"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("folders", []), args.format)
-    else:
-        print(f"Error fetching folders: {response.status_code} - {response.text}")
+    get_client().list_folders(args.space_id, args.format)
 
 
 def list_lists(args):
-    """Get Lists in a Folder or Space (folderless)"""
-    if args.folder_id:
-        url = f"{BASE_URL}/folder/{args.folder_id}/list?archived=false"
-    elif args.space_id:
-        url = f"{BASE_URL}/space/{args.space_id}/list?archived=false"
-    else:
-        print("Error: Either --folder-id or --space-id must be provided.")
-        return
-
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("lists", []), args.format)
-    else:
-        print(f"Error fetching lists: {response.status_code} - {response.text}")
+    get_client().list_lists(args.folder_id, args.space_id, args.format)
 
 
 def list_tasks(args):
-    """Get Tasks in a List with filtering"""
-    url = f"{BASE_URL}/list/{args.list_id}/task?archived=false"
+    get_client().list_tasks(
+        args.list_id, args.status, args.assignee, args.search, args.format
+    )
 
-    # Add filters
-    if args.status:
-        url += f"&statuses[]={args.status}"
-    if args.assignee:
-        url += f"&assignees[]={args.assignee}"
-    # Note: Search is not always available on list view locally, so we might filter client side if needed
-    # But ClickUp API v2 supports some filters. We'll implement basic client-side filtering for search
-    # to be robust across plans.
 
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        tasks = response.json().get("tasks", [])
-
-        # Client-side filtering for search/description
-        if args.search:
-            search_term = args.search.lower()
-            tasks = [
-                t
-                for t in tasks
-                if search_term in t.get("name", "").lower()
-                or search_term in t.get("description", "").lower()
-            ]
-
-        format_output(tasks, args.format)
-    else:
-        print(f"Error fetching tasks: {response.status_code} - {response.text}")
+def find_task(args):
+    get_client().find_task_by_name(args.list_id, args.name, args.parent, args.format)
 
 
 def get_task(args):
-    """Get specific task details"""
-    url = f"{BASE_URL}/task/{args.task_id}"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error fetching task: {response.status_code} - {response.text}")
+    get_client().get_task(args.task_id, args.format)
 
 
 def create_task(args):
-    """Create a Task in a List"""
-    url = f"{BASE_URL}/list/{args.list_id}/task"
-    payload = {"name": args.name, "description": args.description}
-    if args.start_date:
-        val = parse_date(args.start_date)
-        if val:
-            payload["start_date"] = val
-            payload["start_date_time"] = True
-    if args.due_date:
-        val = parse_date(args.due_date, is_due=True)
-        if val:
-            payload["due_date"] = val
-            payload["due_date_time"] = True
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error creating task: {response.status_code} - {response.text}")
-
-
-def create_folder(args):
-    """Create a new folder in a space"""
-    url = f"{BASE_URL}/space/{args.space_id}/folder"
-    payload = {"name": args.name}
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"Folder '{args.name}' created successfully.")
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error creating folder: {response.status_code} - {response.text}")
-
-
-def create_list(args):
-    """Create a List in a Folder or Space"""
-    if args.folder_id:
-        url = f"{BASE_URL}/folder/{args.folder_id}/list"
-    elif args.space_id:
-        url = f"{BASE_URL}/space/{args.space_id}/list"
-    else:
-        print("Error: Either --folder-id or --space-id must be provided.")
-        return
-
-    payload = {"name": args.name}
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"List '{args.name}' created successfully.")
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error creating list: {response.status_code} - {response.text}")
-
-
-def update_status(args):
-    """Update Task Status"""
-    url = f"{BASE_URL}/task/{args.task_id}"
-    payload = {"status": args.status}
-    response = requests.put(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error updating status: {response.status_code} - {response.text}")
-
-
-def post_comment(args):
-    """Post a comment on a task"""
-    url = f"{BASE_URL}/task/{args.task_id}/comment"
-    payload = {"comment_text": args.content}
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"Comentario enviado con éxito a la tarea {args.task_id}")
-    else:
-        print(f"Error al enviar comentario: {response.status_code} - {response.text}")
-
-
-def list_members(args):
-    """Get members of a list or task"""
-    if args.task_id:
-        url = f"{BASE_URL}/task/{args.task_id}/member"
-    elif args.list_id:
-        url = f"{BASE_URL}/list/{args.list_id}/member"
-    else:
-        print("Error: Either --list-id or --task-id must be provided.")
-        return
-
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("members", []), args.format)
-    else:
-        print(f"Error fetching members: {response.status_code} - {response.text}")
-
-
-def list_custom_fields(args):
-    """List custom fields for a list"""
-    url = f"{BASE_URL}/list/{args.list_id}/field"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("fields", []), args.format)
-    else:
-        print(f"Error fetching custom fields: {response.status_code} - {response.text}")
-
-
-def set_custom_field(args):
-    """Set a custom field value on a task"""
-    url = f"{BASE_URL}/task/{args.task_id}/field/{args.field_id}"
-    # Value parsing (try JSON first for complex types)
-    try:
-        value = json.loads(args.value)
-    except ValueError:
-        value = args.value
-
-    payload = {"value": value}
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"Custom field {args.field_id} set successfully on task {args.task_id}")
-    else:
-        print(f"Error setting custom field: {response.status_code} - {response.text}")
-
-
-def add_time_entry(args):
-    """Add a time entry to a task or team"""
-    url = f"{BASE_URL}/team/{args.team_id}/time_entries"
-
-    # Use current time if start not provided (milliseconds)
-    start = int(args.start) if args.start else int(datetime.now().timestamp() * 1000)
-
-    payload = {
-        "description": args.description,
-        "start": start,
-        "duration": int(args.duration_ms),
-        "tid": args.task_id,
-    }
-
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"Time entry added successfully to task {args.task_id}")
-    else:
-        print(f"Error adding time entry: {response.status_code} - {response.text}")
-
-
-def manage_checklist(args):
-    """Create or add items to checklists"""
-    if args.action == "create":
-        url = f"{BASE_URL}/task/{args.task_id}/checklist"
-        payload = {"name": args.name}
-        response = requests.post(url, json=payload, headers=HEADERS)
-    elif args.action == "add-item":
-        url = f"{BASE_URL}/checklist/{args.checklist_id}/checklist_item"
-        payload = {"name": args.name, "assignee": args.assignee}
-        response = requests.post(url, json=payload, headers=HEADERS)
-    else:
-        print(f"Unknown action: {args.action}")
-        return
-
-    if response.status_code == 200:
-        print(f"Checklist action '{args.action}' completed successfully.")
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error managing checklist: {response.status_code} - {response.text}")
+    get_client().create_task(
+        args.list_id,
+        args.name,
+        args.description,
+        args.start_date,
+        args.due_date,
+        args.parent,
+        args.check_exists,
+        args.format,
+    )
 
 
 def update_task(args):
-    """Update general task properties (name, description, priority, etc)"""
-    url = f"{BASE_URL}/task/{args.task_id}"
-    payload = {}
-    if args.name:
-        payload["name"] = args.name
-    if args.description:
-        payload["description"] = args.description
-    if args.priority:
-        payload["priority"] = int(args.priority)
-    if args.status:
-        payload["status"] = args.status
-    if args.start_date:
-        val = parse_date(args.start_date)
-        if val:
-            payload["start_date"] = val
-            payload["start_date_time"] = True
-    if args.due_date:
-        val = parse_date(args.due_date, is_due=True)
-        if val:
-            payload["due_date"] = val
-            payload["due_date_time"] = True
-
-    if not payload:
-        print("Error: No updates provided. Use --name, --description, --priority, etc.")
-        return
-
-    response = requests.put(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"Task {args.task_id} updated successfully.")
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error updating task: {response.status_code} - {response.text}")
+    get_client().update_task(
+        args.task_id,
+        args.name,
+        args.description,
+        args.priority,
+        args.status,
+        args.start_date,
+        args.due_date,
+    )
 
 
-def bulk_create(args):
-    """Create multiple tasks from a JSON file or string"""
-    try:
-        if os.path.exists(args.file):
-            with open(args.file, "r", encoding="utf-8") as f:
-                tasks = json.load(f)
-        else:
-            tasks = json.loads(args.file)
-    except Exception as e:
-        print(f"Error loading tasks: {e}")
-        return
-
-    if not isinstance(tasks, list):
-        print("Error: Bulk create expects a list of task objects.")
-        return
-
-    print(f"Starting bulk creation of {len(tasks)} tasks...")
-    results = []
-    for t in tasks:
-        url = f"{BASE_URL}/list/{args.list_id}/task"
-        payload = {"name": t.get("name"), "description": t.get("description", "")}
-        if t.get("start_date"):
-            payload["start_date"] = parse_date(t["start_date"])
-            payload["start_date_time"] = True
-        if t.get("due_date"):
-            payload["due_date"] = parse_date(t["due_date"], is_due=True)
-            payload["due_date_time"] = True
-
-        response = requests.post(url, json=payload, headers=HEADERS)
-        if response.status_code == 200:
-            print(f"✅ Created: {payload['name']}")
-            results.append(response.json())
-        else:
-            print(f"❌ Failed: {payload['name']} ({response.status_code})")
-
-    print(f"\nBulk creation complete. {len(results)}/{len(tasks)} tasks created.")
+def manage_tags(args):
+    get_client().manage_tags(
+        args.action, args.space_id, args.task_id, args.tag_name, args.format
+    )
 
 
-# --- Docs (API v3) ---
+def upload_attachment(args):
+    get_client().upload_attachment(args.task_id, args.file)
+
+
+def manage_dependencies(args):
+    get_client().manage_dependencies(
+        args.action,
+        args.task_id,
+        getattr(args, "depends_on", None),
+        getattr(args, "dependency_id", None),
+    )
+
+
+def list_goals(args):
+    get_client().list_goals(args.team_id, args.format)
 
 
 def list_docs(args):
-    """List Docs in a workspace"""
-    url = f"{BASE_URL_V3}/workspaces/{args.team_id}/docs"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("docs", []), args.format)
-    else:
-        print(f"Error fetching docs: {response.status_code} - {response.text}")
+    get_client().list_docs(args.team_id, args.format)
 
 
 def create_doc(args):
-    """Create a Doc in a workspace"""
-    url = f"{BASE_URL_V3}/workspaces/{args.team_id}/docs"
-    payload = {"name": args.name}
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 201 or response.status_code == 200:
-        print(f"Documento creado con éxito.")
-        format_output(response.json().get("doc", response.json()), args.format)
-    else:
-        print(f"Error al crear documento: {response.status_code} - {response.text}")
+    get_client().create_doc(args.team_id, args.name, args.format)
 
 
 def create_page(args):
-    """Create a page in a Doc"""
-    url = f"{BASE_URL_V3}/workspaces/{args.team_id}/docs/{args.doc_id}/pages"
-    payload = {
-        "name": args.name,
-        "content": args.content,
-        "content_format": args.content_format or "text",
-    }
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 201 or response.status_code == 200:
-        print(f"Page created successfully in doc {args.doc_id}")
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error creating page: {response.status_code} - {response.text}")
+    get_client().create_page(
+        args.team_id, args.doc_id, args.name, args.content, args.content_format
+    )
 
 
-def update_page(args):
-    """Update a page's content or name"""
-    url = f"{BASE_URL_V3}/workspaces/{args.team_id}/docs/{args.doc_id}/pages/{args.page_id}"
-    payload = {}
-    if args.name:
-        payload["name"] = args.name
-    if args.content:
-        payload["content"] = args.content
-        payload["content_format"] = args.content_format or "text"
-        payload["content_edit_mode"] = args.edit_mode or "replace"
-
-    response = requests.put(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"Page {args.page_id} updated successfully.")
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error updating page: {response.status_code} - {response.text}")
-
-
-# --- Webhooks (API v2) ---
-
-
-def list_webhooks(args):
-    """List webhooks for a workspace"""
-    url = f"{BASE_URL}/team/{args.team_id}/webhook"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        format_output(response.json().get("webhooks", []), args.format)
-    else:
-        print(f"Error fetching webhooks: {response.status_code} - {response.text}")
-
-
-def create_webhook(args):
-    """Create a new webhook"""
-    url = f"{BASE_URL}/team/{args.team_id}/webhook"
-    # Events should be comma separated list in CLI
-    events = [e.strip() for e in args.events.split(",")]
-    payload = {"endpoint": args.endpoint, "events": events}
-    if args.space_id:
-        payload["space_id"] = int(args.space_id)
-    if args.folder_id:
-        payload["folder_id"] = int(args.folder_id)
-    if args.list_id:
-        payload["list_id"] = int(args.list_id)
-
-    response = requests.post(url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print("Webhook created successfully.")
-        format_output(response.json(), args.format)
-    else:
-        print(f"Error creating webhook: {response.status_code} - {response.text}")
-
-
-def delete_webhook(args):
-    """Delete a webhook"""
-    url = f"{BASE_URL}/webhook/{args.webhook_id}"
-    response = requests.delete(url, headers=HEADERS)
-    if response.status_code == 200:
-        print(f"Webhook {args.webhook_id} deleted successfully.")
-    else:
-        print(f"Error deleting webhook: {response.status_code} - {response.text}")
+def bulk_create(args):
+    try:
+        tasks = (
+            json.load(open(args.file, "r"))
+            if os.path.exists(args.file)
+            else json.loads(args.file)
+        )
+        get_client().bulk_create(args.list_id, tasks)
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 def update_env_file(path, key, value):
-    """Update or add a key-value pair in the .env file."""
     lines = []
     if path.exists():
         with open(path, "r") as f:
             lines = f.readlines()
-
-    key_found = False
-    new_lines = []
+    new_lines, found = [], False
     for line in lines:
         if line.strip().startswith(f"{key}="):
             new_lines.append(f"{key}={value}\n")
-            key_found = True
+            found = True
         else:
             new_lines.append(line)
-
-    if not key_found:
+    if not found:
         if new_lines and not new_lines[-1].endswith("\n"):
             new_lines[-1] += "\n"
         new_lines.append(f"{key}={value}\n")
-
     with open(path, "w") as f:
         f.writelines(new_lines)
-    print(f"Updated {key} in {path}")
+    print(f"Updated {key}")
 
 
 def select_item(items, item_type, optional=False):
-    """Interactive selection from a list."""
     if not items:
-        print(f"No {item_type}s found.")
+        print(f"No {item_type} found.")
         return None
-
     print(f"\nAvailable {item_type}s:")
     for i, item in enumerate(items):
         print(f"{i + 1}. {item.get('name')} (ID: {item.get('id')})")
-
     while True:
         prompt = f"Select {item_type} (1-{len(items)})"
         if optional:
             prompt += " or press Enter to skip"
-        prompt += ": "
-
-        choice = input(prompt)
+        choice = input(prompt + ": ")
         if optional and not choice.strip():
             return None
-
         try:
-            index = int(choice) - 1
-            if 0 <= index < len(items):
-                return items[index]
-            else:
-                print("Invalid selection. Try again.")
+            idx = int(choice) - 1
+            if 0 <= idx < len(items):
+                return items[idx]
         except ValueError:
-            print("Please enter a number.")
+            pass
+        print("Invalid choice.")
 
 
 def configure_context(args):
-    """Interactive wizard to set up context."""
-    # Determine .env path (prioritize CWD)
+    if args.clear_cache:
+        get_client().cache.clear()
+        print("Cache base de datos de ClickUp eliminada.")
+        return
     target_env = Path.cwd() / ".env"
-
-    # If arguments are provided, perform non-interactive update
     if any([args.team_id, args.space_id, args.folder_id, args.list_id]):
-        print(f"Non-interactive configuration 🧙\nUpdating: {target_env}\n")
         if args.team_id:
             update_env_file(target_env, "CLICKUP_TEAM_ID", args.team_id)
         if args.space_id:
@@ -597,387 +685,175 @@ def configure_context(args):
             update_env_file(target_env, "CLICKUP_FOLDER_ID", args.folder_id)
         if args.list_id:
             update_env_file(target_env, "CLICKUP_LIST_ID", args.list_id)
-        print("\nConfiguration updated! 🚀")
         return
-
-    print(f"Configuration Wizard 🧙\nSaving to: {target_env}\n")
-
-    # 1. Select Team
-    url = f"{BASE_URL}/team"
-    resp = requests.get(url, headers=HEADERS)
-    if resp.status_code != 200:
-        print(f"Error fetching teams: {resp.text}")
-        return
-
-    team = select_item(resp.json().get("teams", []), "Team")
-    if not team:
-        return
-
-    update_env_file(target_env, "CLICKUP_TEAM_ID", team["id"])
-
-    # 2. Select Space
-    url = f"{BASE_URL}/team/{team['id']}/space"
-    resp = requests.get(url, headers=HEADERS)
-    space = select_item(resp.json().get("spaces", []), "Space")
-    if space:
-        update_env_file(target_env, "CLICKUP_SPACE_ID", space["id"])
-
-        # 3. Select Folder (Optional)
-        url = f"{BASE_URL}/space/{space['id']}/folder"
-        resp = requests.get(url, headers=HEADERS)
-        folder = select_item(resp.json().get("folders", []), "Folder", optional=True)
-        if folder:
-            update_env_file(target_env, "CLICKUP_FOLDER_ID", folder["id"])
-
-            # 4. Select List (Optional) from Folder
-            url = f"{BASE_URL}/folder/{folder['id']}/list"
-            resp = requests.get(url, headers=HEADERS)
-            lst = select_item(resp.json().get("lists", []), "List", optional=True)
-            if lst:
-                update_env_file(target_env, "CLICKUP_LIST_ID", lst["id"])
-        else:
-            # If no folder selected, maybe they have lists directly in space (Folderless lists)
-            print("Checking for folderless lists in space...")
-            url = f"{BASE_URL}/space/{space['id']}/list"
-            resp = requests.get(url, headers=HEADERS)
-            lst = select_item(resp.json().get("lists", []), "List", optional=True)
-            if lst:
-                update_env_file(target_env, "CLICKUP_LIST_ID", lst["id"])
-
-    print("\nConfiguration complete! 🚀")
+    print("Configuration Wizard 🧙")
+    ws = get_client().list_workspaces()
+    w = select_item(ws, "Workspace")
+    if w:
+        update_env_file(target_env, "CLICKUP_TEAM_ID", w["id"])
+        ss = get_client().list_spaces(w["id"])
+        s = select_item(ss, "Space")
+        if s:
+            update_env_file(target_env, "CLICKUP_SPACE_ID", s["id"])
+            fs = get_client().list_folders(s["id"])
+            f = select_item(fs, "Folder", optional=True)
+            if f:
+                update_env_file(target_env, "CLICKUP_FOLDER_ID", f["id"])
+                ls = get_client().list_lists(folder_id=f["id"])
+                l = select_item(ls, "List", optional=True)
+                if l:
+                    update_env_file(target_env, "CLICKUP_LIST_ID", l["id"])
+            else:
+                ls = get_client().list_lists(space_id=s["id"])
+                l = select_item(ls, "List", optional=True)
+                if l:
+                    update_env_file(target_env, "CLICKUP_LIST_ID", l["id"])
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="ClickUp Manager CLI - Token Efficient"
+    parser = argparse.ArgumentParser(description="ClickUp Manager - Hybrid v3/v2")
+    parser.add_argument(
+        "--format", choices=["json", "brief", "silent"], default="brief"
     )
     parser.add_argument(
-        "--format",
-        choices=["json", "brief"],
-        default="brief",
-        help="Output format (default: brief)",
+        "--bypass-cache", action="store_true", help="Omitir caché local"
     )
+    sub = parser.add_subparsers(dest="command")
 
-    subparsers = parser.add_subparsers(dest="command", help="Command to operations")
+    # Config
+    c_p = sub.add_parser("configure")
+    c_p.add_argument("--team-id")
+    c_p.add_argument("--space-id")
+    c_p.add_argument("--folder-id")
+    c_p.add_argument("--list-id")
+    c_p.add_argument("--clear-cache", action="store_true", help="Limpiar caché local")
+    c_p.set_defaults(func=configure_context)
 
-    # Configure
-    config_parser = subparsers.add_parser("configure", help="Interactive setup wizard")
-    config_parser.add_argument("--team-id", help="Set CLICKUP_TEAM_ID")
-    config_parser.add_argument("--space-id", help="Set CLICKUP_SPACE_ID")
-    config_parser.add_argument("--folder-id", help="Set CLICKUP_FOLDER_ID")
-    config_parser.add_argument("--list-id", help="Set CLICKUP_LIST_ID")
-    config_parser.set_defaults(func=configure_context)
+    # Discovery
+    sub.add_parser("list-teams").set_defaults(func=list_teams)
 
-    # List Teams
-    teams_parser = subparsers.add_parser(
-        "list-teams", help="List all authorized workspaces (teams)"
-    )
-    teams_parser.set_defaults(func=list_teams)
+    ls_p = sub.add_parser("list-spaces")
+    ls_p.add_argument("--team-id", default=os.getenv("CLICKUP_TEAM_ID"))
+    ls_p.set_defaults(func=list_spaces)
 
-    # List Spaces
-    spaces_parser = subparsers.add_parser(
-        "list-spaces", help="List spaces in a workspace"
-    )
-    spaces_parser.add_argument(
-        "--team-id",
-        default=os.getenv("CLICKUP_TEAM_ID"),
-        help="Workspace ID (Team ID). Defaults to CLICKUP_TEAM_ID.",
-    )
-    spaces_parser.set_defaults(func=list_spaces)
+    lf_p = sub.add_parser("list-folders")
+    lf_p.add_argument("--space-id", default=os.getenv("CLICKUP_SPACE_ID"))
+    lf_p.set_defaults(func=list_folders)
 
-    # List Folders
-    folders_parser = subparsers.add_parser(
-        "list-folders", help="List folders in a space"
-    )
-    folders_parser.add_argument(
-        "--space-id",
-        default=os.getenv("CLICKUP_SPACE_ID"),
-        help="Space ID. Defaults to CLICKUP_SPACE_ID.",
-    )
-    folders_parser.set_defaults(func=list_folders)
+    ll_p = sub.add_parser("list-lists")
+    ll_p.add_argument("--folder-id", default=os.getenv("CLICKUP_FOLDER_ID"))
+    ll_p.add_argument("--space-id", default=os.getenv("CLICKUP_SPACE_ID"))
+    ll_p.set_defaults(func=list_lists)
 
-    # List Lists
-    lists_parser = subparsers.add_parser(
-        "list-lists", help="List lists in a folder or space"
-    )
-    lists_parser.add_argument(
-        "--folder-id",
-        default=os.getenv("CLICKUP_FOLDER_ID"),
-        help="Folder ID. Defaults to CLICKUP_FOLDER_ID.",
-    )
-    lists_parser.add_argument(
-        "--space-id",
-        default=os.getenv("CLICKUP_SPACE_ID"),
-        help="Space ID (for folderless lists). Defaults to CLICKUP_SPACE_ID.",
-    )
-    lists_parser.set_defaults(func=list_lists)
+    # Tasks
+    ft_p = sub.add_parser("find-task")
+    ft_p.add_argument("--list-id", default=os.getenv("CLICKUP_LIST_ID"))
+    ft_p.add_argument("--name", required=True)
+    ft_p.add_argument("--parent")
+    ft_p.set_defaults(func=find_task)
 
-    # List Tasks (Enhanced)
-    tasks_list_parser = subparsers.add_parser("list-tasks", help="List tasks in a list")
-    tasks_list_parser.add_argument(
-        "--list-id",
-        default=os.getenv("CLICKUP_LIST_ID"),
-        help="List ID. Defaults to CLICKUP_LIST_ID.",
-    )
-    tasks_list_parser.add_argument("--status", help="Filter by status name")
-    tasks_list_parser.add_argument("--assignee", help="Filter by assignee ID")
-    tasks_list_parser.add_argument(
-        "--search", help="Client-side search in name/description"
-    )
-    tasks_list_parser.set_defaults(func=list_tasks)
+    tl_p = sub.add_parser("list-tasks")
+    tl_p.add_argument("--list-id", default=os.getenv("CLICKUP_LIST_ID"))
+    tl_p.add_argument("--status")
+    tl_p.add_argument("--assignee")
+    tl_p.add_argument("--search")
+    tl_p.set_defaults(func=list_tasks)
 
-    # Get Task
-    get_task_parser = subparsers.add_parser("get-task", help="Get task details")
-    get_task_parser.add_argument("--task-id", required=True, help="Task ID")
-    get_task_parser.set_defaults(func=get_task)
+    tc_p = sub.add_parser("create-task")
+    tc_p.add_argument("--list-id", default=os.getenv("CLICKUP_LIST_ID"))
+    tc_p.add_argument("--name", required=True)
+    tc_p.add_argument("--description")
+    tc_p.add_argument("--start-date")
+    tc_p.add_argument("--due-date")
+    tc_p.add_argument("--parent")
+    tc_p.add_argument(
+        "--check-exists", action="store_true", help="Evitar duplicados por nombre"
+    )
+    tc_p.set_defaults(func=create_task)
 
-    # Create Task
-    task_parser = subparsers.add_parser("create-task", help="Create a new task")
-    task_parser.add_argument(
-        "--list-id",
-        default=os.getenv("CLICKUP_LIST_ID"),
-        help="List ID. Defaults to CLICKUP_LIST_ID.",
-    )
-    task_parser.add_argument("--name", required=True, help="Task Name")
-    task_parser.add_argument("--description", help="Task Description")
-    task_parser.add_argument("--start-date", help="Start date (MS or DD/MM/YYYY)")
-    task_parser.add_argument("--due-date", help="Due date (MS or DD/MM/YYYY)")
-    task_parser.set_defaults(func=create_task)
+    tu_p = sub.add_parser("update-task")
+    tu_p.add_argument("--task-id", required=True)
+    tu_p.add_argument("--name")
+    tu_p.add_argument("--description")
+    tu_p.add_argument("--priority")
+    tu_p.add_argument("--status")
+    tu_p.add_argument("--start-date")
+    tu_p.add_argument("--due-date")
+    tu_p.set_defaults(func=update_task)
 
-    # Create Folder
-    folder_create_parser = subparsers.add_parser(
-        "create-folder", help="Create a new folder in a space"
-    )
-    folder_create_parser.add_argument(
-        "--space-id", default=os.getenv("CLICKUP_SPACE_ID"), help="Space ID"
-    )
-    folder_create_parser.add_argument("--name", required=True, help="Folder Name")
-    folder_create_parser.set_defaults(func=create_folder)
+    # Extras (Free)
+    tag_p = sub.add_parser("manage-tags")
+    tag_sub = tag_p.add_subparsers(dest="action", required=True)
 
-    # Create List
-    list_create_parser = subparsers.add_parser("create-list", help="Create a new list")
-    list_create_parser.add_argument(
-        "--folder-id", default=os.getenv("CLICKUP_FOLDER_ID"), help="Folder ID"
-    )
-    list_create_parser.add_argument(
-        "--space-id",
-        default=os.getenv("CLICKUP_SPACE_ID"),
-        help="Space ID (for folderless list)",
-    )
-    list_create_parser.add_argument("--name", required=True, help="List Name")
-    list_create_parser.set_defaults(func=create_list)
+    tag_list = tag_sub.add_parser("list")
+    tag_list.add_argument("--space-id", default=os.getenv("CLICKUP_SPACE_ID"))
 
-    # Update Status
-    status_parser = subparsers.add_parser("update-status", help="Update task status")
-    status_parser.add_argument("--task-id", required=True, help="Task ID")
-    status_parser.add_argument("--status", required=True, help="New status")
-    status_parser.set_defaults(func=update_status)
+    tag_add = tag_sub.add_parser("add")
+    tag_add.add_argument("--task-id", required=True)
+    tag_add.add_argument("--tag-name", required=True)
 
-    # Post Comment
-    comment_parser = subparsers.add_parser("post-comment", help="Post comment to task")
-    comment_parser.add_argument("--task-id", required=True, help="Task ID")
-    comment_parser.add_argument("--content", required=True, help="Comment text")
-    comment_parser.set_defaults(func=post_comment)
+    tag_rem = tag_sub.add_parser("remove")
+    tag_rem.add_argument("--task-id", required=True)
+    tag_rem.add_argument("--tag-name", required=True)
 
-    # List Members
-    members_parser = subparsers.add_parser(
-        "list-members", help="List members of a list or task"
-    )
-    members_parser.add_argument(
-        "--list-id", default=os.getenv("CLICKUP_LIST_ID"), help="List ID"
-    )
-    members_parser.add_argument(
-        "--task-id", help="Task ID (optional, overrides list-id)"
-    )
-    members_parser.set_defaults(func=list_members)
+    tag_p.set_defaults(func=manage_tags)
 
-    # List Custom Fields
-    cf_list_parser = subparsers.add_parser(
-        "list-custom-fields", help="List custom fields for a list"
-    )
-    cf_list_parser.add_argument(
-        "--list-id", default=os.getenv("CLICKUP_LIST_ID"), help="List ID"
-    )
-    cf_list_parser.set_defaults(func=list_custom_fields)
+    att_p = sub.add_parser("upload-attachment")
+    att_p.add_argument("--task-id", required=True)
+    att_p.add_argument("--file", required=True)
+    att_p.set_defaults(func=upload_attachment)
 
-    # Set Custom Field
-    cf_set_parser = subparsers.add_parser(
-        "set-custom-field", help="Set custom field value"
-    )
-    cf_set_parser.add_argument("--task-id", required=True, help="Task ID")
-    cf_set_parser.add_argument("--field-id", required=True, help="Field ID")
-    cf_set_parser.add_argument(
-        "--value", required=True, help="Value (string or JSON for complex types)"
-    )
-    cf_set_parser.set_defaults(func=set_custom_field)
+    dep_p = sub.add_parser("manage-dependencies")
+    dep_sub = dep_p.add_subparsers(dest="action", required=True)
 
-    # Add Time Entry
-    time_parser = subparsers.add_parser("add-time-entry", help="Add a time entry")
-    time_parser.add_argument(
-        "--team-id", default=os.getenv("CLICKUP_TEAM_ID"), help="Team/Workspace ID"
-    )
-    time_parser.add_argument("--task-id", required=True, help="Task ID")
-    time_parser.add_argument(
-        "--duration-ms", required=True, help="Duration in milliseconds"
-    )
-    time_parser.add_argument("--description", help="Entry description")
-    time_parser.add_argument("--start", help="Start time in ms (defaults to now)")
-    time_parser.set_defaults(func=add_time_entry)
+    dep_add = dep_sub.add_parser("add")
+    dep_add.add_argument("--task-id", required=True)
+    dep_add.add_argument("--depends-on", required=True)
 
-    # Manage Checklists
-    checklist_parser = subparsers.add_parser(
-        "manage-checklist", help="Manage task checklists"
-    )
-    checklist_subparsers = checklist_parser.add_subparsers(dest="action", required=True)
+    dep_rem = dep_sub.add_parser("remove")
+    dep_rem.add_argument("--task-id", required=True)
+    dep_rem.add_argument("--dependency-id", required=True)
 
-    cl_create = checklist_subparsers.add_parser("create")
-    cl_create.add_argument("--task-id", required=True)
-    cl_create.add_argument("--name", required=True)
+    dep_p.set_defaults(func=manage_dependencies)
 
-    cl_add_item = checklist_subparsers.add_parser("add-item")
-    cl_add_item.add_argument("--checklist-id", required=True)
-    cl_add_item.add_argument("--name", required=True)
-    cl_add_item.add_argument("--assignee", help="User ID to assign")
+    lg_p = sub.add_parser("list-goals")
+    lg_p.add_argument("--team-id", default=os.getenv("CLICKUP_TEAM_ID"))
+    lg_p.set_defaults(func=list_goals)
 
-    checklist_parser.set_defaults(func=manage_checklist)
+    # Docs
+    ld_p = sub.add_parser("list-docs")
+    ld_p.add_argument("--team-id", default=os.getenv("CLICKUP_TEAM_ID"))
+    ld_p.set_defaults(func=list_docs)
 
-    # General Task Update
-    update_task_parser = subparsers.add_parser(
-        "update-task", help="Update general task properties"
-    )
-    update_task_parser.add_argument("--task-id", required=True, help="Task ID")
-    update_task_parser.add_argument("--name", help="New name")
-    update_task_parser.add_argument("--description", help="New description")
-    update_task_parser.add_argument("--priority", help="New priority (1-4)")
-    update_task_parser.add_argument("--status", help="New status")
-    update_task_parser.add_argument("--start-date", help="Start date in MS")
-    update_task_parser.add_argument("--due-date", help="Due date (MS or DD/MM/YYYY)")
-    update_task_parser.set_defaults(func=update_task)
+    doc_cp = sub.add_parser("create-doc")
+    doc_cp.add_argument("--team-id", default=os.getenv("CLICKUP_TEAM_ID"))
+    doc_cp.add_argument("--name", required=True)
+    doc_cp.set_defaults(func=create_doc)
 
-    # Bulk Create
-    bulk_parser = subparsers.add_parser(
-        "bulk-create", help="Create multiple tasks from JSON"
-    )
-    bulk_parser.add_argument(
-        "--list-id", default=os.getenv("CLICKUP_LIST_ID"), help="List ID"
-    )
-    bulk_parser.add_argument(
-        "--file", required=True, help="Path to JSON file or JSON string"
-    )
-    bulk_parser.set_defaults(func=bulk_create)
+    pag_cp = sub.add_parser("create-page")
+    pag_cp.add_argument("--team-id", default=os.getenv("CLICKUP_TEAM_ID"))
+    pag_cp.add_argument("--doc-id", required=True)
+    pag_cp.add_argument("--name", required=True)
+    pag_cp.add_argument("--content")
+    pag_cp.add_argument("--content-format", default="text")
+    pag_cp.set_defaults(func=create_page)
 
-    # Docs Management
-    doc_list_parser = subparsers.add_parser("list-docs", help="List workspace docs")
-    doc_list_parser.add_argument(
-        "--team-id", default=os.getenv("CLICKUP_TEAM_ID"), help="Workspace ID"
-    )
-    doc_list_parser.set_defaults(func=list_docs)
-
-    doc_create_parser = subparsers.add_parser(
-        "create-doc", help="Create a workspace doc"
-    )
-    doc_create_parser.add_argument(
-        "--team-id", default=os.getenv("CLICKUP_TEAM_ID"), help="Workspace ID"
-    )
-    doc_create_parser.add_argument("--name", required=True, help="Doc name")
-    doc_create_parser.set_defaults(func=create_doc)
-
-    page_create_parser = subparsers.add_parser("create-page", help="Create a doc page")
-    page_create_parser.add_argument(
-        "--team-id", default=os.getenv("CLICKUP_TEAM_ID"), help="Workspace ID"
-    )
-    page_create_parser.add_argument("--doc-id", required=True, help="Doc ID")
-    page_create_parser.add_argument("--name", required=True, help="Page name")
-    page_create_parser.add_argument("--content", help="Page content")
-    page_create_parser.add_argument(
-        "--content-format", choices=["text", "html", "markdown"], default="text"
-    )
-    page_create_parser.set_defaults(func=create_page)
-
-    page_update_parser = subparsers.add_parser("update-page", help="Update a doc page")
-    page_update_parser.add_argument(
-        "--team-id", default=os.getenv("CLICKUP_TEAM_ID"), help="Workspace ID"
-    )
-    page_update_parser.add_argument("--doc-id", required=True, help="Doc ID")
-    page_update_parser.add_argument("--page-id", required=True, help="Page ID")
-    page_update_parser.add_argument("--name", help="New name")
-    page_update_parser.add_argument("--content", help="New content")
-    page_update_parser.add_argument(
-        "--content-format", choices=["text", "html", "markdown"], default="text"
-    )
-    page_update_parser.add_argument(
-        "--edit-mode", choices=["replace", "append", "prepend"], default="replace"
-    )
-    page_update_parser.set_defaults(func=update_page)
-
-    # Webhooks Management
-    webhook_list_parser = subparsers.add_parser(
-        "list-webhooks", help="List workspace webhooks"
-    )
-    webhook_list_parser.add_argument(
-        "--team-id", default=os.getenv("CLICKUP_TEAM_ID"), help="Workspace ID"
-    )
-    webhook_list_parser.set_defaults(func=list_webhooks)
-
-    webhook_create_parser = subparsers.add_parser(
-        "create-webhook", help="Create a webhook"
-    )
-    webhook_create_parser.add_argument(
-        "--team-id", default=os.getenv("CLICKUP_TEAM_ID"), help="Workspace ID"
-    )
-    webhook_create_parser.add_argument(
-        "--endpoint", required=True, help="Destination URL"
-    )
-    webhook_create_parser.add_argument(
-        "--events",
-        required=True,
-        help="Comma separated events (e.g. taskCreated,taskStatusUpdated)",
-    )
-    webhook_create_parser.add_argument("--space-id", help="Filter by space")
-    webhook_create_parser.add_argument("--folder-id", help="Filter by folder")
-    webhook_create_parser.add_argument("--list-id", help="Filter by list")
-    webhook_create_parser.set_defaults(func=create_webhook)
-
-    webhook_delete_parser = subparsers.add_parser(
-        "delete-webhook", help="Delete a webhook"
-    )
-    webhook_delete_parser.add_argument("--webhook-id", required=True, help="Webhook ID")
-    webhook_delete_parser.set_defaults(func=delete_webhook)
+    bc_p = sub.add_parser("bulk-create")
+    bc_p.add_argument("--list-id", default=os.getenv("CLICKUP_LIST_ID"))
+    bc_p.add_argument("--file", required=True)
+    bc_p.set_defaults(func=bulk_create)
 
     args = parser.parse_args()
-
-    # Validation for required args that might rely on env vars
-    # Skip validation for 'configure' command
-    if args.command == "configure":
-        pass
-    elif (
-        args.command
-        in ["list-spaces", "list-docs", "create-doc", "list-webhooks", "create-webhook"]
-        and not args.team_id
-    ):
-        print("Error: --team-id is required (or set CLICKUP_TEAM_ID)")
-        sys.exit(1)
-    elif args.command == "list-folders" and not args.space_id:
-        folders_parser.error("--space-id is required (or set CLICKUP_SPACE_ID)")
-    elif args.command == "list-lists" and not args.folder_id and not args.space_id:
-        lists_parser.error("--folder-id or --space-id is required")
-    elif (
-        (
-            args.command
-            in ["list-tasks", "create-task", "list-members", "list-custom-fields"]
-        )
-        and not args.list_id
-        and not (hasattr(args, "task_id") and args.task_id)
-    ):
-        print(
-            f"Error: --list-id is required for {args.command} (or set CLICKUP_LIST_ID)"
-        )
-        sys.exit(1)
-
-    if hasattr(args, "func"):
-        args.func(args)
-    else:
-        parser.print_help()
+    get_client(args.bypass_cache)  # Initialize with flag
+    try:
+        if hasattr(args, "func"):
+            args.func(args)
+        else:
+            parser.print_help()
+    finally:
+        # Clean shutdown of pbar if initialized
+        if _client_instance and _client_instance.limiter.pbar:
+            _client_instance.limiter.pbar.close()
 
 
 if __name__ == "__main__":

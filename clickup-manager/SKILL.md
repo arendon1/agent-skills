@@ -1,54 +1,40 @@
 ---
 name: clickup-manager
 description: >-
-  Manage ClickUp projects, lists, and tasks using a Personal Access Token (PAT).
-  Use when you need to list workspaces, spaces, folders, lists, or create new tasks in ClickUp.
-  Requires CLICKUP_PAT environment variable.
-user-invocable: true
+  Allows LLM agents to manage ClickUp projects using a Hybrid API approach (v3 with v2 fallback).
+  Optimized for ClickUp 3.0, including Rate Limiting with visual monitoring and Free Tier enhancement.
+metadata:
+  version: "2.0.0"
+  language: en
 ---
 
 # ClickUp Manager
 
-Allows LLM agents to manage ClickUp projects by interacting with the ClickUp API V2.
+Allows LLM agents to manage ClickUp projects by interacting with the ClickUp API (v3/v2).
 
 ## 🔑 Authentication setup
 
 To use this skill, you must have a ClickUp Personal Access Token (PAT).
 
 1. **Get your PAT**:
-   - Go to ClickUp Settings -> Apps.
-   - Generate a new API Token.
+   - Go to ClickUp Settings -> Apps -> Generate API Token.
 2. **Set environment variable**:
    - Add `CLICKUP_PAT=pk_your_token_here` to your `.env` file.
 3. **Install dependencies**:
-   - Run `pip install -r requirements.txt`.
-4. **Optional - Context Scoping**: Add default IDs to avoid repeating them:
+   - Run `pip install -r requirements.txt` (includes `tqdm` for RPM tracking).
 
-   ```bash
-   CLICKUP_TEAM_ID=...
-   CLICKUP_SPACE_ID=...
-   CLICKUP_FOLDER_ID=...
-   CLICKUP_LIST_ID=...
-   ```
+## ⚡ Features (v2.0)
 
-   - This allows you to run commands like `clickup_client.py list-tasks` without specifying the list ID every time.
-   - This ensures your token is secure and not committed to git.
-
-## ⚡ Features
-
-- **Token Efficient**: Uses `--format brief` by default for concise outputs.
-- **Context Aware**: Auto-loads `.env` from workspace.
-- **Interactive Config**: Run `configure` to set up your defaults.
+- **Hybrid API Layer**: Uses API v3 by default, with automatic fallback to v2 for legacy endpoints.
+- **Efficiency & RPM Tracking**: Managed 100 RPM with a visual progress bar and backoff.
+- **ClickUp 3.0 Ready**: Structural alignment with "Workspace" terminology.
+- **Free Tier Maximized**: Support for Tags, Attachments, Dependencies, and Goals.
 
 ## 🛠️ Usage
 
 ### Quick Setup 🚀
 
-Type `/setup` to launch the interactive configuration wizard.
-
-### Configuration Wizard 🧙
-
-Run this first to interactively select your Workspace, Space, and Folder. It will save your choices to `.env`.
+Run the interactive wizard to set up your `.env` defaults:
 
 ```bash
 python scripts/clickup_client.py configure
@@ -56,152 +42,80 @@ python scripts/clickup_client.py configure
 
 ### Commands
 
-This skill provides a Python script `scripts/clickup_client.py` to interact with ClickUp.
-
-### Efficient Data Retrieval (Brief Mode)
-
-Use `--format brief` to save tokens by getting only IDs, names, and statuses.
+### Workspaces & Hierarchy
 
 ```bash
-python scripts/clickup_client.py --format brief list-teams
+python scripts/clickup_client.py list-teams        # List Workspaces
+python scripts/clickup_client.py list-spaces       # List Spaces in a Workspace
+python scripts/clickup_client.py list-folders      # List Folders in a Space
+python scripts/clickup_client.py list-lists        # List Lists in a Folder/Space
 ```
 
-### List Workspaces (Teams)
+### Task Management
 
 ```bash
-python scripts/clickup_client.py list-teams
+# List tasks with filters and brief output (token efficient)
+python scripts/clickup_client.py --format brief list-tasks --status "Doing" --search "Bug"
+
+# Create task (supports DD/MM/YYYY and subtasks)
+python scripts/clickup_client.py create-task --name "Title" --due-date "28/02/2026" --parent <TASK_ID>
+
+# Update task
+python scripts/clickup_client.py update-task --task-id <ID> --status "Complete" --priority 1
 ```
 
-### List Spaces
+### Free Tier Enhancements (NEW)
 
 ```bash
-python scripts/clickup_client.py list-spaces --team-id <TEAM_ID>
+# Tags
+python scripts/clickup_client.py manage-tags list --space-id <ID>
+python scripts/clickup_client.py manage-tags add --task-id <ID> --tag-name "Urgent"
+
+# Attachments (100MB Bucket)
+python scripts/clickup_client.py upload-attachment --task-id <ID> --file "report.pdf"
+
+# Dependencies
+python scripts/clickup_client.py manage-dependencies add --task-id <ID> --depends-on <OTHER_ID>
+
+# Goals
+python scripts/clickup_client.py list-goals
 ```
 
-### List Folders
+### Knowledge Management (Docs v3)
 
 ```bash
-python scripts/clickup_client.py list-folders --space-id <SPACE_ID>
-```
-
-### List Lists
-
-```bash
-python scripts/clickup_client.py list-lists --folder-id <FOLDER_ID>
-```
-
-### List Tasks (with filtering)
-
-Filter by status, assignee, or search text to find exactly what you need without loading hundreds of tasks.
-
-```bash
-# Brief list of open bugs
-python scripts/clickup_client.py --format brief list-tasks --list-id <LIST_ID> --status "Open" --search "bug"
-```
-
-### Get Task Details
-
-```bash
-python scripts/clickup_client.py get-task --task-id <TASK_ID>
-```
-
-### Create Task (Natural Dates Supported)
-
-You can use numeric Epoch MS or human-readable dates (`DD/MM/YYYY`). Due dates default to 23:59:59.
-
-```bash
-python scripts/clickup_client.py create-task --list-id <LIST_ID> --name "Task Name" --due-date "28/02/2026"
-```
-
-### Bulk Create Tasks
-
-Create multiple tasks from a JSON file.
-
-```bash
-# JSON format: [{"name": "Task 1", "due_date": "01/03/2026"}, {"name": "Task 2"}]
-python scripts/clickup_client.py bulk-create --list-id <LIST_ID> --file tasks.json
-```
-
-### Update Task
-
-```bash
-# Update multiple fields at once
-python scripts/clickup_client.py update-task --task-id <TASK_ID> --priority 1 --status "Doing" --description "New description"
-```
-
-### Post Comment
-
-```bash
-python scripts/clickup_client.py post-comment --task-id <TASK_ID> --content "Work started on this item."
-```
-
-### List Members
-
-Retrieve people available for assignment.
-
-```bash
-python scripts/clickup_client.py list-members --list-id <LIST_ID>
-```
-
-### Custom Fields
-
-```bash
-# List available custom fields for a list
-python scripts/clickup_client.py list-custom-fields --list-id <LIST_ID>
-
-# Set value (supports strings and JSON for complex types)
-python scripts/clickup_client.py set-custom-field --task-id <TASK_ID> --field-id <FIELD_ID> --value "high"
-```
-
-### Time Tracking
-
-```bash
-# Add 1 hour (3600000 ms) entry
-python scripts/clickup_client.py add-time-entry --task-id <TASK_ID> --duration-ms 3600000 --description "Analysis phase"
-```
-
-### Checklists
-
-```bash
-# Create a checklist
-python scripts/clickup_client.py manage-checklist create --task-id <TASK_ID> --name "Deployment Steps"
-
-# Add item to checklist
-python scripts/clickup_client.py manage-checklist add-item --checklist-id <CHECKLIST_ID> --name "Run migrations"
-```
-
-### Knowledge Management (Docs)
-
-Manage project documentation and SOPs across the workspace.
-
-```bash
-# List all docs in workspace
 python scripts/clickup_client.py list-docs
-
-# Create a new doc
-python scripts/clickup_client.py create-doc --name "Project Wiki"
-
-# Create a page in a doc
-python scripts/clickup_client.py create-page --doc-id <DOC_ID> --name "Architecture" --content "Details go here..." --content-format markdown
-
-# Update page content
-python scripts/clickup_client.py update-page --doc-id <DOC_ID> --page-id <PAGE_ID> --content "Updated architecture info" --edit-mode replace
+python scripts/clickup_client.py create-doc --name "Strategy"
+python scripts/clickup_client.py create-page --doc-id <ID> --name "Architecture" --content "Details..."
 ```
 
-### Webhooks (Event-Driven)
+## 🛡️ Best Practices & Safety
 
-Subscribe to workspace events to trigger external automations.
+To avoid data pollution and duplicate tasks when working alongside manual users:
 
-```bash
-# List active webhooks
-python scripts/clickup_client.py list-webhooks
+### 1. Search-Before-Act (Heuristic)
 
-# Create a webhook for task updates
-python scripts/clickup_client.py create-webhook --endpoint "https://your-api.com/webhook" --events "taskCreated,taskStatusUpdated"
+Always verify existence before creating new items:
 
-# Delete a webhook
-python scripts/clickup_client.py delete-webhook --webhook-id <WEBHOOK_ID>
-```
+- **Tasks**: Use `list-tasks --search "Name"` or the new `--check-exists` flag.
+- **Tags**: The system automatically avoids duplicate tags.
+- **Subtasks**: Check the parent task's subtasks before adding more.
+
+### 2. Tiered Caching (Transparent)
+
+The skill uses a local cache (`.clickup_cache.json`) to speed up operations:
+
+- **Discovery (Workspaces/Lists)**: Cached for **24 hours**.
+- **Operations (Tasks/Tags)**: Cached for **2 hours**.
+- **Management**:
+  - Use `--bypass-cache` to force a fresh fetch from ClickUp.
+  - Use `configure --clear-cache` to reset all local data.
+
+### 3. Decision Heuristics
+
+- If an exact match is found: **Use existing ID**.
+- If a partial match is found: **Ask the USER** for confirmation.
+- If no match: **Proceed with creation**.
 
 ## 📚 References
 

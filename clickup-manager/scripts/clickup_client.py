@@ -287,6 +287,38 @@ class ClickUpClient:
             return data
         return []
 
+    # --- Task Types & Discovery ---
+    def list_custom_task_types(self, workspace_id, format_type="brief"):
+        """Get custom task types for a workspace (v2 endpoint but consistent with v3 needs)."""
+        cache_key = f"custom_items:{workspace_id}"
+        cached = self.cache.get(cache_key, "team/custom_item")
+        if cached:
+            self.format_output(cached, format_type)
+            return cached
+
+        response = self._request(
+            "GET", f"team/{workspace_id}/custom_item", version="v2"
+        )
+        if response and response.status_code == 200:
+            data = response.json().get("custom_items", [])
+            self.cache.set(cache_key, data)
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    def resolve_task_type(self, workspace_id, type_name_or_id):
+        """Heuristic to resolve a task type by name or ID using cache."""
+        types = self.list_custom_task_types(workspace_id, format_type="silent")
+        for t in types:
+            # Check ID match
+            if str(t.get("id")) == str(type_name_or_id):
+                return t.get("id")
+            # Check name match (case insensitive)
+            if t.get("name", "").lower() == str(type_name_or_id).lower():
+                return t.get("id")
+        # Default fallback: return as is (might be a raw ID)
+        return type_name_or_id
+
     # --- Task Management ---
     def list_tasks(
         self, list_id, status=None, assignee=None, search=None, format_type="brief"
@@ -339,6 +371,13 @@ class ClickUpClient:
         start_date=None,
         due_date=None,
         parent=None,
+        priority=None,
+        assignees=None,
+        tags=None,
+        status=None,
+        task_type=None,
+        time_estimate=None,
+        custom_fields=None,
         check_exists=False,
         format_type="brief",
     ):
@@ -353,6 +392,29 @@ class ClickUpClient:
         payload = {"name": name, "description": description or ""}
         if parent:
             payload["parent"] = parent
+        if priority:
+            payload["priority"] = int(priority)
+        if status:
+            payload["status"] = status
+        if tags:
+            payload["tags"] = tags if isinstance(tags, list) else [tags]
+        if assignees:
+            payload["assignees"] = (
+                assignees if isinstance(assignees, list) else [assignees]
+            )
+        if time_estimate:
+            payload["time_estimate"] = int(time_estimate)
+        if custom_fields:
+            payload["custom_fields"] = custom_fields
+
+        if task_type:
+            # We need workspace_id to resolve task type from cache/heuristics
+            # Usually CLICKUP_TEAM_ID is available
+            ws_id = os.getenv("CLICKUP_TEAM_ID")
+            if ws_id:
+                resolved_type = self.resolve_task_type(ws_id, task_type)
+                payload["custom_item_id"] = resolved_type
+
         if start_date:
             v = self.parse_date(start_date)
             if v:
@@ -361,6 +423,7 @@ class ClickUpClient:
             v = self.parse_date(due_date, is_due=True)
             if v:
                 payload["due_date"] = v
+
         response = self._request(
             "POST", f"list/{list_id}/task", json=payload, version="v2"
         )
@@ -379,6 +442,11 @@ class ClickUpClient:
         status=None,
         start_date=None,
         due_date=None,
+        parent=None,
+        time_estimate=None,
+        task_type=None,
+        assignees_add=None,
+        assignees_rem=None,
     ):
         payload = {}
         if name:
@@ -389,15 +457,69 @@ class ClickUpClient:
             payload["priority"] = int(priority)
         if status:
             payload["status"] = status
+        if parent:
+            payload["parent"] = parent
+        if time_estimate:
+            payload["time_estimate"] = int(time_estimate)
+        if task_type:
+            ws_id = os.getenv("CLICKUP_TEAM_ID")
+            if ws_id:
+                payload["custom_item_id"] = self.resolve_task_type(ws_id, task_type)
+
         if start_date:
             payload["start_date"] = self.parse_date(start_date)
         if due_date:
             payload["due_date"] = self.parse_date(due_date, is_due=True)
+
+        if assignees_add or assignees_rem:
+            payload["assignees"] = {}
+            if assignees_add:
+                payload["assignees"]["add"] = (
+                    assignees_add
+                    if isinstance(assignees_add, list)
+                    else [assignees_add]
+                )
+            if assignees_rem:
+                payload["assignees"]["rem"] = (
+                    assignees_rem
+                    if isinstance(assignees_rem, list)
+                    else [assignees_rem]
+                )
+
         response = self._request("PUT", f"task/{task_id}", json=payload, version="v2")
         if response and response.status_code == 200:
             print(f"Task {task_id} updated.")
             return response.json()
         return None
+
+    # --- Comments & Custom Fields ---
+    def add_comment(self, task_id, text, notify_all=False):
+        payload = {"comment_text": text, "notify_all": notify_all}
+        return self._request(
+            "POST", f"task/{task_id}/comment", json=payload, version="v2"
+        )
+
+    def list_comments(self, task_id, format_type="brief"):
+        response = self._request("GET", f"task/{task_id}/comment", version="v2")
+        if response and response.status_code == 200:
+            data = response.json().get("comments", [])
+            self.format_output(data, format_type)
+            return data
+        return []
+
+    def set_custom_field(self, task_id, field_id, value):
+        payload = {"value": value}
+        return self._request(
+            "POST", f"task/{task_id}/field/{field_id}", json=payload, version="v2"
+        )
+
+    def list_accessible_custom_fields(self, list_id, format_type="brief"):
+        response = self._request("GET", f"list/{list_id}/field", version="v2")
+        if response and response.status_code == 200:
+            data = response.json().get("fields", [])
+            self.format_output(data, format_type)
+            return data
+        return []
 
     # --- Free Tier Features ---
     def manage_tags(
@@ -553,6 +675,14 @@ def get_task(args):
 
 
 def create_task(args):
+    # Parse custom fields if provided as JSON string
+    cf = None
+    if getattr(args, "custom_fields", None):
+        try:
+            cf = json.loads(args.custom_fields)
+        except Exception:
+            print("Warning: Could not parse custom_fields JSON.")
+
     get_client().create_task(
         args.list_id,
         args.name,
@@ -560,6 +690,13 @@ def create_task(args):
         args.start_date,
         args.due_date,
         args.parent,
+        args.priority,
+        args.assignees,
+        args.tags,
+        args.status,
+        args.task_type,
+        args.time_estimate,
+        cf,
         args.check_exists,
         args.format,
     )
@@ -574,6 +711,11 @@ def update_task(args):
         args.status,
         args.start_date,
         args.due_date,
+        args.parent,
+        args.time_estimate,
+        args.task_type,
+        args.assignees_add,
+        args.assignees_rem,
     )
 
 
@@ -624,6 +766,44 @@ def bulk_create(args):
         get_client().bulk_create(args.list_id, tasks)
     except Exception as e:
         print(f"Error: {e}")
+
+
+def list_task_types(args):
+    get_client().list_custom_task_types(args.team_id, args.format)
+
+
+def add_comment(args):
+    get_client().add_comment(
+        args.task_id, args.text, getattr(args, "notify_all", False)
+    )
+
+
+def list_comments(args):
+    get_client().list_comments(args.task_id, args.format)
+
+
+def set_custom_field(args):
+    get_client().set_custom_field(args.task_id, args.field_id, args.value)
+
+
+def list_custom_fields(args):
+    get_client().list_accessible_custom_fields(args.list_id, args.format)
+
+
+def manage_comments(args):
+    if args.action == "list":
+        get_client().list_comments(args.task_id, args.format)
+    elif args.action == "add":
+        get_client().add_comment(
+            args.task_id, args.text, getattr(args, "notify_all", False)
+        )
+
+
+def manage_custom_fields(args):
+    if args.action == "list":
+        get_client().list_accessible_custom_fields(args.list_id, args.format)
+    elif args.action == "set":
+        get_client().set_custom_field(args.task_id, args.field_id, args.value)
 
 
 def update_env_file(path, key, value):
@@ -766,6 +946,13 @@ def main():
     tc_p.add_argument("--start-date")
     tc_p.add_argument("--due-date")
     tc_p.add_argument("--parent")
+    tc_p.add_argument("--priority")
+    tc_p.add_argument("--status")
+    tc_p.add_argument("--assignees", nargs="+")
+    tc_p.add_argument("--tags", nargs="+")
+    tc_p.add_argument("--task-type", help="Name or ID of custom task type")
+    tc_p.add_argument("--time-estimate", type=int, help="Time estimate in ms")
+    tc_p.add_argument("--custom-fields", help="JSON string of custom fields")
     tc_p.add_argument(
         "--check-exists", action="store_true", help="Evitar duplicados por nombre"
     )
@@ -779,6 +966,11 @@ def main():
     tu_p.add_argument("--status")
     tu_p.add_argument("--start-date")
     tu_p.add_argument("--due-date")
+    tu_p.add_argument("--parent")
+    tu_p.add_argument("--time-estimate", type=int)
+    tu_p.add_argument("--task-type")
+    tu_p.add_argument("--assignees-add", nargs="+")
+    tu_p.add_argument("--assignees-rem", nargs="+")
     tu_p.set_defaults(func=update_task)
 
     # Extras (Free)
@@ -802,6 +994,34 @@ def main():
     att_p.add_argument("--task-id", required=True)
     att_p.add_argument("--file", required=True)
     att_p.set_defaults(func=upload_attachment)
+
+    # New Features
+    ltt_p = sub.add_parser("list-task-types")
+    ltt_p.add_argument("--team-id", default=os.getenv("CLICKUP_TEAM_ID"))
+    ltt_p.set_defaults(func=list_task_types)
+
+    com_p = sub.add_parser("manage-comments")
+    com_sub = com_p.add_subparsers(dest="action", required=True)
+    com_sub.add_parser("list").add_argument("--task-id", required=True)
+    com_add = com_sub.add_parser("add")
+    com_add.add_argument("--task-id", required=True)
+    com_add.add_argument("--text", required=True)
+    com_add.add_argument("--notify-all", action="store_true")
+    com_p.set_defaults(
+        func=manage_comments
+    )  # We need to create manage_comments or fix bridge
+
+    # Custom Fields
+    cf_p = sub.add_parser("manage-custom-fields")
+    cf_sub = cf_p.add_subparsers(dest="action", required=True)
+    cf_sub.add_parser("list").add_argument(
+        "--list-id", default=os.getenv("CLICKUP_LIST_ID")
+    )
+    cf_set = cf_sub.add_parser("set")
+    cf_set.add_argument("--task-id", required=True)
+    cf_set.add_argument("--field-id", required=True)
+    cf_set.add_argument("--value", required=True)
+    cf_p.set_defaults(func=manage_custom_fields)
 
     dep_p = sub.add_parser("manage-dependencies")
     dep_sub = dep_p.add_subparsers(dest="action", required=True)

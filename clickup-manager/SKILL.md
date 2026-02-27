@@ -29,6 +29,8 @@ To use this skill, you must have a ClickUp Personal Access Token (PAT).
 - **Efficiency & RPM Tracking**: Managed 100 RPM with a visual progress bar and backoff.
 - **ClickUp 3.0 Ready**: Structural alignment with "Workspace" terminology.
 - **Free Tier Maximized**: Support for Tags, Attachments, Dependencies, and Goals.
+- **Advanced Metadata**: Support for **Custom Task Types**, **Comments**, and **Custom Fields**.
+- **Heuristic Discovery**: Intelligent resolution of task types and duplicate prevention via cache.
 
 ## 🛠️ Usage
 
@@ -60,8 +62,8 @@ python scripts/clickup_client.py --format brief list-tasks --status "Doing" --se
 # Create task (supports DD/MM/YYYY and subtasks)
 python scripts/clickup_client.py create-task --name "Title" --due-date "28/02/2026" --parent <TASK_ID>
 
-# Update task
-python scripts/clickup_client.py update-task --task-id <ID> --status "Complete" --priority 1
+# Update task (supports moving subtasks, time estimate, and assignees add/rem)
+python scripts/clickup_client.py update-task --task-id <ID> --status "Complete" --priority 1 --time-estimate 3600000 --assignees-add <USER_ID>
 ```
 
 ### Free Tier Enhancements (NEW)
@@ -79,6 +81,23 @@ python scripts/clickup_client.py manage-dependencies add --task-id <ID> --depend
 
 # Goals
 python scripts/clickup_client.py list-goals
+
+### Advanced Management (NEW)
+
+```bash
+# Custom Task Types
+python scripts/clickup_client.py list-task-types
+python scripts/clickup_client.py create-task --name "New Bug" --task-type "Bug"
+
+# Comments
+python scripts/clickup_client.py manage-comments list --task-id <ID>
+python scripts/clickup_client.py manage-comments add --task-id <ID> --text "Updated status"
+
+# Custom Fields
+python scripts/clickup_client.py manage-custom-fields list --list-id <ID>
+python scripts/clickup_client.py manage-custom-fields set --task-id <ID> --field-id <FID> --value "Custom Value"
+```
+
 ```
 
 ### Knowledge Management (Docs v3)

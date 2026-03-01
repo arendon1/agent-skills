@@ -34,6 +34,7 @@ Do not try to "manually" write validation algorithms. **Use the scripts.**
 Use this workflow to scaffold a brand new, structurally flawless skill directory.
 
 - **Behind the scenes**: It runs `scripts/init_skill.py`.
+- **skillfish Integration**: Automatically executes `skillfish init` to generate a `skillfish.json` manifest.
 - **Next steps**: Focus entirely on polishing the `description` string. It must start with "Use when..." and explain the *triggering symptoms*, not the process. Keep the `SKILL.md` under 500 lines.
 
 ### 2. `/skill-improve` (Empirical TDD Optimization)
@@ -55,6 +56,7 @@ Use this workflow before finalizing a skill.
   - `SKILL.md` length (<500 lines).
   - Third-party prompt formatting ("Use when...").
   - Reference folder depth (max 1 level deep).
+  - **skillfish Audit**: Verifies that `skillfish.json` exists, is valid, and matches the skill.
   - **Language Audit**: Verifies that the skill is either English or Spanish and remains consistent throughout.
   - **Security Scan**: Statically analyzes `scripts/` for obvious bad practices (e.g., unfiltered `os.system()`, `eval()`).
 
@@ -64,14 +66,32 @@ Use this workflow to zip one or many skills for sharing or distribution.
 
 - **Behind the scenes**: It runs `scripts/package_skills.py`.
 - **Functionality**:
-  - Packages the entire skill directory into a `.skill` (ZIP) format.
+  - Packages the entire skill directory into a `.zip` format.
   - Supports multiple skill paths at once.
   - Automatically excludes junk like `__pycache__` and `.git`.
+  - **skillfish Extras**: Use `--bundle` to update the workshop manifest or `--submit [repo]` to register skills.
 - **Result**: Retrieve the generated archives from the `dist/` directory.
 
-## Required Skill Frontmatter
+### 5. `/skill-manage` (Registry and Operations)
 
-Every skill created by the forge must use this generalized frontmatter schema:
+Use this workflow to browse, list, update, or remove skills using the `skillfish` engine.
+
+- **Behind the scenes**: It runs `scripts/skill_manager.py`.
+- **Operations**: `list`, `search [query]`, `update`, `remove [skill]`, `bundle`.
+
+### 6. `/skill-sync` (Environment Synchronization)
+
+Use this workflow to synchronize your local environment with the project's `skillfish.json` manifest.
+
+- **Behind the scenes**: It runs `scripts/skill_manager.py sync --project`.
+- **Purpose**: Ensures all team members or agents have the exact same skill set installed.
+
+## Required Skill Frontmatter (CRITICAL)
+
+Every skill created by the forge **MUST** use this generalized frontmatter schema **embedded directly at the very top of the `SKILL.md` file**.
+
+> [!CAUTION]
+> **NEVER** separate the YAML frontmatter into a separate `.yml` or `.yaml` file. The frontmatter MUST be the first thing in `SKILL.md`, delimited by `---` markers.
 
 ```yaml
 ---

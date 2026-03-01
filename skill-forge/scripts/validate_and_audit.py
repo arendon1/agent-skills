@@ -17,11 +17,29 @@ def validate_skill(skill_path: Path) -> bool:
         return False
 
     with open(skill_md, "r", encoding="utf-8") as f:
+        first_line = f.readline().strip()
+        f.seek(0)
         lines = f.readlines()
 
     if len(lines) > 500:
         print(
             f"❌ Error: SKILL.md is {len(lines)} lines long. Maximum is 500. Extract details to references/ instead."
+        )
+        return False
+
+    if first_line != "---":
+        print("❌ Error: SKILL.md MUST start with '---' YAML frontmatter delimiter.")
+        return False
+
+    # Check for second --- delimiter
+    delim_count = 0
+    for line in lines:
+        if line.strip() == "---":
+            delim_count += 1
+
+    if delim_count < 2:
+        print(
+            "❌ Error: SKILL.md MUST contain a closing '---' YAML frontmatter delimiter."
         )
         return False
 
@@ -50,10 +68,6 @@ def validate_skill(skill_path: Path) -> bool:
                 )
         else:
             body_text += line
-
-        if i > 100 and not in_frontmatter and len(body_text) > 1000:
-            # We have enough to check consistency later
-            pass
 
     if not description_found:
         print("❌ Error: Missing 'description' in SKILL.md frontmatter")
@@ -117,6 +131,60 @@ def validate_skill(skill_path: Path) -> bool:
             except ValueError:
                 continue
 
+    # Check for rogue YAML files in the root that might be leaked metadata
+    # Only flag them if they contain skill-related keys to avoid false positives
+    skill_keys = ["name:", "description:", "metadata:", "trit:", "risk_tier:"]
+    for ext in ["*.yml", "*.yaml"]:
+        for rogue_yml in skill_path.glob(ext):
+            try:
+                with open(rogue_yml, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if any(key in content for key in skill_keys):
+                        print(
+                            f"❌ Error: Skill metadata must NOT be in a separate file ({rogue_yml.name})."
+                        )
+                        print(
+                            "   The YAML frontmatter MUST be embedded inside SKILL.md."
+                        )
+                        return False
+            except Exception:
+                continue
+
+    return True
+
+
+def validate_manifest(skill_path: Path, skill_name: str) -> bool:
+    """
+    Validates the skillfish.json manifest:
+    - Exists in the skill root
+    - Is valid JSON
+    - Name matches the skill directory/frontmatter
+    """
+    import json
+
+    manifest_path = skill_path / "skillfish.json"
+    if not manifest_path.exists():
+        print(f"⚠️ Warning: missing skillfish.json manifest in {skill_path.name}")
+        return False
+
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        manifest_name = data.get("name")
+        if manifest_name != skill_name:
+            print(
+                f"❌ Error: Manifest name '{manifest_name}' does not match skill name '{skill_name}'"
+            )
+            return False
+
+    except json.JSONDecodeError:
+        print(f"❌ Error: skillfish.json is not valid JSON")
+        return False
+    except Exception as e:
+        print(f"❌ Error validating manifest: {e}")
+        return False
+
     return True
 
 
@@ -176,7 +244,11 @@ if __name__ == "__main__":
     skill_dir = Path(args.skill_dir)
     print(f"Auditing {skill_dir.name}...")
 
-    if validate_skill(skill_dir) and security_scan(skill_dir):
+    if (
+        validate_skill(skill_dir)
+        and validate_manifest(skill_dir, skill_dir.name)
+        and security_scan(skill_dir)
+    ):
         print(
             f"✅ Success! {skill_dir.name} passed all validation and security checks."
         )

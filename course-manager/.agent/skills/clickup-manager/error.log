@@ -1,0 +1,11 @@
+
+ClickUp RPM:   0%|          | 0/100 [Peticiones/min]Traceback (most recent call last):
+  File "C:\Users\andres.rendon\Documents\Prompts\skills\clickup-manager\scripts\clickup_client.py", line 676, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\andres.rendon\Documents\Prompts\skills\clickup-manager\scripts\clickup_client.py", line 579, in main
+    ).set_defaults(func=list_spaces)
+      ^^^^^^^^^^^^
+AttributeError: '_StoreAction' object has no attribute 'set_defaults'
+
+ClickUp RPM:   0%|          | 0/100 [Peticiones/min]

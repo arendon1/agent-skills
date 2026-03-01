@@ -16,8 +16,8 @@ description: Scaffold a new skill directory using the strict skill-forge standar
 ## Creating a New Skill
 
 1. **Invoke Initialization**: Run `python {forge_script_dir}/init_skill.py <skill-name> --path <destination>`
-2. **Document Triggers**: Edit the newly created `SKILL.md` and focus completely on the `description` block inside the frontmatter. Ensure you answer "Use when...", not "What this does".
-3. **Reference Generation**: Populate any heavy references in `references/` one level deep. Do not nest directories.
+2. **skillfish Integration**: The script automatically initializes a `skillfish.json` manifest.
+3. **Document Triggers**: Edit the newly created `SKILL.md` and focus completely on the `description` block inside the frontmatter. Ensure you answer "Use when...", not "What this does".
 4. **Draft Instructions**: Write the actual instructional prose inside `SKILL.md`, adhering to the maximum 500-line token constraint.
 """,
     "skill-audit": """---
@@ -26,7 +26,7 @@ description: Validate a skill's token efficiency, check structural compliance, a
 ## Auditing a Skill
 
 1. **Invoke Validation**: Run `python {forge_script_dir}/validate_and_audit.py <path-to-skill>`
-2. **Review Violations**: The script will check if `SKILL.md` is over 500 lines, if references are nested too deeply, or if the description misses the "Use when..." directive.
+2. **Review Violations**: The script will check if `SKILL.md` is too long, if description rules are followed, and if **`skillfish.json`** is present and valid.
 3. **Security Scan**: The validation also statically analyzes the `scripts/` directory for obvious bad security practices, exploits, or malware.
 """,
     "skill-package": """---
@@ -34,20 +34,39 @@ description: Zip one or many skills for sharing or distribution
 ---
 ## Packaging Skills
 
-1. **Identify Skills**: Collect the directory paths of the skills you want to package.
-2. **Execute Packaging**: Run `python {forge_script_dir}/package_skills.py <path-to-skill1> [path-to-skill2] ...`
-3. **Optional Output**: You can specify an output directory with `--out <dir>`.
-4. **Collect Artifacts**: The scripts will generate `.skill` (ZIP) files in the `dist/` folder (or your specified output dir).
+1. **Invoke Packaging**: Run `python {forge_script_dir}/package_skills.py <path-to-skill1> [path-to-skill2] ...`
+2. **Distribution Options**:
+   - Use `--bundle` to update the project's `skillfish.json` manifest.
+   - Use `--submit <repo>` to register your skills on skill.fish.
+3. **Collect Artifacts**: Generated `.zip` files will be in the `dist/` folder.
 """,
     "skill-improve": """---
 description: Execute Test-Driven Development loops to optimize a skill's description and test its agentic compliance against baselines
 ---
 ## Improving a Skill
 
-1. **Trigger Evals**: Run `python {forge_script_dir}/generate_trigger_evals.py <path-to-skill>`. Review the generated 20 test cases (positive + negative) with the user.
-2. **Optimize Description**: Run `python {forge_script_dir}/optimize_description.py <path-to-skill> --eval-set <eval.json>`. Ensure you pass your session's model ID so the triggers test against the actual active model.
-3. **Behavioral Benchmarking**: Run `python {forge_script_dir}/run_benchmark.py <path-to-skill> --iterations 1`. This will spawn parallel baseline agents and evaluate them against grading assertions. 
-4. **Iterative Refinement**: Rewrite the rules in `SKILL.md` based on the benchmarking failures, aiming to close agent loopholes, and re-run.
+1. **Trigger Evals**: Run `python {forge_script_dir}/generate_trigger_evals.py <path-to-skill>`. Review the generated 20 test cases.
+2. **Optimize Description**: Run `python {forge_script_dir}/optimize_description.py <path-to-skill> --eval-set <eval.json>`.
+3. **Behavioral Benchmarking**: Run `python {forge_script_dir}/run_benchmark.py <path-to-skill> --iterations 1`.
+4. **Iterative Refinement**: Rewrite the rules in `SKILL.md` based on benchmarking failures and re-run.
+""",
+    "skill-manage": """---
+description: Browse, list, update, or remove skills using the skillfish engine
+---
+## Managing Skills
+
+1. **Inventory**: Run `python {forge_script_dir}/skill_manager.py list` to see installed skills.
+2. **Registry Search**: Run `python {forge_script_dir}/skill_manager.py search <query>`.
+3. **Maintenance**: Run `python {forge_script_dir}/skill_manager.py update` to keep skills fresh.
+4. **Removal**: Run `python {forge_script_dir}/skill_manager.py remove <skill>` to clean up.
+""",
+    "skill-sync": """---
+description: Synchronize environment with the project's skillfish.json manifest
+---
+## Syncing Skills
+
+1. **Manifest Sync**: Run `python {forge_script_dir}/skill_manager.py sync --project`.
+2. **Verification**: After syncing, run `/skill-manage list` to confirm consistency.
 """,
 }
 

@@ -13,7 +13,7 @@ def package_skill(skill_path: Path, output_dir: Path):
     skill_name = skill_path.name
     output_dir.mkdir(exist_ok=True)
 
-    zip_path = output_dir / f"{skill_name}.skill"
+    zip_path = output_dir / f"{skill_name}.zip"
 
     # If the file exists, we'll overwrite it
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -31,9 +31,21 @@ def package_skill(skill_path: Path, output_dir: Path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Package one or more skills into .skill (ZIP) files.")
-    parser.add_argument("skill_paths", nargs="+", help="Paths to one or more skill directories")
-    parser.add_argument("--out", default="dist", help="Output directory for the packaged skills (default: dist)")
+    parser = argparse.ArgumentParser(
+        description="Package one or more skills into .zip files."
+    )
+    parser.add_argument(
+        "skill_paths", nargs="+", help="Paths to one or more skill directories"
+    )
+    parser.add_argument(
+        "--out",
+        default="dist",
+        help="Output directory for the packaged skills (default: dist)",
+    )
+    parser.add_argument(
+        "--bundle", action="store_true", help="Run skillfish bundle after packaging"
+    )
+    parser.add_argument("--submit", help="Run skillfish submit [repo] after packaging")
 
     args = parser.parse_args()
 
@@ -50,5 +62,18 @@ if __name__ == "__main__":
 
     if success_count > 0:
         print(f"\nSummary: Packaged {success_count} skill(s) into {out_dir}")
+
+        # skillfish integration
+        import subprocess
+
+        if args.bundle:
+            print(f"🐟 Bundling skills...")
+            subprocess.run(["skillfish", "bundle"], check=False, shell=True)
+
+        if args.submit:
+            print(f"🐟 Submitting to registry: {args.submit}")
+            subprocess.run(
+                ["skillfish", "submit", args.submit], check=False, shell=True
+            )
     else:
         print("\nNo skills were packaged.")

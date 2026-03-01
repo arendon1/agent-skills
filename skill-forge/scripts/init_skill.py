@@ -61,6 +61,36 @@ def init_skill(skill_name: str, target_dir: Path):
     with open(skill_dir / "SKILL.md", "w", encoding="utf-8") as f:
         f.write(generate_frontmatter(skill_name))
 
+    # skillfish integration
+    print(f"🐟 Initializing skillfish manifest...")
+    try:
+        import subprocess
+
+        # skillfish init --project needs an agent folder to detect
+        agent_dir = skill_dir / ".agent"
+        agent_dir.mkdir(exist_ok=True)
+
+        subprocess.run(
+            [
+                "skillfish",
+                "init",
+                "--name",
+                skill_name,
+                "--description",
+                f"A skill-forge skill: {skill_name}",
+                "--yes",
+                "--project",
+            ],
+            cwd=skill_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        print(f"✅ Created skillfish.json in {skill_dir}")
+    except Exception as e:
+        print(f"⚠️ Warning: skillfish init failed: {e}")
+
     print(f"✅ Created core structure for {skill_name}")
     print(f"   Docs:     {skill_dir}/SKILL.md")
     print(f"   Context:  {skill_dir}/references/")

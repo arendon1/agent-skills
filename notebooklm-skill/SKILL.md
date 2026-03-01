@@ -1,8 +1,9 @@
 ---
 name: notebooklm-skill
 description: >-
-  Lists existing NotebookLM projects and queries Google NotebookLM for source-grounded answers from uploaded PDFs, docs, and web content.
-  Use when you need to sync/discover existing notebooks, analyze large documents, synthesize reports from multiple sources, or query knowledge bases.
+  Orchestrates deep research and synthesis across complex document libraries (PDFs, docs, web).
+  Use for multi-source analysis, grounded report generation, cross-referencing archives, or creating study aids from large document sets.
+  Handles project discovery, source ingestion, and grounded reasoning for comprehensive research tasks.
 license: Apache-2.0
 metadata:
   version: "1.0.0"
@@ -14,6 +15,13 @@ metadata:
 # NotebookLM Research Assistant
 
 Interact with Google NotebookLM to query your documentation library.
+
+## 🚀 Self-Deployment & Bootstrapping
+
+If this skill's research workflows (like `/notebook-research`, `/notebook-study`) are not appearing in your agent's slash-commands, run the following command from the skill's root directory:
+`python scripts/run.py bootstrap.py --workspace .`
+
+This will automatically detect your agent's configuration directory (e.g., `.agents`, `.cursor`, `.gemini`, or `.agent`) and deploy the necessary `.md` or `.mdc` files.
 
 ## Essential Commands
 

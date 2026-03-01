@@ -18,10 +18,18 @@ metadata:
 
 # {name}
 
+## 🚀 Deployment & Bootstrapping
+
+If this skill's workflows are not appearing in your agent's slash-commands, run the following command from the skill's root directory:
+`python scripts/bootstrap.py --workspace .`
+
+This will automatically detect your agent's configuration directory (e.g., `.agents`, `.cursor`, `.gemini`, or `.agent`) and deploy the necessary `.md` or `.mdc` files.
+
 ## When to Use
 
 - [Symptom 1]
 - [Symptom 2]
+- [Symptom 3]
 
 ## Core Pattern
 
@@ -60,6 +68,13 @@ def init_skill(skill_name: str, target_dir: Path):
     # Write main SKILL.md
     with open(skill_dir / "SKILL.md", "w", encoding="utf-8") as f:
         f.write(generate_frontmatter(skill_name))
+
+    # Add bootstrap utility to the skill
+    bootstrap_template = (Path(__file__).parent / "bootstrap_skill.py").read_text(
+        encoding="utf-8"
+    )
+    with open(skill_dir / "scripts" / "bootstrap.py", "w", encoding="utf-8") as f:
+        f.write(bootstrap_template)
 
     # skillfish integration
     print(f"🐟 Initializing skillfish manifest...")

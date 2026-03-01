@@ -17,6 +17,13 @@ metadata:
 
 The **Academic Author** is a high-level orchestrator designed to produce publication-quality scientific documents. It coordinates specialized sub-skills to handle every aspect of the academic workflow.
 
+## 🚀 Self-Deployment & Bootstrapping
+
+If this skill's academic workflows (like `/paper-init`) are not appearing in your agent's slash-commands, run the following command from the skill's root directory:
+`python scripts/bootstrap.py --workspace .`
+
+This will automatically detect your agent's configuration directory (e.g., `.agents`, `.cursor`, `.gemini`, or `.agent`) and deploy the necessary `.md` or `.mdc` files.
+
 **Primary Responsibilities:**
 
 1. **Orchestration**: Directs specialized agents (`citation-management`, `typst-writer`, `scientific-schematics`).

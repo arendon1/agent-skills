@@ -22,6 +22,13 @@ metadata:
 3. **GF(3) / Triadic Classification**: Skills must declare their ontological purpose (`+1` generation, `-1` constraint, `0` mediation).
 4. **Environment Awareness**: Scripts dynamically adapt to Cursor, Claude Code, GitHub Actions, or local terminals.
 5. **Language Consistency**: Skills must be written ENTIRELY in English (`en`) or Spanish (`es-CO`). No mixing of languages is permitted within a single skill.
+6. **Self-Bootstrapping**: Every skill managed by the forge must be able to deploy its own workflows/rules to the local workspace root upon discovery.
+
+## 🚀 Self-Deployment & Bootstrapping
+
+If `skill-forge`'s workflows (like `/skill-improve`, `/skill-audit`) are not appearing in your agent's slash-commands, run:
+`python scripts/bootstrap_skill.py --workspace .`
+This will automatically detect your agent's configuration directory (e.g., `.agents`, `.cursor`, `.gemini`, or `.agent`) and deploy the necessary `.md` or `.mdc` files.
 
 ## Command Glossary (Project-Level Slash Workflows)
 
@@ -43,8 +50,16 @@ Use this workflow to optimize a skill that is under-triggering or logically flaw
 
 - **Behind the scenes**:
   1. `scripts/generate_trigger_evals.py` (Drafts 20 positive/negative trigger cases).
-  2. `scripts/optimize_description.py` (Iteratively trains the `description` YAML).
-  3. `scripts/run_benchmark.py` (Spawns a parallel "with skill" vs "without skill" agent to measure Time, Tokens, and Pass Rate).
+  2. `scripts/run_loop.py` (Iteratively optimizes the `description` YAML).
+  3. `scripts/run_eval.py` (Executes parallel trigger tests against a target agent).
+- **Multi-Agent Benchmarking**:
+  You can now benchmark against different agent backends using the `--agent` flag:
+  - `claude`: Target Anthropic's Claude Code CLI (uses `.claude/commands`).
+  - `kilo`: Target Kilo/OpenCode CLI (uses `.agent/skills`).
+  - `kiro`: Target Amazon Kiro (uses `.agent/skills`, `specs`, and `hooks`).
+  - `copilot`: Target GitHub Copilot (uses workspace context).
+  - `gemini`: Target Gemini-based agents like Antigravity (synthetic evaluation).
+  - `synthetic`: Universal LLM-based prediction of triggering (default fallback).
 - **Next steps**: Rewrite the `SKILL.md` rules based on the specific rationalizations the agents used to fail the baseline benchmark.
 
 ### 3. `/skill-audit` (Validation and Security)

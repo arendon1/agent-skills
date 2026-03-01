@@ -8,3 +8,8 @@ patchright==1.55.2
 
 # Environment management
 python-dotenv==1.0.0
+# Testing framework
+pytest==8.3.2
+pytest-asyncio==0.23.8
+pytest-mock==3.14.0
+notebooklm-py

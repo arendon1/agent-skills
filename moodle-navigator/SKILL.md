@@ -49,13 +49,12 @@ If the user hasn't provided a specific URL, you must discover the course from th
 4. **User Confirmation**: Present the detected courses to the user and ask: "Which courses should I initialize/scaffold?"
 5. **Proceed**: Use the selected URLs for the workflows below.
 
-## 🚀 Course Management Workflows
+## 🚀 Autodespliegue y Configuración (Bootstrapping)
 
-### 🛠️ Self-Deployment
+**CRÍTICO**: Si este skill se mueve a un nuevo workspace o los flujos de trabajo (como `/curso-init`, `/curso-sync`) no aparecen en tu agente, ejecuta el siguiente comando desde la raíz del skill:
+`python scripts/bootstrap.py --workspace .`
 
-**CRITICAL**: If this skill is moved to a new workspace or slash commands are missing, run:
-`python scripts/deploy_workflows.py`
-This will proyect the `/curso-init` and `/curso-sync` workflows into the local `.agents/workflows` directory.
+Esto detectará automáticamente el directorio de configuración de tu agente (ej. `.agents`, `.cursor`, `.gemini`, o `.agent`) y desplegará los flujos necesarios.
 
 ### 1. `/curso-init` (Deep Scaffolding)
 

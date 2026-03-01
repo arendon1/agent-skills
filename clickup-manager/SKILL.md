@@ -12,6 +12,13 @@ metadata:
 
 Allows LLM agents to manage ClickUp projects by interacting with the ClickUp API (v3/v2).
 
+## 🚀 Self-Deployment & Bootstrapping
+
+If this skill's ClickUp workflows (like `/setup`) are not appearing in your agent's slash-commands, run the following command from the skill's root directory:
+`python scripts/bootstrap.py --workspace .`
+
+This will automatically detect your agent's configuration directory (e.g., `.agents`, `.cursor`, `.gemini`, or `.agent`) and deploy the necessary `.md` or `.mdc` files.
+
 ## 🔑 Authentication setup
 
 To use this skill, you must have a ClickUp Personal Access Token (PAT).

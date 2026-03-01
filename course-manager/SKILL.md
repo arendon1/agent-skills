@@ -15,6 +15,13 @@ metadata:
 
 Este es un orquestador integral para la gestión de tu vida universitaria. A diferencia de su predecesor, es totalmente autocontenido y soporta flujos multi-agente en paralelo para una configuración ultra-rápida.
 
+## 🚀 Autodespliegue y Configuración (Bootstrapping)
+
+Si los flujos de trabajo de este curso (como `/setup`) no aparecen en los comandos de slash de tu agente, ejecuta el siguiente comando desde la raíz del skill:
+`python scripts/bootstrap.py --workspace .`
+
+Esto detectará automáticamente el directorio de configuración de tu agente (ej. `.agents`, `.cursor`, `.gemini`, o `.agent`) y desplegará los archivos `.md` o `.mdc` necesarios.
+
 ## 🛠️ Estructura y Dependencias
 
 Este skill consume sus dependencias internamente desde `.agent/skills/`:

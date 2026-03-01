@@ -1,8 +1,8 @@
 ---
 name: notebooklm-skill
 description: >-
-  Queries Google NotebookLM for source-grounded answers from uploaded PDFs, docs, and web content.
-  Use when analyzing large documents, synthesizing reports from multiple sources, or querying knowledge bases.
+  Lists existing NotebookLM projects and queries Google NotebookLM for source-grounded answers from uploaded PDFs, docs, and web content.
+  Use when you need to sync/discover existing notebooks, analyze large documents, synthesize reports from multiple sources, or query knowledge bases.
 license: Apache-2.0
 metadata:
   version: "1.0.0"
@@ -19,58 +19,39 @@ Interact with Google NotebookLM to query your documentation library.
 
 **ALWAYS use `scripts/run.py` wrapper.**
 
-### 1. Authentication
+### 1. Unified Interface (Recommendation)
 
-Check status first. If failed, run setup (browser will open).
+Use the new bridge for all operations. It handles authentication automatically from storage.
 
 ```bash
-python scripts/run.py auth_manager.py status
-python scripts/run.py auth_manager.py setup   # Opens browser for login
+python scripts/run.py unified_bridge.py list
+python scripts/run.py unified_bridge.py create --title "Project Beta"
+python scripts/run.py unified_bridge.py ask --notebook-id [ID] --question "..."
 ```
 
-### 2. Library Management
+### 2. Research & Learning Workflows
+
+Invoke these from the workspace root for high-level orchestration:
+
+- `/notebook-research [TOPIC]`: Deep dive research and source aggregation.
+- `/notebook-study [ID]`: Active learning with quizes/flashcards.
+- `/notebook-visualize [ID]`: Generate Mind-Maps.
+
+### 3. Artifact Generation
 
 ```bash
-# List all notebooks
-python scripts/run.py notebook_manager.py list
-
-# Search library
-python scripts/run.py notebook_manager.py search --query "project specs"
-```
-
-### 3. Adding Notebooks
-
-**Smart Add** (Recommended if details unknown):
-
-1. Query URL first: `python scripts/run.py ask_question.py --question "Describe content" --notebook-url URL`
-2. Add with details: `python scripts/run.py notebook_manager.py add --url URL ...`
-
-**Manual Add** (All fields required):
-
-```bash
-python scripts/run.py notebook_manager.py add \
-  --url "https://notebooklm..." \
-  --name "Project Alpha" \
-  --description "Technical specs and architecture" \
-  --topics "specs,architecture,2026"
-```
-
-### 4. Asking Questions
-
-```bash
-# Query specific notebook
-python scripts/run.py ask_question.py --question "What are the API limits?" --notebook-id [ID]
-
-# Query by URL (Temporary session)
-python scripts/run.py ask_question.py --question "Summary of findings" --notebook-url "https://..."
+python scripts/run.py unified_bridge.py artifact --notebook-id [ID] --type audio
+python scripts/run.py unified_bridge.py artifact --notebook-id [ID] --type quiz
+python scripts/run.py unified_bridge.py artifact --notebook-id [ID] --type mind-map
 ```
 
 ## Workflow
 
-1. **Check Auth**: `auth_manager.py status`
-2. **Locate/Add Notebook**: `notebook_manager.py`
-3. **Query**: `ask_question.py`
-4. **Follow-up**: If answer ends with "Is that ALL?", analyze gaps and ask follow-ups.
+1. **Discover / Sync**: **ALWAYS** run `python scripts/run.py unified_bridge.py list` first to see existing NotebookLM projects. Do not create new ones blindly; be aware of what is already present!
+2. **Research**: Call `/notebook-research` to initialize.
+3. **Optimize**: Use `/gh-learn` to find secondary sources and add them.
+4. **Study**: Run `/notebook-study` to verify comprehension.
+5. **Visualize**: Use `/notebook-visualize` for architectural insight.
 
 ## References
 

@@ -1,0 +1,90 @@
+[
+  {
+    "query": "Synthesize a research report on AI safety from the PDF documents in my library using NotebookLM.",
+    "should_trigger": true
+  },
+  {
+    "query": "Ask my NotebookLM about the main goals of 'Project Beta' from the notebook ID 123.",
+    "should_trigger": true
+  },
+  {
+    "query": "Generate a quiz for my study session about quantum computing from the uploaded documentation.",
+    "should_trigger": true
+  },
+  {
+    "query": "List all the notebooks I have currently stored in my NotebookLM account.",
+    "should_trigger": true
+  },
+  {
+    "query": "Create a mind-map visualization for the project architecture documentation using my research library.",
+    "should_trigger": true
+  },
+  {
+    "query": "Can you research the latest trends in renewable energy by aggregating sources from my notebook?",
+    "should_trigger": true
+  },
+  {
+    "query": "Upload these three papers to NotebookLM and start a research session on their findings.",
+    "should_trigger": true
+  },
+  {
+    "query": "Generate an audio overview for my latest research notes in my NotebookLM project.",
+    "should_trigger": true
+  },
+  {
+    "query": "I need to study the physics textbook I uploaded; create some flashcards and a study guide.",
+    "should_trigger": true
+  },
+  {
+    "query": "Sync and list the contents and sources of my existing NotebookLM projects.",
+    "should_trigger": true
+  },
+  {
+    "query": "Create a new notebook titled 'Deep Learning Research' and start adding PDF sources.",
+    "should_trigger": true
+  },
+  {
+    "query": "Ask NotebookLM: What are the key takeaways from the meeting transcript I just added?",
+    "should_trigger": true
+  },
+  {
+    "query": "Search for 'NotebookLM pricing' on Google using web search.",
+    "should_trigger": false
+  },
+  {
+    "query": "Convert this PDF file named 'Manual.pdf' to a markdown document.",
+    "should_trigger": false
+  },
+  {
+    "query": "Read the first 50 lines of the local file research_notes.txt in my workspace.",
+    "should_trigger": false
+  },
+  {
+    "query": "List all my git repositories in this project folder.",
+    "should_trigger": false
+  },
+  {
+    "query": "Summarize the content of the AUTHENTICATION.md file I have open right now.",
+    "should_trigger": false
+  },
+  {
+    "query": "Add a comment to the ClickUp task about the research progress for the next sprint.",
+    "should_trigger": false
+  },
+  {
+    "query": "Download a file from 'https://example.com/data.zip' and save it locally.",
+    "should_trigger": false
+  },
+  {
+    "query": "What is the current weather in London right now?",
+    "should_trigger": false
+  },
+  {
+    "query": "Visualize the dependency graph of my python project's modules.",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to chat about the future of AI. What do you think about agentic workflows?",
+    "should_trigger": false
+  }
+]

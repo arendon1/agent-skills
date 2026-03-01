@@ -15,6 +15,13 @@ metadata:
 
 Expert Git operations with built-in safety rails and best practices.
 
+## 🚀 Self-Deployment & Bootstrapping
+
+If this skill's Git workflows are not appearing in your agent's slash-commands, run the following command from the skill's root directory:
+`python scripts/bootstrap.py --workspace .`
+
+This will automatically detect your agent's configuration directory (e.g., `.agents`, `.cursor`, `.gemini`, or `.agent`) and deploy the necessary `.md` or `.mdc` files.
+
 ## 🚨 CRITICAL RULES
 
 1. **Safety First**: Before ANY destructive operation (`reset --hard`, `force push`, `filter-repo`), you MUST:

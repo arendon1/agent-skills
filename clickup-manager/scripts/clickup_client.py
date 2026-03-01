@@ -145,16 +145,32 @@ class RateLimiter:
         self.pbar.refresh()
 
 
+class MockResponse:
+    def __init__(self, data, status_code=200):
+        self._data = data
+        self.status_code = status_code
+
+    def json(self):
+        return self._data
+
+    def __bool__(self):
+        return self.status_code in [200, 201]
+
+
 class ClickUpClient:
-    def __init__(self, api_token):
+    def __init__(self, api_token, bypass_cache=False):
         self.headers = {"Authorization": api_token, "Content-Type": "application/json"}
         self.base_url_v2 = "https://api.clickup.com/api/v2"
         self.base_url_v3 = "https://api.clickup.com/api/v3"
         self.limiter = RateLimiter()
         self.cache = CacheHandler()
+        self.bypass_cache = bypass_cache
 
-    def _request(self, method, endpoint, version="v3", bypass_cache=False, **kwargs):
+    def _request(self, method, endpoint, version="v3", bypass_cache=None, **kwargs):
         """Unified request handler with v3-default and v2-fallback logic + Caching."""
+        # Resolver preferencia de bypass_cache: parámetro -> instancia
+        final_bypass = bypass_cache if bypass_cache is not None else self.bypass_cache
+
         base_url = self.base_url_v3 if version == "v3" else self.base_url_v2
         url = f"{base_url}/{endpoint.lstrip('/')}"
 
@@ -162,23 +178,22 @@ class ClickUpClient:
         cache_params = kwargs.get("params", {})
         cache_key = f"{method}:{url}:{json.dumps(cache_params, sort_keys=True)}"
 
-        if method == "GET" and not bypass_cache:
+        if method == "GET" and not final_bypass:
             cached_data = self.cache.get(cache_key, endpoint)
             if cached_data:
-
-                class MockResponse:
-                    def __init__(self, data):
-                        self._data = data
-                        self.status_code = 200
-
-                    def json(self):
-                        return self._data
-
                 return MockResponse(cached_data)
 
         self.limiter.wait_if_needed()
         try:
-            response = requests.request(method, url, headers=self.headers, **kwargs)
+            # Add timeout to requests
+            response = requests.request(
+                method, url, headers=self.headers, timeout=30, **kwargs
+            )
+
+            # Handle 401 Unauthorized
+            if response.status_code == 401:
+                print("Error: 401 Unauthorized. Check your CLICKUP_PAT.")
+                return response
 
             # Targeted Invalidation on Write
             if method in ["POST", "PUT", "DELETE"]:
@@ -194,7 +209,7 @@ class ClickUpClient:
                 and method == "GET"
             ):
                 return self._request(
-                    method, endpoint, version="v2", bypass_cache=bypass_cache, **kwargs
+                    method, endpoint, version="v2", bypass_cache=final_bypass, **kwargs
                 )
             return response
         except requests.exceptions.RequestException as e:
@@ -209,7 +224,9 @@ class ClickUpClient:
             if isinstance(data, list):
                 summary = []
                 for item in data:
-                    entry = f"ID: {item.get('id', '?')} | Nombre: {item.get('name', 'Desconocido')}"
+                    # Handle name or comment_text
+                    name = item.get("name") or item.get("comment_text", "Desconocido")
+                    entry = f"ID: {item.get('id', '?')} | Contenido: {name}"
                     status = item.get("status")
                     if status:
                         status_val = (
@@ -219,7 +236,8 @@ class ClickUpClient:
                     summary.append(entry)
                 print("\n".join(summary))
             elif isinstance(data, dict):
-                entry = f"ID: {data.get('id', '?')} | Nombre: {data.get('name', 'Desconocido')}"
+                name = data.get("name") or data.get("comment_text", "Desconocido")
+                entry = f"ID: {data.get('id', '?')} | Contenido: {name}"
                 status = data.get("status")
                 if status:
                     status_val = (
@@ -634,11 +652,13 @@ class ClickUpClient:
 _client_instance = None
 
 
-def get_client(bypass_cache=False):
+def get_client(bypass_cache=None):
     global _client_instance
     if _client_instance is None:
-        _client_instance = ClickUpClient(API_TOKEN, bypass_cache)
-    else:
+        _client_instance = ClickUpClient(
+            API_TOKEN, bypass_cache if bypass_cache is not None else False
+        )
+    elif bypass_cache is not None:
         _client_instance.bypass_cache = bypass_cache
     return _client_instance
 
@@ -957,6 +977,10 @@ def main():
         "--check-exists", action="store_true", help="Evitar duplicados por nombre"
     )
     tc_p.set_defaults(func=create_task)
+
+    gt_p = sub.add_parser("get-task")
+    gt_p.add_argument("--task-id", required=True)
+    gt_p.set_defaults(func=get_task)
 
     tu_p = sub.add_parser("update-task")
     tu_p.add_argument("--task-id", required=True)

@@ -1,6 +1,6 @@
 # LLM Agent Skills Repository
 
-This repository is a **Dynamic Orchestration Hub** for LLM-based agents. It is designed to host a modular, evolving collection of "Superpowers"—structured knowledge bases and deterministic toolsets that enable agents to perform complex, domain-specific tasks with high reliability and low token overhead.
+This repository is a **Dynamic Hub** for LLM-based agents skills. It is designed to host a modular, evolving collection of "Superpowers"—structured knowledge bases and deterministic toolsets that enable agents to perform complex, domain-specific tasks with high reliability and low token overhead.
 
 ## 🧠 Core Philosophy: The Skill-Forge Logic
 

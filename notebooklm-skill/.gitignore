@@ -72,3 +72,13 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+# Added by workspace-manager
+*.pyc
+*.pyo
+*.pyd
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+out/
+.review/

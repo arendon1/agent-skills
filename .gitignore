@@ -1,6 +1,9 @@
 # IDEs and configuration folders
 !.gitignore
 
+# Custom folders name patterns
+.archive/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -64,9 +67,4 @@ venv.bak/
 .vscode/
 .vibecheck/
 *.last_audit
-/package-lock.json
-
-# VibeCheck
-.vibecheck/screenshots/
-.vibecheck/scan-results.json
-.vibecheck/context-engine-ledger.json
+package-lock.json

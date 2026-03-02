@@ -1,90 +1,132 @@
 [
   {
-    "query": "Synthesize a research report on AI safety from the PDF documents in my library using NotebookLM.",
+    "comment": "Broad synthesis across multiple sources",
+    "query": "Synthesize a core findings report based on all clinical trial PDFs in my research library.",
     "should_trigger": true
   },
   {
-    "query": "Ask my NotebookLM about the main goals of 'Project Beta' from the notebook ID 123.",
+    "comment": "Broad synthesis (Spanish)",
+    "query": "Sintetiza un reporte de hallazgos principales basado en todos los PDFs de ensayos clínicos en mi biblioteca de investigación.",
     "should_trigger": true
   },
   {
-    "query": "Generate a quiz for my study session about quantum computing from the uploaded documentation.",
+    "comment": "Comparing across a large document set",
+    "query": "Compare the security architectures described in these five technical whitepapers.",
     "should_trigger": true
   },
   {
-    "query": "List all the notebooks I have currently stored in my NotebookLM account.",
+    "comment": "Study aid from complex knowledge bases",
+    "query": "Generate a specialized quiz and study guide from my latest textbook and lecture note uploads.",
     "should_trigger": true
   },
   {
-    "query": "Create a mind-map visualization for the project architecture documentation using my research library.",
+    "comment": "Study aid (Spanish)",
+    "query": "Genera un cuestionario especializado y una guía de estudio a partir de mis últimos libros de texto y notas de clase cargados.",
     "should_trigger": true
   },
   {
-    "query": "Can you research the latest trends in renewable energy by aggregating sources from my notebook?",
+    "comment": "Visual representation of complex relationships",
+    "query": "Create a mind-map illustrating the architectural dependencies across my project documentation.",
     "should_trigger": true
   },
   {
-    "query": "Upload these three papers to NotebookLM and start a research session on their findings.",
+    "comment": "Deep dive research from specific sets",
+    "query": "Conduct a deep research session on current renewable energy trends using my document store.",
     "should_trigger": true
   },
   {
-    "query": "Generate an audio overview for my latest research notes in my NotebookLM project.",
+    "comment": "Research session (Spanish)",
+    "query": "Realiza una sesión de investigación profunda sobre las tendencias actuales de energía renovable usando mi repositorio de documentos.",
     "should_trigger": true
   },
   {
-    "query": "I need to study the physics textbook I uploaded; create some flashcards and a study guide.",
+    "comment": "Audio summaries for on-the-go",
+    "query": "Create an audio overview summarizing the key takeaways from these last three legal briefings.",
     "should_trigger": true
   },
   {
-    "query": "Sync and list the contents and sources of my existing NotebookLM projects.",
+    "comment": "Synchronizing and discovering existing knowledge assets",
+    "query": "What existing research notebooks and projects do I already have available in my documentation sync?",
     "should_trigger": true
   },
   {
-    "query": "Create a new notebook titled 'Deep Learning Research' and start adding PDF sources.",
+    "comment": "Sync assets (Spanish)",
+    "query": "¿Qué cuadernos de investigación y proyectos existentes tengo disponibles en mi sincronización de documentación?",
     "should_trigger": true
   },
   {
-    "query": "Ask NotebookLM: What are the key takeaways from the meeting transcript I just added?",
+    "comment": "Querying a grounded knowledge base",
+    "query": "Based on my internal documentation, what are the primary goals for the upcoming quarter?",
     "should_trigger": true
   },
   {
-    "query": "Search for 'NotebookLM pricing' on Google using web search.",
+    "comment": "Interactive learning session",
+    "query": "I want to start an interactive study session for my physics exam using my uploaded materials.",
+    "should_trigger": true
+  },
+  {
+    "comment": "New project from external grounding",
+    "query": "Create a new research project to analyze the impact of LLMs based on this collection of papers.",
+    "should_trigger": true
+  },
+  {
+    "comment": "Generic web search (negative)",
+    "query": "Search Google for the latest stock prices of tech companies.",
     "should_trigger": false
   },
   {
-    "query": "Convert this PDF file named 'Manual.pdf' to a markdown document.",
+    "comment": "Generic search (Spanish negative)",
+    "query": "Busca en Google los precios actuales de las acciones de empresas tecnológicas.",
     "should_trigger": false
   },
   {
-    "query": "Read the first 50 lines of the local file research_notes.txt in my workspace.",
+    "comment": "Single file local processing (negative)",
+    "query": "Format this local README.md file to follow standard Markdown guidelines.",
     "should_trigger": false
   },
   {
-    "query": "List all my git repositories in this project folder.",
+    "comment": "Local file reading (negative)",
+    "query": "Read the first 20 lines of the local file config.json.",
     "should_trigger": false
   },
   {
-    "query": "Summarize the content of the AUTHENTICATION.md file I have open right now.",
+    "comment": "Git operation (negative)",
+    "query": "Commit my latest changes and push them to the master branch.",
     "should_trigger": false
   },
   {
-    "query": "Add a comment to the ClickUp task about the research progress for the next sprint.",
+    "comment": "Interactive chat about AI (negative)",
+    "query": "Let's discuss the philosophical implications of artificial general intelligence.",
     "should_trigger": false
   },
   {
-    "query": "Download a file from 'https://example.com/data.zip' and save it locally.",
+    "comment": "ClickUp task management (negative)",
+    "query": "List all my pending tasks in the Development list on ClickUp.",
     "should_trigger": false
   },
   {
-    "query": "What is the current weather in London right now?",
+    "comment": "Task management (Spanish negative)",
+    "query": "Enumera todas mis tareas pendientes en la lista de Desarrollo de ClickUp.",
     "should_trigger": false
   },
   {
-    "query": "Visualize the dependency graph of my python project's modules.",
+    "comment": "Network/URL download (negative)",
+    "query": "Download the dataset at https://example.com/data.csv and save it to my downloads folder.",
     "should_trigger": false
   },
   {
-    "query": "I want to chat about the future of AI. What do you think about agentic workflows?",
+    "comment": "Current status/weather (negative)",
+    "query": "Brief me on the current weather and news in Tokyo.",
+    "should_trigger": false
+  },
+  {
+    "comment": "Python code analysis (negative)",
+    "query": "Find all function definitions in the module main.py and explain their purpose.",
+    "should_trigger": false
+  },
+  {
+    "comment": "Unit test generation (negative)",
+    "query": "Generate a comprehensive set of unit tests for the functions I just wrote.",
     "should_trigger": false
   }
 ]

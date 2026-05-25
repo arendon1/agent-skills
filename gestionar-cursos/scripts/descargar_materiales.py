@@ -5,6 +5,9 @@ Descarga materiales de Moodle aplicando forcedownload=1.
 import os
 from typing import Optional
 
+from browser_api import obtener_cookies_browser, hacer_get
+
+
 def descargar_material(url: str, ruta_destino: str) -> bool:
     """
     Descarga material de Moodle.

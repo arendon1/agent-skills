@@ -5,6 +5,8 @@ Extrae cronograma de sesiones sincrónicas con validación de links Teams.
 import re
 from typing import List, Dict
 
+from browser_api import extraer_filas_tabla
+
 TEAMS_PATTERN = r'teams\.microsoft\.com/l/meetup-join/'
 
 def es_link_teams_valido(url: str) -> bool:

@@ -6,6 +6,13 @@ busca actividades del PGA y extrae detalles completos.
 from typing import Dict, Optional, List
 from difflib import SequenceMatcher
 
+from browser_api import (
+    get_navegador, click, esperar_carga, encontrar_menus_cerrados,
+    extraer_sidebar, extraer_texto_descripcion, extraer_instrucciones,
+    extraer_links_materiales, extraer_criterios, extraer_nombre_unidad,
+)
+
+
 def extraer_unidad(url_unidad: str, actividades_pga: List[str]) -> Dict:
     """
     Extrae información completa de una unidad.

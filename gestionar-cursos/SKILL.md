@@ -31,8 +31,29 @@ Antes de cualquier navegación:
 El skill detecta automáticamente qué tool de navegación está disponible:
 
 1. **browser_tool** → VS Code / Antigravity (navegación headless integrada)
-2. **open_browser** → OpenCode / fallback (ventana externa del SO)
-3. **Ninguna** → Error: "No hay tool de navegación disponible"
+2. **open_browser** → OpenCode IDE / fallback (ventana externa del SO)
+3. **selenium** → Terminal / CLI (Chrome DevTools Protocol)
+4. **Ninguna** → Error con instrucciones de instalación
+
+### Terminal / CLI Fallback
+
+Cuando se ejecuta desde terminal (sin agente IDE):
+
+- Se conecta a Chrome via **CDP** (`localhost:9222`)
+- Si Chrome no está abierto con `--remote-debugging-port=9222`, se lanza automáticamente una instancia visible
+- El usuario hace login en Moodle en esa ventana
+- El script espera y continúa la extracción automáticamente
+
+**Requisitos:**
+```bash
+pip install selenium beautifulsoup4 lxml requests
+```
+
+**Uso desde terminal:**
+```bash
+cd gestionar-cursos/scripts
+python cli_init.py "https://aulavirtual.uniremington.edu.co/course/view.php?id=10272" --destino .
+```
 
 ## Workflows
 

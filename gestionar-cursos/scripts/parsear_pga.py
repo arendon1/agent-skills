@@ -5,6 +5,9 @@ Extrae y normaliza la tabla DO-FR-66 Plan de Gestión Académica.
 from datetime import datetime
 from typing import List, Dict
 
+from browser_api import extraer_filas_tabla
+
+
 def normalizar_fecha(fecha_str: str) -> str:
     """
     Convierte fecha de formato DD/M/YYYY a YYYY-MM-DD (ISO 8601).

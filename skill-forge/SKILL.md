@@ -2,111 +2,60 @@
 name: skill-forge
 description: >-
   The definitive framework for creating, optimizing, and auditing AI agent skills.
-  Combines Test-Driven Development loops with strict architectural validation.
+  Uses Test-Driven Development loops with XML prompt-based evaluation.
   Use when creating a new skill, improving an existing skill's trigger rate,
-  benchmarking agent performance, or auditing a skill for structural/security issues.
-metadata:
-  version: "1.0.0"
-  trit: 0
-  risk_tier: CAUTION
+  or auditing a skill for structural/security issues.
 ---
 
-# skill-forge: United Skill Development Framework
+# skill-forge
 
-**`skill-forge`** merges the architectural rigor of Token Loading Hierarchies with the empirical validation of Test-Driven agent workflows. It explicitly offloads heavy processing into deterministic Python scripts to prevent LLM context rot.
+**`skill-forge`** generates XML prompts that agents consume to spawn subagents internally for skill evaluation. No external API calls required.
 
-## The 4 Core Principles
+## Core Principles
 
-1. **Token Hierarchy Efficiency**: Only the `name` and `description` are loaded globally. `SKILL.md` is loaded conditionally. `references/` are loaded on-demand.
-2. **Deterministic Process Logic**: We do not let agents "guess" how to test or validate skills. We execute python scripts to execute parallel baselines.
-3. **GF(3) / Triadic Classification**: Skills must declare their ontological purpose (`+1` generation, `-1` constraint, `0` mediation).
-4. **Environment Awareness**: Scripts dynamically adapt to Cursor, Claude Code, GitHub Actions, or local terminals.
-5. **Language Consistency**: Skills must be written ENTIRELY in English (`en`) or Spanish (`es-CO`). No mixing of languages is permitted within a single skill.
-6. **Self-Bootstrapping**: Every skill managed by the forge must be able to deploy its own workflows/rules to the local workspace root upon discovery.
+1. **XML Prompt Architecture**: Scripts output structured XML prompts that agents parse to understand evaluation tasks.
+2. **Agent-Native Execution**: Agents spawn subagents with different models internally to run evaluations.
+3. **TDD Workflow**: Test cases are generated first, then skill is iteratively improved until tests pass.
+4. **Language Consistency**: Skills must be written ENTIRELY in English (`en`) or Spanish (`es-CO`).
 
-## 🚀 Self-Deployment & Bootstrapping
+## 🚀 Self-Deployment
 
 If `skill-forge`'s workflows (like `/skill-improve`, `/skill-audit`) are not appearing in your agent's slash-commands, run:
-`python scripts/bootstrap_skill.py --workspace .`
-This will automatically detect your agent's configuration directory (e.g., `.agents`, `.cursor`, `.gemini`, or `.agent`) and deploy the necessary `.md` or `.mdc` files.
+`python scripts/deploy.py --workspace .`
 
-## Command Glossary (Project-Level Slash Workflows)
+## Command Glossary
 
-You should manage skills by invoking the project-level slash workflows (which were generated globally by `scripts/deploy_slash_workflows.py`).
+### `/skill-create`
 
-Do not try to "manually" write validation algorithms. **Use the scripts.**
+Scaffold a brand new, structurally flawless skill directory.
 
-### 1. `/skill-create` (Initialization)
+- **Behind the scenes**: Runs `scripts/init.py`.
+- **Next steps**: Focus on polishing the `description` string. Keep `SKILL.md` under 500 lines.
 
-Use this workflow to scaffold a brand new, structurally flawless skill directory.
+### `/skill-improve` (TDD Optimization)
 
-- **Behind the scenes**: It runs `scripts/init_skill.py`.
-- **skillfish Integration**: Automatically executes `skillfish init` to generate a `skillfish.json` manifest.
-- **Next steps**: Focus entirely on polishing the `description` string. It must start with "Use when..." and explain the *triggering symptoms*, not the process. Keep the `SKILL.md` under 500 lines.
+Optimize a skill using Test-Driven Development.
 
-### 2. `/skill-improve` (Empirical TDD Optimization)
+- **Behind the scenes**: Runs `scripts/audit.py` which outputs an XML prompt.
+- **Process**: Agent receives XML prompt with test cases and improvement criteria. Agent runs entire TDD loop internally, spawning subagents as needed.
+- **Output**: Improved `SKILL.md` with description that passes all test cases.
 
-Use this workflow to optimize a skill that is under-triggering or logically flawed.
+### `/skill-audit` (Validation and Security)
 
-- **Behind the scenes**:
-  1. `scripts/generate_trigger_evals.py` (Drafts 20 positive/negative trigger cases).
-  2. `scripts/run_loop.py` (Iteratively optimizes the `description` YAML).
-  3. `scripts/run_eval.py` (Executes parallel trigger tests against a target agent).
-- **Multi-Agent Benchmarking**:
-  You can now benchmark against different agent backends using the `--agent` flag:
-  - `claude`: Target Anthropic's Claude Code CLI (uses `.claude/commands`).
-  - `kilo`: Target Kilo/OpenCode CLI (uses `.agent/skills`).
-  - `kiro`: Target Amazon Kiro (uses `.agent/skills`, `specs`, and `hooks`).
-  - `copilot`: Target GitHub Copilot (uses workspace context).
-  - `gemini`: Target Gemini-based agents like Antigravity (synthetic evaluation).
-  - `synthetic`: Universal LLM-based prediction of triggering (default fallback).
-- **Next steps**: Rewrite the `SKILL.md` rules based on the specific rationalizations the agents used to fail the baseline benchmark.
+Validate a skill's structure and security.
 
-### 3. `/skill-audit` (Validation and Security)
+- **Behind the scenes**: Runs `scripts/audit.py` which outputs an XML prompt.
+- **Process**: Agent spawns subagents internally to run different audit checks.
+- **Checks**:
+  - `SKILL.md` length (<500 lines)
+  - Description format ("Use when..." pattern)
+  - Reference folder depth (max 1 level)
+  - Language consistency (en or es-CO)
+  - Security scan of `scripts/` directory
 
-Use this workflow before finalizing a skill.
+## Required Skill Frontmatter
 
-- **Behind the scenes**: It runs `scripts/validate_and_audit.py`.
-- **What it checks**:
-  - `SKILL.md` length (<500 lines).
-  - Third-party prompt formatting ("Use when...").
-  - Reference folder depth (max 1 level deep).
-  - **skillfish Audit**: Verifies that `skillfish.json` exists, is valid, and matches the skill.
-  - **Language Audit**: Verifies that the skill is either English or Spanish and remains consistent throughout.
-  - **Security Scan**: Statically analyzes `scripts/` for obvious bad practices (e.g., unfiltered `os.system()`, `eval()`).
-
-### 4. `/skill-package` (Distribution)
-
-Use this workflow to zip one or many skills for sharing or distribution.
-
-- **Behind the scenes**: It runs `scripts/package_skills.py`.
-- **Functionality**:
-  - Packages the entire skill directory into a `.zip` format.
-  - Supports multiple skill paths at once.
-  - Automatically excludes junk like `__pycache__` and `.git`.
-  - **skillfish Extras**: Use `--bundle` to update the workshop manifest or `--submit [repo]` to register skills.
-- **Result**: Retrieve the generated archives from the `dist/` directory.
-
-### 5. `/skill-manage` (Registry and Operations)
-
-Use this workflow to browse, list, update, or remove skills using the `skillfish` engine.
-
-- **Behind the scenes**: It runs `scripts/skill_manager.py`.
-- **Operations**: `list`, `search [query]`, `update`, `remove [skill]`, `bundle`.
-
-### 6. `/skill-sync` (Environment Synchronization)
-
-Use this workflow to synchronize your local environment with the project's `skillfish.json` manifest.
-
-- **Behind the scenes**: It runs `scripts/skill_manager.py sync --project`.
-- **Purpose**: Ensures all team members or agents have the exact same skill set installed.
-
-## Required Skill Frontmatter (CRITICAL)
-
-Every skill created by the forge **MUST** use this generalized frontmatter schema **embedded directly at the very top of the `SKILL.md` file**.
-
-> [!CAUTION]
-> **NEVER** separate the YAML frontmatter into a separate `.yml` or `.yaml` file. The frontmatter MUST be the first thing in `SKILL.md`, delimited by `---` markers.
+Every skill created by the forge **MUST** use this schema at the top of `SKILL.md`:
 
 ```yaml
 ---
@@ -114,21 +63,16 @@ name: [lowercase-with-hyphens]
 description: >-
   [What it does briefly].
   Use when [Specific trigger phrases, contexts, error symptoms, file types].
-metadata:
-  version: "1.0.0"
-  language: en # Options: en, es-CO
-  trit: [1, 0, or -1]
-  risk_tier: [CRITICAL, DANGEROUS, CAUTION]
 ---
 ```
 
-## Further Reading (On-Demand References)
+## Supported Agents
 
-If you need deeper context, read the following files located in `references/`:
+skill-forge works with any agent capable of spawning subagents:
 
-- `references/archetypes.md`: Standard structural blueprints (CLI Reference, Methodology, Safety, Orchestration).
-- `references/token-hierarchy.md`: The calculus of how LLMs load skill context.
-- `references/schemas.md`: JSON structures for Test-Driven evaluations.
-- `references/testing-methodology.md`: The RED-GREEN-REFACTOR doctrine for documentation.
+- **Antigravity CLI** - Google Antigravity agent harness
+- **OpenCode** - OpenCode agent framework
+- **Copilot CLI** - GitHub Copilot CLI agent
+- **Kiro CLI** - Kiro custom agent framework
 
-**Remember**: Let Python handle the loops. Your job is writing excellent, airtight prose in `SKILL.md`.
+Agents are auto-detected by `deploy.py` based on available CLI tools.

@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.ruff_cache/
+uv.lock
+
+# Chrome browser profile
+.browserdata/
+
+# Moodle session
+.moodle_session.json
+
+# Checkpoints
+.progress.json
+
+# Debug artifacts
+scripts/debug_profesor.html

@@ -3,7 +3,7 @@ Detecta qué tool de navegación está disponible en el entorno.
 Retorna: 'browser_tool' | 'open_browser' | 'selenium' | 'error'
 """
 
-from browser_api import _agent_has_tool, esta_usando_selenium
+from browser_api import esta_usando_selenium
 
 
 def detectar_navegacion():

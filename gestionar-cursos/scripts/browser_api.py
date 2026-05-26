@@ -6,7 +6,6 @@ En entorno de agente (VS Code / OpenCode IDE) usa las tools inyectadas.
 En terminal fallback a Chrome DevTools Protocol via Selenium.
 """
 
-import sys
 
 # ---------------------------------------------------------------------------
 # Detección de modo agente
@@ -35,22 +34,22 @@ def _load_cdp():
 
     try:
         from navegador_cdp import (
-            navegar,
-            obtener_url_actual,
-            obtener_contenido,
             click,
-            esperar_carga,
             encontrar_menus_cerrados,
-            extraer_sidebar,
-            extraer_texto_descripcion,
+            esperar_carga,
+            extraer_criterios,
+            extraer_filas_tabla,
             extraer_instrucciones,
             extraer_links_materiales,
-            extraer_criterios,
             extraer_nombre_unidad,
-            obtener_cookies,
-            hacer_get,
-            extraer_filas_tabla,
+            extraer_sidebar,
+            extraer_texto_descripcion,
             get_driver,
+            hacer_get,
+            navegar,
+            obtener_contenido,
+            obtener_cookies,
+            obtener_url_actual,
         )
         _cdp_funcs = {
             'navegar': navegar,
@@ -69,6 +68,7 @@ def _load_cdp():
             'hacer_get': hacer_get,
             'extraer_filas_tabla': extraer_filas_tabla,
             'get_driver': get_driver,
+            'abrir_popup_grid_y_obtener_html': abrir_popup_grid_y_obtener_html,
         }
         return _cdp_funcs
     except ImportError as e:
@@ -101,7 +101,7 @@ def get_navegador():
     """Retorna callable que navega a URL."""
     if _agent_has_tool():
         import builtins
-        return getattr(builtins, 'browser_tool', None) or getattr(builtins, 'open_browser')
+        return getattr(builtins, 'browser_tool', None) or builtins.open_browser
     return _load_cdp()['navegar']
 
 
@@ -149,6 +149,10 @@ def extraer_nombre_unidad():
     return _get_func('extraer_nombre_unidad')()
 
 
+def abrir_popup_grid_y_obtener_html(nombre_seccion: str) -> str:
+    return _get_func('abrir_popup_grid_y_obtener_html')(nombre_seccion)
+
+
 def obtener_cookies_browser():
     return _get_func('obtener_cookies_browser')()
 
@@ -174,3 +178,14 @@ def get_driver():
     if _agent_has_tool():
         raise RuntimeError("get_driver solo disponible en modo CDP/terminal")
     return _load_cdp()['get_driver']()
+
+
+def set_profile_dir(path: str):
+    """
+    Configura directorio persistente para perfil de Chrome (solo modo CDP).
+    Debe llamarse antes de cualquier navegación.
+    """
+    if _agent_has_tool():
+        return  # No aplica en modo agente
+    from navegador_cdp import set_profile_dir as _set
+    _set(path)

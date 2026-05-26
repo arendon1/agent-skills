@@ -2,44 +2,42 @@
 Verifica el estado de autenticación en Moodle Uniremington.
 """
 
-from browser_api import get_navegador, get_current_url, get_page_content
+from browser_api import get_current_url, get_navegador, get_page_content
 
 BASE_URL = "https://aulavirtual.uniremington.edu.co"
 
 
-def verificar_sesion_moodle():
+def verificar_pagina_actual():
     """
-    Navega a la página de área personal y verifica si está autenticado.
+    Verifica si la PÁGINA ACTUAL (sin navegar) está autenticada.
 
     Returns:
-        True si autenticado, False si no.
-
-    Raises:
-        RuntimeError si no se puede completar la verificación.
+        True si el contenido actual muestra sesión activa.
+        False si parece no autenticado.
     """
-    navegador = get_navegador()
-
-    # Navegar a área personal
-    navegador(BASE_URL + "/my/")
-
-    # Obtener URL actual después de navegación
     url_actual = get_current_url()
 
-    # Verificar indicadores de no autenticado
     if "login/index.php" in url_actual:
         return False
 
-    # Verificar indicadores de autenticado
     page_content = get_page_content()
 
     if "Usted no se ha identificado" in page_content:
         return False
 
-    if "Andres Felipe Rendon Hernandez" in page_content or "Área personal" in page_content:
-        return True
+    return "Andres Felipe Rendon Hernandez" in page_content or "Área personal" in page_content
 
-    # Si no podemos determinar, asumir no autenticado
-    return False
+
+def verificar_sesion_moodle():
+    """
+    Navega a área personal Y verifica si está autenticado.
+
+    Returns:
+        True si autenticado, False si no.
+    """
+    navegador = get_navegador()
+    navegador(BASE_URL + "/my/")
+    return verificar_pagina_actual()
 
 
 def requerir_sesion():

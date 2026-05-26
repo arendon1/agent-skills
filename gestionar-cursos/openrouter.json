@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_nota": "model: null = usa default_model. fallback: null = usa fallback_model.",
+  "api": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "timeout": 60,
+    "credit_threshold": 0.01,
+    "credit_check": true
+  },
+  "default_model": "google/gemma-4-31b-it:free",
+  "fallback_model": "google/gemma-4-31b-it",
+  "profiles": {
+    "document_formatter": {
+      "description": "Limpia, estructura y extrae metadatos de documentos académicos de Moodle.",
+      "model": null,
+      "fallback": null,
+      "system_prompt": "Eres un asistente de procesamiento de documentos académicos en español (es-CO). Recibes texto crudo extraído de un documento universitario (módulo, microcurrículo, plan de estudios).\n\nTu tarea:\n1. Limpia el texto: elimina ruido de UI, menús de navegación, números de página sueltos, headers/footers repetidos, y cualquier elemento no académico.\n2. Estructúralo en markdown limpio con headings, listas y párrafos coherentes.\n3. Extrae metadatos estructurados del documento.\n\nDevuelve EXCLUSIVAMENTE un objeto JSON válido, sin markdown alrededor, sin backticks, sin comentarios. Todos los textos y campos DEBEN estar en español:\n\n{\n  \"clean_text\": \"texto formateado en markdown...\",\n  \"metadata\": {\n    \"objetivos\": [\"objetivo 1\", \"objetivo 2\"],\n    \"competencias\": [\"competencia 1\", \"competencia 2\"],\n    \"metodologia\": \"descripción de la metodología\",\n    \"criterios_evaluacion\": [\"criterio 1\", \"criterio 2\"],\n    \"unidades_tematicas\": [\"Unidad 1: nombre\", \"Unidad 2: nombre\"],\n    \"bibliografia\": [\"referencia 1\", \"referencia 2\"]\n  }\n}\n\nSi un campo no aparece en el documento, usa string vacío o array vacío según corresponda. NO inventes información. Solo extrae lo que esté explícitamente en el texto. Responde SIEMPRE en español.",
+      "temperature": 0.3,
+      "max_tokens": 10000,
+      "timeout": 60,
+      "chunking": {
+        "enabled": true,
+        "max_chars": 8000,
+        "overlap": 500
+      }
+    },
+    "youtube_summarizer": {
+      "description": "Resume subtítulos de videos de YouTube. Genera un resumen, extrae conceptos clave, definiciones y ejemplos.",
+      "model": null,
+      "fallback": null,
+      "system_prompt": "Eres un asistente que resume videos académicos en español (es-CO). Resume el siguiente contenido de subtítulos de un video académico. Extrae los conceptos clave, definiciones importantes y ejemplos mencionados. Estructura el resumen en markdown con viñetas. Sé conciso pero no omitas información relevante. NO incluyas introducciones como 'El video trata de...' — ve directo al contenido. Responde SIEMPRE en español.",
+      "temperature": 0.2,
+      "max_tokens": 6000,
+      "timeout": 90
+    }
+  }
+}

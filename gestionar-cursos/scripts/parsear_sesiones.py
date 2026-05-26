@@ -1,13 +1,16 @@
 """
 Extrae cronograma de sesiones sincrónicas con validación de links Teams.
+
+Parsea directamente la tabla HTML para obtener hrefs de enlaces,
+no solo el texto de las celdas.
 """
 
 import re
-from typing import List, Dict
 
-from browser_api import extraer_filas_tabla
+from bs4 import BeautifulSoup
 
-TEAMS_PATTERN = r'teams\.microsoft\.com/l/meetup-join/'
+TEAMS_PATTERN = r'teams\.microsoft\.com/(?:l/meetup-join|meet)/'
+
 
 def es_link_teams_valido(url: str) -> bool:
     """Verifica si el URL es un link directo de reunión Teams."""
@@ -16,83 +19,107 @@ def es_link_teams_valido(url: str) -> bool:
     return bool(re.search(TEAMS_PATTERN, url))
 
 
-def parsear_sesiones(html_content: str) -> List[Dict]:
+def _quitar_tildes(texto: str) -> str:
+    import unicodedata
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
+def _texto_celda(celda) -> str:
+    """Extrae texto plano de una celda, ignorando tags internos."""
+    return celda.get_text(separator=' ', strip=True)
+
+
+def _primer_href(celda) -> str:
+    """Devuelve el href del primer <a> dentro de la celda, o texto si no hay link."""
+    a = celda.find('a')
+    if a:
+        href = a.get('href', '').strip()
+        if href and href != '#':
+            return href
+    return _texto_celda(celda)
+
+
+def parsear_sesiones(html_content: str) -> list[dict]:
     """
-    Extrae tabla de cronograma de sesiones sincrónicas.
-    
-    Columnas de la tabla:
-    - Descripción (ej: "Primera sesión")
-    - Enlace de Ingreso a las Sesiones
-    - Fecha Inicio (dd/mm)
-    - Hora Inicio (hh:mm)
-    - Enlace de Ingreso a las Grabaciones
-    
-    Args:
-        html_content: HTML crudo de la sección Sesiones Sincrónicas
-    
-    Returns:
-        Lista de diccionarios con datos de cada sesión.
+    Extrae tabla de cronograma de sesiones sincrónicas del HTML.
+
+    Busca la tabla que contiene "CRONOGRAMA DE SESIONES SINCRÓNICAS" y extrae:
+    - Descripción (texto de la 1ra columna)
+    - Link Teams (href del <a> en la 2da columna)
+    - Fecha (texto de la 3ra columna)
+    - Hora (texto de la 4ta columna)
+    - Link Grabaciones (href del <a> en la 5ta columna)
     """
+    soup = BeautifulSoup(html_content, 'lxml')
     sesiones = []
-    
-    # Extraer filas de la tabla de sesiones sincrónicas
-    filas = extraer_filas_tabla(html_content, "CRONOGRAMA DE SESIONES SINCRÓNICAS")
-    
-    for fila in filas:
-        descripcion = fila.get("Descripción", "")
-        link_teams_raw = fila.get("Enlace de Ingreso a las Sesiones", "")
-        link_teams = limpiar_link(link_teams_raw)
-        
-        fecha_raw = fila.get("Fecha Inicio (dd/mm)", "")
-        hora_raw = fila.get("Hora Inicio (hh:mm)", "")
-        
-        link_grabaciones_raw = fila.get("Enlace de Ingreso a las Grabaciones", "")
-        link_grabaciones = limpiar_link(link_grabaciones_raw)
-        
-        # Validar link Teams
-        if not es_link_teams_valido(link_teams):
-            link_teams = "[PENDIENTE: Link no seguro o inexistente]"
-        
-        sesiones.append({
-            "descripcion": descripcion,
-            "link_teams": link_teams,
-            "fecha": fecha_raw,
-            "hora": hora_raw,
-            "link_grabaciones": link_grabaciones if es_link_teams_valido(link_grabaciones) else "[PENDIENTE]"
-        })
-    
+
+    for tabla in soup.find_all('table'):
+        texto_tabla = _quitar_tildes(tabla.get_text(separator=' ', strip=True)).lower()
+        if 'cronograma de sesiones sincronicas' not in texto_tabla:
+            continue
+
+        filas_tr = tabla.find_all('tr')
+
+        # Encontrar fila de headers de columna (la que tiene "Descripción" + "Enlace")
+        idx_header = -1
+        for i, tr in enumerate(filas_tr):
+            celdas = tr.find_all(['td', 'th'])
+            if len(celdas) >= 5:
+                header_text = _quitar_tildes(' '.join(_texto_celda(c) for c in celdas)).lower()
+                if 'descripcion' in header_text and 'enlace' in header_text:
+                    idx_header = i
+                    break
+
+        if idx_header == -1:
+            continue
+
+        # Procesar filas de datos después del header
+        for tr in filas_tr[idx_header + 1:]:
+            celdas = tr.find_all(['td', 'th'])
+            if len(celdas) < 5:
+                continue
+
+            descripcion = _texto_celda(celdas[0])
+            link_teams_raw = _primer_href(celdas[1])
+            fecha = _texto_celda(celdas[2])
+            hora = _texto_celda(celdas[3])
+            link_grab_raw = _primer_href(celdas[4])
+
+            link_teams = link_teams_raw if es_link_teams_valido(link_teams_raw) else "[PENDIENTE: Link no seguro o inexistente]"
+            link_grabaciones = link_grab_raw if link_grab_raw and link_grab_raw != '#' else "[PENDIENTE]"
+
+            sesiones.append({
+                "descripcion": descripcion,
+                "link_teams": link_teams,
+                "fecha": fecha,
+                "hora": hora,
+                "link_grabaciones": link_grabaciones,
+            })
+
+        break  # Solo la primera tabla que coincida
+
     return sesiones
 
 
-def limpiar_link(url: str) -> str:
-    """Limpia URL, removiendo parámetros tracking o vacío."""
-    if not url or url.strip() in ["", "#", "link", "enlace"]:
-        return ""
-    
-    # Remover espacios
-    url = url.strip()
-    
-    # Remover parámetros de tracking si existen
-    # Pero mantener el link real
-    return url
-
-
-def generar_markdown_sesiones(sesiones: List[Dict]) -> str:
-    """Genera markdown formateado para archivo SESIONES_SINCRONAS.md."""
+def generar_markdown_sesiones(sesiones: list[dict]) -> str:
+    """Genera markdown formateado para insertar en AGENTS.md o SESIONES_SINCRONAS.md."""
     lines = [
         "# Sesiones Sincrónicas",
         "",
         "| Descripción | Link Teams | Fecha | Hora | Grabaciones |",
         "|-------------|------------|-------|------|--------------|"
     ]
-    
+
     for sesion in sesiones:
         lines.append(
             f"| {sesion['descripcion']} | {sesion['link_teams']} | "
             f"{sesion['fecha']} | {sesion['hora']} | {sesion['link_grabaciones']} |"
         )
-    
+
     lines.append("")
     lines.append("**Nota:** Para ingresar a las sesiones debe iniciar sesión en Office 365 institucional.")
-    
+
     return "\n".join(lines)

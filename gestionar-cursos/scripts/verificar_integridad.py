@@ -3,12 +3,12 @@ Verifica integridad de archivos locales y links.
 """
 
 import os
-from typing import Dict, List
 
-def verificar_integridad(ruta_curso: str) -> Dict:
+
+def verificar_integridad(ruta_curso: str) -> dict:
     """
     Verifica estado de archivos locales vs referencias.
-    
+
     Returns:
         Dict con:
         {
@@ -20,13 +20,13 @@ def verificar_integridad(ruta_curso: str) -> Dict:
         }
     """
     problemas = []
-    
+
     # Verificar archivos referenciados en sitemap
     archivos_ok = 0
     archivos_totales = 0
-    
+
     sitemap = leer_sitemap(ruta_curso)
-    
+
     # Verificar archivos de materiales
     for unidad in sitemap.get("unidades", []):
         for material in unidad.get("materiales", []):
@@ -38,7 +38,7 @@ def verificar_integridad(ruta_curso: str) -> Dict:
                     "tipo": "archivo_faltante",
                     "ruta": material["ruta_local"]
                 })
-    
+
     # Verificar actividades con detalle
     actividades_sin_detalle = 0
     for unidad in sitemap.get("unidades", []):
@@ -50,7 +50,7 @@ def verificar_integridad(ruta_curso: str) -> Dict:
                     "nombre": actividad.get("nombre"),
                     "unidad": unidad.get("nombre")
                 })
-    
+
     return {
         "archivos_totales": archivos_totales,
         "archivos_ok": archivos_ok,
@@ -60,13 +60,13 @@ def verificar_integridad(ruta_curso: str) -> Dict:
     }
 
 
-def leer_sitemap(ruta_local: str) -> Dict:
+def leer_sitemap(ruta_local: str) -> dict:
     """Lee sitemap.json actual."""
     import json
     ruta = os.path.join(ruta_local, "sitemap.json")
-    
+
     if os.path.exists(ruta):
-        with open(ruta, 'r', encoding='utf-8') as f:
+        with open(ruta, encoding='utf-8') as f:
             return json.load(f)
-    
+
     return {"unidades": [], "materiales": [], "actividades": []}

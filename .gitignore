@@ -1,0 +1,16 @@
+# Chrome DevTools Protocol browser profile
+.browserdata/
+
+# Moodle session cookies
+.moodle_session.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+uv.lock
+.ruff_cache/
+
+# IDE
+.vscode/

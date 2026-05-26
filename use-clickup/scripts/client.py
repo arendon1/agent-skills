@@ -100,7 +100,7 @@ class ClickUpClient:
                 # Error de servidor - reintentar
                 response.raise_for_status()
                 
-            except requests.exceptions.RequestException as e:
+            except requests.exceptions.RequestException:
                 if intento == self.MAX_RETRIES - 1:
                     raise
                 # Backoff exponencial: 1s, 2s, 4s

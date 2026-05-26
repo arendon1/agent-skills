@@ -54,7 +54,7 @@ def actualizar_tarea(
             raise ValueError(f"Fecha inválida: {e}")
     
     if prioridad is not None:
-        PRIORIDADES = {"urgent": 1, "high": 2, "normal": 3, "low": 4}
+        PRIORIDADES = {"urgente": 1, "alta": 2, "normal": 3, "baja": 4}
         if prioridad not in PRIORIDADES:
             raise ValueError(f"Prioridad inválida: {prioridad}")
         payload["priority"] = PRIORIDADES[prioridad]

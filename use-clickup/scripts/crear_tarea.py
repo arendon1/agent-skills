@@ -5,16 +5,11 @@ Crear tarea en ClickUp via API.
 from typing import List, Optional
 from client import get_cliente, iso_a_milisegundos
 
-TAGS_VALIDOS = [
-    "evaluable", "no-evaluable", "parcial", "cuestionario", 
-    "foro", "taller", "examen", "actividad", "material", "recurso"
-]
-
 PRIORIDADES = {
-    "urgent": 1,
-    "high": 2,
+    "urgente": 1,
+    "alta": 2,
     "normal": 3,
-    "low": 4
+    "baja": 4
 }
 
 def crear_tarea(
@@ -34,38 +29,25 @@ def crear_tarea(
         nombre: Nombre de la tarea
         descripcion: Descripción (texto o markdown)
         due_date: Fecha en formato ISO 8601 (YYYY-MM-DD)
-        tags: Lista de tags válidos
-        prioridad: "urgent", "high", "normal", "low"
+        tags: Lista de tags a asignar (sin validación, los define el skill orquestador)
+        prioridad: "urgente", "alta", "normal", "baja"
         markdown_description: Usar markdown en descripción
         
     Returns:
         Dict con datos de la tarea creada
         
     Raises:
-        ValueError si tags o prioridad inválidos
+        ValueError si prioridad inválida
         RuntimeError si la API falla
     """
     cliente = get_cliente()
     
-    # Validar tags
-    if tags:
-        for tag in tags:
-            if tag not in TAGS_VALIDOS:
-                raise ValueError(
-                    f"Tag inválido: '{tag}'. "
-                    f"Tags válidos: {TAGS_VALIDOS}"
-                )
-    
     # Validar prioridad
-    priority_id = None
-    if prioridad:
-        if prioridad not in PRIORIDADES:
-            raise ValueError(
-                f"Prioridad inválida: '{prioridad}'. "
-                f"Valores válidos: {list(PRIORIDADES.keys())}"
-            )
-        # ClickUp acepta priority como objeto con id
-        priority_id = {"priority": {"priority": prioridad}}
+    if prioridad and prioridad not in PRIORIDADES:
+        raise ValueError(
+            f"Prioridad inválida: '{prioridad}'. "
+            f"Valores válidos: {list(PRIORIDADES.keys())}"
+        )
     
     # Construir payload
     payload = {"name": nombre}
@@ -86,8 +68,8 @@ def crear_tarea(
     if tags:
         payload["tags"] = tags
     
-    if priority_id:
-        payload.update(priority_id)
+    if prioridad:
+        payload["priority"] = PRIORIDADES[prioridad]
     
     # Hacer request
     response = cliente.post(f"/list/{lista_id}/task", json=payload)

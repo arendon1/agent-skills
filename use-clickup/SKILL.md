@@ -34,12 +34,10 @@ La API key se busca en orden:
   --descripcion "## Instrucciones\nLeer capítulo 1" \
   --due_date 2026-02-01 \
   --tags evaluable,parcial \
-  --prioridad normal
+  --prioridad alta
 ```
 
-**Tags válidos:** evaluable, no-evaluable, parcial, cuestionario, foro, taller, examen, actividad, material, recurso
-
-**Prioridades:** urgent, high, normal, low
+**Prioridades:** urgente, alta, normal, baja
 
 ---
 
@@ -51,7 +49,7 @@ La API key se busca en orden:
 ```
 /use-clickup actualizar-tarea def456 \
   --due_date 2026-02-15 \
-  --prioridad high
+  --prioridad alta
 ```
 
 **Nota:** Custom fields no se pueden actualizar via este workflow.

@@ -31,6 +31,7 @@ from browser_api import (
     esta_usando_selenium,
     extraer_sidebar,
     get_current_url,
+    get_driver,
     get_navegador,
     get_page_content,
     set_profile_dir,
@@ -392,6 +393,7 @@ def _sync_curso(url: str, ruta_curso: str):
 
 def _init_curso(url: str, destino: str, profile_dir: str | None = None,
                 reset_profile: bool = False, no_browser: bool = False,
+                use_requests: bool = False,
                 periodo: str = "", bloque: str = ""):
     """Inicializa UN curso desde Moodle. Llamable directamente o via subproceso.
 
@@ -401,17 +403,30 @@ def _init_curso(url: str, destino: str, profile_dir: str | None = None,
         profile_dir: Directorio de perfil Chrome (None = default .browserdata).
         reset_profile: Borrar perfil antes de iniciar.
         no_browser: No lanzar Chrome, asumir CDP en localhost:9222.
+        use_requests: Usar requests.Session en vez de Selenium/CDP.
         periodo: Período académico (ej: 2026-2). Se infiere de --destino si vacío.
         bloque: Bloque académico (ej: B1). Se infiere de --destino si vacío.
     """
-    if not no_browser:
+    if use_requests:
+        from moodle_session import cargar_session_requests
+        session = cargar_session_requests()
+        if not session:
+            console.print(
+                "[bold red]ERROR:[/bold red] No hay sesión guardada "
+                "(.moodle_session.json). Corre primero con navegador para hacer login."
+            )
+            sys.exit(1)
+        from browser_api import set_request_mode
+        set_request_mode(session)
+        console.print("[dim]Modo requests activado (sin navegador)[/dim]")
+    elif not no_browser:
         profile = profile_dir or os.path.join(os.getcwd(), ".browserdata")
         if reset_profile and os.path.isdir(profile):
             import shutil
             shutil.rmtree(profile, ignore_errors=True)
         set_profile_dir(profile)
 
-    if not esta_usando_selenium():
+    if not use_requests and not esta_usando_selenium():
         console.print("[bold red]ERROR:[/bold red] No se detectó modo CDP/Selenium.")
         sys.exit(1)
 
@@ -554,7 +569,7 @@ def _init_curso(url: str, destino: str, profile_dir: str | None = None,
         return
 
     ruta_curso = os.path.join(
-        destino, nombre_carpeta_curso(datos_curso["codigo"], datos_curso["nombre"]),
+        destino, nombre_carpeta_curso(datos_curso["codigo"], datos_curso["nombre"], url),
     )
     console.print(f"    [green]Creado:[/green] {os.path.abspath(ruta_curso)}")
 
@@ -587,7 +602,7 @@ def _init_curso(url: str, destino: str, profile_dir: str | None = None,
 
     # Escribir/actualizar clickup.json en la raíz del período
     _escribir_clickup_json(destino, datos_curso["codigo"], datos_curso["nombre"],
-                           periodo, bloque)
+                           periodo, bloque, url)
 
     # 11. Resumen
     console.print(f"\n[bold green]Inicialización completa:[/bold green] {datos_curso['nombre']}")
@@ -764,6 +779,10 @@ def main():
         help="No abrir Chrome; asume que ya está corriendo con --remote-debugging-port=9222"
     )
     parser.add_argument(
+        "--requests", action="store_true",
+        help="Usar requests.Session (sin navegador). Requiere .moodle_session.json válido."
+    )
+    parser.add_argument(
         "--profile-dir", "-p", default=None,
         help="Directorio para perfil persistente de Chrome"
     )
@@ -786,7 +805,7 @@ def main():
         style="bold cyan", border_style="cyan"
     ))
 
-    if not esta_usando_selenium():
+    if not args.requests and not esta_usando_selenium():
         console.print("[bold red]ERROR:[/bold red] No se detectó modo CDP/Selenium.")
         sys.exit(1)
 
@@ -807,6 +826,7 @@ def main():
         console.print(f"\n[bold]Curso:[/bold] {url}")
         _init_curso(url, args.destino, profile_dir=profile,
                     reset_profile=args.reset_profile, no_browser=args.no_browser,
+                    use_requests=args.requests,
                     periodo=args.periodo, bloque=args.bloque)
 
 
@@ -894,12 +914,17 @@ CLICKUP_TEMPLATE = {
 
 
 def _escribir_clickup_json(destino: str, codigo: str, nombre_curso: str,
-                           periodo: str, bloque: str):
+                           periodo: str, bloque: str, url: str = ""):
     """Escribe o actualiza clickup.json en la raíz del período académico.
 
-    Si ya existe, solo agrega la entrada courses[codigo].
+    Usa el ID de Moodle (?id=) como key para soportar cursos con mismo código.
+    Si ya existe, solo agrega la entrada courses[key].
     """
     import json
+
+    from scaffold_curso import extraer_codigo_desde_url
+
+    course_key = extraer_codigo_desde_url(url) if url else codigo
 
     ruta_clickup = os.path.join(destino, "clickup.json")
     if os.path.isfile(ruta_clickup):
@@ -912,15 +937,15 @@ def _escribir_clickup_json(destino: str, codigo: str, nombre_curso: str,
         data["courses"] = {}
         console.print("    [dim]clickup.json creado en período[/dim]")
 
-    if codigo not in data.get("courses", {}):
-        data.setdefault("courses", {})[codigo] = {
+    if course_key not in data.get("courses", {}):
+        data.setdefault("courses", {})[course_key] = {
             "list_id": None,
             "list_name": f"{nombre_curso} - {codigo}",
             "tasks": {},
         }
-        console.print(f"    [dim]Curso {codigo} agregado a clickup.json[/dim]")
+        console.print(f"    [dim]Curso {course_key} agregado a clickup.json[/dim]")
     else:
-        console.print(f"    [dim]Curso {codigo} ya existe en clickup.json[/dim]")
+        console.print(f"    [dim]Curso {course_key} ya existe en clickup.json[/dim]")
 
     with open(ruta_clickup, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -928,14 +953,18 @@ def _escribir_clickup_json(destino: str, codigo: str, nombre_curso: str,
 
 def _init_parallel(urls: list[str], destino: str, profile_dir: str,
                    periodo: str = "", bloque: str = ""):
-    """Lanza subprocesos independientes para cada URL.
+    """Lanza subprocesos independientes para cada URL usando requests.
 
-    Cada subproceso ejecuta `python cli_init.py <url> --destino <dir> --no-browser`.
-    El proceso padre primero asegura que Chrome esté corriendo con CDP.
+    Flujo:
+    1. Padre hace login via Chrome CDP.
+    2. Exporta cookies a .moodle_session.json.
+    3. Cierra Chrome/desconecta driver.
+    4. Lanza N subprocesos, cada uno con --requests.
+    5. Cada subproceso carga cookies y usa requests.Session sin navegador.
     """
     import shlex
 
-    # Asegurar que Chrome CDP esté corriendo
+    # 1. Login via Chrome CDP (padre)
     set_profile_dir(profile_dir)
     navegador = get_navegador()
     navegador(BASE_URL + "/my/")
@@ -944,7 +973,22 @@ def _init_parallel(urls: list[str], destino: str, profile_dir: str,
         console.print("[bold red]ERROR:[/bold red] No se pudo autenticar.")
         return
 
-    console.print(f"\n[dim]Lanzando {len(urls)} subprocesos...[/dim]")
+    # 2. Exportar cookies para subprocesos
+    console.print("[dim]Exportando cookies de sesión...[/dim]")
+    from moodle_session import guardar_cookies_selenium
+    if not guardar_cookies_selenium():
+        console.print("[bold red]ERROR:[/bold red] No se pudieron exportar cookies.")
+        return
+
+    # 3. Desconectar driver del padre (libera Chrome)
+    try:
+        driver = get_driver()
+        driver.quit()
+    except Exception:
+        pass
+
+    # 4. Lanzar subprocesos (cada uno con --requests)
+    console.print(f"\n[dim]Lanzando {len(urls)} subprocesos (modo requests)...[/dim]")
     proceso_script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                   "cli_init.py")
 
@@ -954,23 +998,24 @@ def _init_parallel(urls: list[str], destino: str, profile_dir: str,
             sys.executable, proceso_script,
             url,
             "--destino", destino,
-            "--no-browser",
-            "--profile-dir", profile_dir,
+            "--requests",
         ]
         if periodo:
             cmd.extend(["--periodo", periodo])
         if bloque:
             cmd.extend(["--bloque", bloque])
         console.print(f"  [{i}/{len(urls)}] {' '.join(shlex.quote(a) for a in cmd[:3])}...")
+        env = os.environ.copy()
+        env.setdefault("PYTHONIOENCODING", "utf-8")
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             text=True, encoding="utf-8", errors="replace")
+                             text=True, encoding="utf-8", errors="replace", env=env)
         procesos.append((url, p))
 
-    # Esperar y recolectar resultados
+    # 5. Esperar y recolectar resultados
     for url, p in procesos:
         console.print(f"\n[bold]--- Resultado: {url} ---[/bold]")
         for line in p.stdout:
-            console.print(f"  [dim]{line.rstrip()}[/dim]")
+            console.print(f"  {line.rstrip()}", markup=False, highlight=False)
         p.wait()
         if p.returncode == 0:
             console.print("  [green]OK[/green]")

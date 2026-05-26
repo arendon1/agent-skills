@@ -33,13 +33,27 @@ def extraer_codigo_desde_url(url: str) -> str:
     return "CURSO"
 
 
-def nombre_carpeta_curso(codigo: str, nombre: str) -> str:
+def nombre_carpeta_curso(codigo: str, nombre: str, url: str = "") -> str:
     """Construye nombre de carpeta: '[CODIGO]-nombre-en-kebab-case'.
 
     Sanitiza caracteres inválidos para Windows.
+    Si el nombre del curso contiene el código (ej: 'ANALÍTICA - 2510B04G1'),
+    lo elimina para evitar redundancia. Si el nombre es solo el código,
+    usa el ?id= de la URL como diferenciador.
     """
-    nombre_kebab = _a_kebab_case(nombre)
-    if not nombre_kebab or codigo.upper() in nombre_kebab.upper():
+    patron = r'\s*[-–—]*\s*' + re.escape(codigo) + r'\s*[-–—]*\s*'
+    nombre_limpio = re.sub(patron, ' ', nombre, flags=re.IGNORECASE).strip()
+    nombre_limpio = re.sub(r'\s+', ' ', nombre_limpio).strip()
+
+    if not nombre_limpio:
+        if url:
+            m = re.search(r'[?&]id=(\d+)', url)
+            if m:
+                return f"{codigo}-{m.group(1)}"
+        return codigo
+
+    nombre_kebab = _a_kebab_case(nombre_limpio)
+    if not nombre_kebab:
         return codigo
     return f"{codigo}-{nombre_kebab}"
 
@@ -50,7 +64,7 @@ def _a_kebab_case(texto: str) -> str:
     texto = re.sub(r'[()\[\]{}]', ' ', texto)
     texto = re.sub(r'\s+', '-', texto.strip())
     texto = re.sub(r'-+', '-', texto)
-    return texto.upper().strip('-')
+    return texto.lower().strip('-')
 
 
 def _sanitizar_nombre_carpeta(nombre: str) -> str:
@@ -64,7 +78,8 @@ def crear_estructura_curso(datos_curso: dict, ruta_base: str) -> bool:
     """Crea estructura de carpetas y archivos para un curso."""
     curso_code = datos_curso.get("codigo", "CURSO_DESCONOCIDO")
     curso_nombre = datos_curso.get("nombre", "")
-    nombre_dir = nombre_carpeta_curso(curso_code, curso_nombre)
+    curso_url = datos_curso.get("url", "")
+    nombre_dir = nombre_carpeta_curso(curso_code, curso_nombre, curso_url)
     ruta_curso = os.path.join(ruta_base, nombre_dir)
 
     os.makedirs(ruta_curso, exist_ok=True)

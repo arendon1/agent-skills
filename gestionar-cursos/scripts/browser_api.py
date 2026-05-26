@@ -21,10 +21,66 @@ def _agent_has_tool():
 
 
 # ---------------------------------------------------------------------------
-# Carga lazy de fallback CDP
+# Carga lazy de fallback CDP y requests
 # ---------------------------------------------------------------------------
 
 _cdp_funcs = None
+_requests_funcs = None
+_use_requests = False
+
+
+def set_request_mode(session):
+    """Activa modo requests. Debe llamarse antes de cualquier operación."""
+    global _use_requests, _requests_funcs
+    from navegador_requests import set_session
+    set_session(session)
+    _use_requests = True
+
+
+def _load_requests():
+    global _requests_funcs
+    if _requests_funcs is not None:
+        return _requests_funcs
+
+    from navegador_requests import (
+        abrir_popup_grid_y_obtener_html,
+        click,
+        encontrar_menus_cerrados,
+        esperar_carga,
+        extraer_criterios,
+        extraer_filas_tabla,
+        extraer_instrucciones,
+        extraer_links_materiales,
+        extraer_nombre_unidad,
+        extraer_sidebar,
+        extraer_texto_descripcion,
+        get_driver,
+        hacer_get,
+        navegar,
+        obtener_contenido,
+        obtener_cookies,
+        obtener_url_actual,
+    )
+    _requests_funcs = {
+        'navegar': navegar,
+        'obtener_url_actual': obtener_url_actual,
+        'obtener_contenido': obtener_contenido,
+        'click': click,
+        'esperar_carga': esperar_carga,
+        'encontrar_menus_cerrados': encontrar_menus_cerrados,
+        'extraer_sidebar': extraer_sidebar,
+        'extraer_texto_descripcion': extraer_texto_descripcion,
+        'extraer_instrucciones': extraer_instrucciones,
+        'extraer_links_materiales': extraer_links_materiales,
+        'extraer_criterios': extraer_criterios,
+        'extraer_nombre_unidad': extraer_nombre_unidad,
+        'obtener_cookies_browser': obtener_cookies,
+        'hacer_get': hacer_get,
+        'extraer_filas_tabla': extraer_filas_tabla,
+        'get_driver': get_driver,
+        'abrir_popup_grid_y_obtener_html': abrir_popup_grid_y_obtener_html,
+    }
+    return _requests_funcs
 
 
 def _load_cdp():
@@ -81,7 +137,9 @@ def _load_cdp():
 
 
 def _get_func(name: str):
-    """Obtiene función de agente o fallback CDP."""
+    """Obtiene función de agente, requests o fallback CDP."""
+    if _use_requests:
+        return _load_requests()[name]
     if _agent_has_tool():
         import builtins
         val = getattr(builtins, name, None)
@@ -99,6 +157,8 @@ def _get_func(name: str):
 
 def get_navegador():
     """Retorna callable que navega a URL."""
+    if _use_requests:
+        return _load_requests()['navegar']
     if _agent_has_tool():
         import builtins
         return getattr(builtins, 'browser_tool', None) or builtins.open_browser
@@ -167,7 +227,7 @@ def extraer_filas_tabla(html_content, header_text):
 
 def esta_usando_selenium():
     """True si estamos en modo terminal con CDP/Selenium."""
-    if _agent_has_tool():
+    if _use_requests or _agent_has_tool():
         return False
     _load_cdp()
     return True
@@ -175,7 +235,7 @@ def esta_usando_selenium():
 
 def get_driver():
     """Expone el driver Selenium directamente (solo modo CDP)."""
-    if _agent_has_tool():
+    if _use_requests or _agent_has_tool():
         raise RuntimeError("get_driver solo disponible en modo CDP/terminal")
     return _load_cdp()['get_driver']()
 
@@ -185,7 +245,7 @@ def set_profile_dir(path: str):
     Configura directorio persistente para perfil de Chrome (solo modo CDP).
     Debe llamarse antes de cualquier navegación.
     """
-    if _agent_has_tool():
-        return  # No aplica en modo agente
+    if _use_requests or _agent_has_tool():
+        return  # No aplica en modo requests o agente
     from navegador_cdp import set_profile_dir as _set
     _set(path)

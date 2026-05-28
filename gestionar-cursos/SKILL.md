@@ -76,18 +76,24 @@ Universidad (space, id fijo: 901311224662)
     └── BASES DE DATOS 2 - 2601B05G2 (list)
 ```
 
-**Flujo del agente tras `init`:**
-1. Leer `PERIODO`, `BLOQUE` y `CLICKUP_LIST_ID` de AGENTS.md
-2. Si `CLICKUP_LIST_ID` es `[PENDIENTE]`: leer `clickup.json`, encontrar el
-   curso por código, resolver `folder.id` y `list.id` vía `use-clickup`,
-   guardar IDs en ambos archivos
-3. Por cada actividad del PGA que no esté en `clickup.json → tasks`:
-   crear tarea vía `use-clickup` con `due_date`, tags y prioridad
+**Flujo tras `init`:**
+1. Al terminar `init`, avisar al usuario: "¿Sincronizar con ClickUp?"
+2. Si confirma → ejecutar `cli_clickup.py`:
+```bash
+cd gestionar-cursos/scripts
+uv run python cli_clickup.py "C:/Users/.../Universidad/2026-2-B1"
+```
+3. Se puede previsualizar con `--dry-run` antes de confirmar
 
-**Flujo del agente tras `estado`:**
+`cli_clickup.py`:
+1. Resuelve `folder.id` y `list.id` en el espacio "Universidad" (crea si no existen)
+2. Crea tareas en ClickUp para cada actividad del PGA no sincronizada
+3. Actualiza `AGENTS.md` con `CLICKUP_LIST_ID` y `clickup.json` con los IDs resueltos
+
+**Flujo tras `estado`:**
 1. Ejecutar `cli_estado.py` → detectar cambios de fecha y nuevas actividades
-2. `use-clickup actualizar-tarea` para fechas modificadas
-3. `use-clickup crear-tarea` para actividades nuevas
+2. Preguntar: "¿Actualizar tareas en ClickUp con estos cambios?"
+3. Si confirma → `cli_clickup.py` actualiza fechas modificadas y crea tareas nuevas
 
 ### Tags del Skill
 
@@ -200,6 +206,22 @@ uv run python cli_init.py <url1> <url2> <url3> --parallel --destino .
 - Refresca secciones marcadas `<!-- auto -->` desde Moodle.
 - Preserva secciones marcadas `<!-- manual -->` (ej: PERIOD, BLOCK editados a mano).
 - Documentos introductorios se vuelven a extraer y fusionan.
+
+### /gestionar-cursos clickup-sync \<PERIODO_DIR\>
+
+**Uso:** Sincronizar la estructura local de todo un período con ClickUp.
+
+```bash
+uv run python cli_clickup.py "C:/Users/.../Universidad/2026-2-B1"
+uv run python cli_clickup.py "C:/Users/.../Universidad/2026-2-B1" --dry-run
+```
+
+**Qué hace:**
+1. Resuelve `folder.id` en el espacio "Universidad" (crea folder si no existe)
+2. Por cada curso en `clickup.json` con `list_id: null`, resuelve/crea la lista
+3. Por cada actividad en `PGA.md` no sincronizada, crea tarea con tags y prioridad
+4. Actualiza `AGENTS.md` con `CLICKUP_LIST_ID` y `clickup.json` con los IDs resueltos
+5. Si la tarea ya existe pero cambió la fecha, la actualiza automáticamente
 
 ### /gestionar-cursos estado \<CARPETA\>
 
@@ -423,6 +445,7 @@ Las fechas ya quedan reflejadas dentro del contenido.
 |---------|-----------|
 | `cli_init.py` | Inicializar curso(s) desde URL(s) de Moodle |
 | `cli_estado.py` | Verificar estado y sincronización |
+| `cli_clickup.py` | Sincronizar cursos locales con ClickUp (IDs, tareas, tags) |
 
 ### Extracción de Moodle
 | Archivo | Propósito |

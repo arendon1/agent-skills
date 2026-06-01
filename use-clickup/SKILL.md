@@ -1,117 +1,117 @@
 ---
 name: use-clickup
 description: >-
-  Gestión de tareas y listas en ClickUp via API oficial.
-  Úsalo para crear tareas, actualizar fechas, buscar actividades,
-  y organizar listas de cursos.
+  Task and list management in ClickUp via the official API.
+  Use when creating tasks, updating dates, searching activities,
+  and organizing course lists.
 metadata:
   version: "1.0.0"
-  language: es-CO
+  language: en-US
   risk_tier: MEDIUM
 ---
 
 # /use-clickup
 
-Skill para gestión completa de ClickUp. Solo workflows esenciales,
-con documentación interna completa en `references/` para capacidades avanzadas.
+Skill for complete ClickUp management. Essential workflows only,
+with comprehensive internal documentation in `references/` for advanced capabilities.
 
-## Autenticación
+## Authentication
 
-La API key se busca en orden:
-1. Archivo `.env` en workspace actual (variable `CLICKUP_API_KEY`)
-2. Variable de entorno `CLICKUP_API_KEY`
-3. Error claro con instrucciones si no se encuentra
+The API key is resolved in order:
+1. `.env` file in current workspace (`CLICKUP_API_KEY` variable)
+2. `CLICKUP_API_KEY` environment variable
+3. Clear error with instructions if not found
 
 ## Workflows
 
-### /use-clickup crear-tarea
+### /use-clickup create-task
 
-**Uso:** `crear-tarea <lista_id> <nombre> [--descripcion] [--due_date] [--tags] [--prioridad]`
+**Usage:** `create-task <list_id> <name> [--description] [--due_date] [--tags] [--priority]`
 
-**Ejemplo:**
+**Example:**
 ```
-/use-clickup crear-tarea abc123 "Prueba Inicial" \
-  --descripcion "## Instrucciones\nLeer capítulo 1" \
+/use-clickup create-task abc123 "Initial Test" \
+  --description "## Instructions\nRead chapter 1" \
   --due_date 2026-02-01 \
-  --tags evaluable,parcial \
-  --prioridad alta
+  --tags gradable,midterm \
+  --priority high
 ```
 
-**Prioridades:** urgente, alta, normal, baja
+**Priorities:** urgent, high, normal, low
 
 ---
 
-### /use-clickup actualizar-tarea
+### /use-clickup update-task
 
-**Uso:** `actualizar-tarea <task_id> [--nombre] [--descripcion] [--due_date] [--prioridad] [--tags]`
+**Usage:** `update-task <task_id> [--name] [--description] [--due_date] [--priority] [--tags]`
 
-**Ejemplo:**
+**Example:**
 ```
-/use-clickup actualizar-tarea def456 \
+/use-clickup update-task def456 \
   --due_date 2026-02-15 \
-  --prioridad alta
+  --priority high
 ```
 
-**Nota:** Custom fields no se pueden actualizar via este workflow.
+**Note:** Custom fields cannot be updated via this workflow.
 
 ---
 
-### /use-clickup buscar-tarea
+### /use-clickup search-task
 
-**Uso:** `buscar-tarea [--nombre] [--tag] [--lista_id]`
+**Usage:** `search-task [--name] [--tag] [--list_id]`
 
-**Ejemplo:**
+**Example:**
 ```
-/use-clickup buscar-tarea --nombre "Parcial" --tag evaluable
-```
-
----
-
-### /use-clickup crear-lista
-
-**Uso:** `crear-lista <folder_id> <nombre>`
-
-**Ejemplo:**
-```
-/use-clickup crear-lista folder123 "BASES DE DATOS 2 - 2601B04G1"
+/use-clickup search-task --name "Midterm" --tag gradable
 ```
 
 ---
 
-### /use-clickup ver-listas
+### /use-clickup create-list
 
-**Uso:** `ver-listas [--folder_id] [--space_id]`
+**Usage:** `create-list <folder_id> <name>`
 
-**Ejemplo:**
+**Example:**
 ```
-/use-clickup ver-listas --folder_id folder123
+/use-clickup create-list folder123 "DATABASES 2 - 2601B04G1"
 ```
 
 ---
 
-## Manejo de Errores
+### /use-clickup view-lists
 
-| Código | Significado | retry? | Acción |
-|--------|-------------|--------|--------|
-| 200 | Éxito | - | Continuar |
-| 400 | Bad request | No | Corregir input |
-| 401 | Auth fallida | No | Verificar API key |
-| 403 | Sin permisos | No | Verificar acceso |
-| 404 | No encontrado | No | Verificar ID |
-| 409 | Conflicto | No | Resolver duplicado |
-| 429 | Rate limit | Sí | Backoff 1s, 2s, 4s |
-| 500 | Error servidor | Sí | Reintentar 3x |
+**Usage:** `view-lists [--folder_id] [--space_id]`
 
-## Referencias Internas
+**Example:**
+```
+/use-clickup view-lists --folder_id folder123
+```
 
-La documentación completa de la API está en `references/`:
-- `api-tasks.md` — Todos los endpoints de tasks
-- `api-lists.md` — CRUD de listas
-- `api-folders.md` — CRUD de folders
-- `api-spaces.md` — CRUD de spaces
+---
+
+## Error Handling
+
+| Code | Meaning | Retry? | Action |
+|------|---------|--------|--------|
+| 200 | Success | - | Continue |
+| 400 | Bad request | No | Fix input |
+| 401 | Auth failed | No | Verify API key |
+| 403 | No permissions | No | Verify access |
+| 404 | Not found | No | Verify ID |
+| 409 | Conflict | No | Resolve duplicate |
+| 429 | Rate limit | Yes | Backoff 1s, 2s, 4s |
+| 500 | Server error | Yes | Retry 3x |
+
+## Internal References
+
+Full API documentation in `references/`:
+- `api-tasks.md` — All task endpoints
+- `api-lists.md` — List CRUD
+- `api-folders.md` — Folder CRUD
+- `api-spaces.md` — Space CRUD
 - `api-comments.md` — Comments
 - `api-checklists.md` — Checklists
-- `api-tags.md` — Gestión de tags
+- `api-tags.md` — Tag management
 - `api-custom-fields.md` — Custom fields
-- `formato-fechas.md` — Conversión ISO ↔ milisegundos
-- `manejo-errores.md` — Códigos y estrategias de retry
+- `date-formatting.md` — ISO to milliseconds conversion
+- `error-handling.md` — Error codes and retry strategies

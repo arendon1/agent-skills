@@ -8,6 +8,7 @@ Requisitos:
 Configuración LLM centralizada en openrouter.json (perfil 'youtube_summarizer').
 """
 
+import contextlib
 import json
 import os
 import re
@@ -159,7 +160,7 @@ def _limpiar_temp(base_path: str):
     """Elimina archivos temporales de subtítulos."""
     import glob as _glob
     for f in _glob.glob(f"{base_path}*"):
-        with __import__('contextlib').suppress(OSError):
+        with contextlib.suppress(OSError):
             os.remove(f)
 
 

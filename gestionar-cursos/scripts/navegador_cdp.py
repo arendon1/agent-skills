@@ -13,6 +13,7 @@ El script se conecta a esa instancia y navega automáticamente.
 import atexit
 import contextlib
 import os
+import re
 import socket
 import subprocess
 import time
@@ -259,7 +260,7 @@ def _extraer_section_num(sec) -> str:
     sec_id = sec.get('id', '')
     m = None
     if sec_id:
-        m = __import__('re').search(r'section-(\d+)', sec_id)
+        m = re.search(r'section-(\d+)', sec_id)
     if m:
         return m.group(1)
     data_sec = sec.get('data-sectionid', '')

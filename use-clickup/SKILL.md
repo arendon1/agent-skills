@@ -4,9 +4,9 @@ description: >-
   Task and list management in ClickUp via the official API.
   Use when creating tasks, updating dates, searching activities,
   and organizing course lists.
+language: en-US
 metadata:
   version: "1.0.0"
-  language: en-US
   risk_tier: MEDIUM
 ---
 
@@ -17,7 +17,7 @@ with comprehensive internal documentation in `references/` for advanced capabili
 
 ## Authentication
 
-The API key is resolved in order:
+script: `client.py` — shared API client for all ClickUp operations. The API key is resolved in order:
 1. `.env` file in current workspace (`CLICKUP_API_KEY` variable)
 2. `CLICKUP_API_KEY` environment variable
 3. Clear error with instructions if not found
@@ -27,6 +27,7 @@ The API key is resolved in order:
 ### /use-clickup create-task
 
 **Usage:** `create-task <list_id> <name> [--description] [--due_date] [--tags] [--priority]`
+script: `create_task.py`
 
 **Example:**
 ```
@@ -44,6 +45,7 @@ The API key is resolved in order:
 ### /use-clickup update-task
 
 **Usage:** `update-task <task_id> [--name] [--description] [--due_date] [--priority] [--tags]`
+script: `update_task.py`
 
 **Example:**
 ```
@@ -59,6 +61,7 @@ The API key is resolved in order:
 ### /use-clickup search-task
 
 **Usage:** `search-task [--name] [--tag] [--list_id]`
+script: `search_task.py`
 
 **Example:**
 ```
@@ -70,6 +73,7 @@ The API key is resolved in order:
 ### /use-clickup create-list
 
 **Usage:** `create-list <folder_id> <name>`
+script: `create_list.py`
 
 **Example:**
 ```
@@ -81,6 +85,7 @@ The API key is resolved in order:
 ### /use-clickup view-lists
 
 **Usage:** `view-lists [--folder_id] [--space_id]`
+script: `view_lists.py`
 
 **Example:**
 ```

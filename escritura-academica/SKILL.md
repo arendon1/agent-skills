@@ -4,9 +4,9 @@ description: >-
   Produce documentos académicos listos para publicación en formato APA 7 usando Typst.
   Usa cuando el usuario quiere escribir un paper, necesita estructura IMRaD, o solicita
   "escribir un documento de investigación".
+language: es-CO
 metadata:
   version: "1.0.0"
-  language: es-CO
   trit: 0
   risk_tier: CAUTION
 ---
@@ -24,6 +24,8 @@ Si los workflows de escritura académica no aparecen en los comandos del agente,
 ```bash
 python scripts/bootstrap_skill.py --workspace .
 ```
+
+script: `bootstrap_skill.py` — detecta el agente y despliega los workflows automáticamente.
 
 Esto detectará automáticamente el directorio de configuración del agente y desplegará los archivos necesarios.
 
@@ -51,7 +53,13 @@ Seguir estructura IMRaD según `references/imrad-guia.md`.
 
 ### 3. Citar
 
-Usar scripts de búsqueda y validación para encontrar y verificar referencias.
+Usar scripts de búsqueda y validación para encontrar y verificar referencias:
+
+- Buscar artículos: script: `search_google_scholar.py` o script: `search_pubmed.py`
+- Extraer metadatos: script: `extract_metadata.py`
+- Validar citas: script: `validate_citations.py`
+- Convertir DOIs a BibTeX: script: `doi_to_bibtex.py`
+- Formatear BibTeX: script: `format_bibtex.py`
 
 ### 4. Componer
 
@@ -65,7 +73,7 @@ Producir PDF final con Typst.
 
 **Nunca** generar citas falsas o alucinadas. Antes de usar cualquier referencia:
 
-1. Validar DOI con `scripts/citation-validar.py`
+1. Validar DOI con script: `validate_citations.py`
 2. Verificar que la referencia existe realmente
 3. Confirmar coincidencias de autor, año y título
 
@@ -99,6 +107,7 @@ Producir PDF final con Typst.
 | `scripts/extract_metadata.py` | Extraer metadatos |
 | `scripts/validate_citations.py` | Validar citas |
 | `scripts/format_bibtex.py` | Formatear BibTeX |
+| `scripts/doi_to_bibtex.py` | Convertir DOIs a BibTeX vía CrossRef |
 
 ## Verificación del Entorno Typst
 

@@ -2,12 +2,13 @@
 name: git-master
 description: >-
   Proactive version control strategy for AI agents. Creates worktrees, commits at plan
-  checkpoints with conventional commits, merges at plan completion. Load at session start
-  and keep in context permanently.
+  checkpoints with conventional commits, merges at plan completion. Use when starting
+  any development session that involves code changes. Load at session start and keep
+  in context permanently.
+language: en
 license: Apache-2.0
 metadata:
   version: "2.0.0"
-  language: en
   trit: -1
   author: agent-builder
 ---
@@ -200,6 +201,11 @@ Tags are the user's decision. Never create tags automatically.
 
 If multiple agents produce worktrees simultaneously, each one rebases on the latest
 base branch before merging. Last one to merge handles the rebase.
+
+## Scripts
+
+script: `bootstrap.py` — deploys the skill's workflow files into agent directories
+(`.agent/workflows`, `.cursor/rules`, etc.). Run with `python scripts/bootstrap.py --skill-path .`.
 
 ## Reference
 

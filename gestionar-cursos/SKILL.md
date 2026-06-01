@@ -441,6 +441,9 @@ Las fechas ya quedan reflejadas dentro del contenido.
 ## Archivos del Skill
 
 ### Puntos de Entrada (CLI)
+
+script: `cli_init.py` — entry point principal que orquesta el pipeline completo importando 17 scripts: navegación (`browser_api`, `navegador_cdp`, `navegador_requests`), extracción por tipo de módulo (`extractor_modulos`, `extractor_foro`, `extractor_documentos`, `extractor_youtube`), scaffolding (`scaffold_curso`, `parsear_pga`, `parsear_sesiones`), procesamiento LLM (`llm_api`, `openrouter_client`, `formatear_llm`), y control de sesión (`moodle_session`, `verificar_sesion`, `checkpoint`).
+
 | Archivo | Propósito |
 |---------|-----------|
 | `cli_init.py` | Inicializar curso(s) desde URL(s) de Moodle |
@@ -451,6 +454,7 @@ Las fechas ya quedan reflejadas dentro del contenido.
 | Archivo | Propósito |
 |---------|-----------|
 | `navegador_cdp.py` | Navegador Chrome DevTools Protocol + Selenium |
+| `navegador_requests.py` | Backend alternativo: requests + BS4 sin navegador real |
 | `browser_api.py` | Capa de abstracción IDE ↔ CDP |
 | `moodle_session.py` | Exportación de cookies Selenium → requests |
 | `verificar_sesion.py` | Detección de sesión activa en Moodle |

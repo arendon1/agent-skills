@@ -33,11 +33,11 @@ USE_CLICKUP_DIR = os.path.join(SKILLS_ROOT, "use-clickup", "scripts")
 sys.path.insert(0, USE_CLICKUP_DIR)
 sys.path.insert(0, THIS_DIR)
 
-from client import get_cliente
-from crear_tarea import crear_tarea
-from actualizar_tarea import actualizar_tarea
-from crear_lista import crear_lista
-from ver_listas import ver_listas
+from client import get_client
+from create_task import create_task
+from update_task import update_task
+from create_list import create_list
+from view_lists import view_lists
 
 CLICKUP_SPACE_ID = "901311224662"
 CLICKUP_SPACE_NAME = "Universidad"
@@ -110,9 +110,9 @@ def _clasificar_actividad(nombre: str, valor_str: str) -> tuple[list[str], str]:
 # ClickUp ID resolution
 # ---------------------------------------------------------------------------
 
-def _resolver_folder(cliente, space_id: str, folder_name: str) -> str:
+def _resolver_folder(client, space_id: str, folder_name: str) -> str:
     """Find folder by name or create it. Returns folder ID."""
-    resp = cliente.get(f"/space/{space_id}/folder?archived=false")
+    resp = client.get(f"/space/{space_id}/folder?archived=false")
     if resp.status_code != 200:
         raise RuntimeError(f"Error listando folders: {resp.status_code} {resp.text}")
     folders = resp.json().get("folders", [])
@@ -120,7 +120,7 @@ def _resolver_folder(cliente, space_id: str, folder_name: str) -> str:
         if f["name"] == folder_name:
             return f["id"]
 
-    resp = cliente.post(f"/space/{space_id}/folder", json={"name": folder_name})
+    resp = client.post(f"/space/{space_id}/folder", json={"name": folder_name})
     if resp.status_code != 200:
         raise RuntimeError(f"Error creando folder '{folder_name}': {resp.status_code} {resp.text}")
     fid = resp.json()["id"]
@@ -128,14 +128,14 @@ def _resolver_folder(cliente, space_id: str, folder_name: str) -> str:
     return fid
 
 
-def _resolver_list(cliente, folder_id: str, list_name: str) -> str:
+def _resolver_list(client, folder_id: str, list_name: str) -> str:
     """Find list by name or create it. Returns list ID."""
-    existing = ver_listas(folder_id=folder_id)
+    existing = view_lists(folder_id=folder_id)
     for lst in existing:
         if lst["name"] == list_name:
             return lst["id"]
 
-    result = crear_lista(folder_id=folder_id, nombre=list_name)
+    result = create_list(folder_id=folder_id, name=list_name)
     lid = result["id"]
     console.print(f"    [green]+Lista creada:[/green] {list_name} ({lid})")
     return lid
@@ -265,8 +265,8 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
     console.print("[bold cyan][1/3][/bold cyan] Resolviendo folder...")
     folder_id = None
     if not dry_run:
-        cliente = get_cliente()
-        folder_id = _resolver_folder(cliente, CLICKUP_SPACE_ID, folder_name)
+        client = get_client()
+        folder_id = _resolver_folder(client, CLICKUP_SPACE_ID, folder_name)
         clickup_data["folder"]["id"] = folder_id
         console.print(f"    Folder: {folder_name} → {folder_id}")
     else:
@@ -284,7 +284,7 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
         console.print(f"\n  [bold]{course_key}[/bold] — {list_name}")
 
         if not list_id and not dry_run:
-            list_id = _resolver_list(cliente, folder_id, list_name)
+            list_id = _resolver_list(client, folder_id, list_name)
             course_info["list_id"] = list_id
             console.print(f"    list_id → {list_id}")
         elif not list_id and dry_run:
@@ -335,10 +335,10 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
                 fecha_fin = act.get("fecha_fin", "")
                 if fecha_fin and existing_due != fecha_fin:
                     if not dry_run:
-                        actualizar_tarea(
+                        update_task(
                             task_id=existing_tasks[task_key]["id"],
                             due_date=fecha_fin,
-                            nombre=nombre_act,
+                            name=nombre_act,
                         )
                         existing_tasks[task_key]["due_date"] = fecha_fin
                     console.print(f"    [cyan]↻ actualizado:[/cyan] {nombre_act} → {fecha_fin}")
@@ -366,13 +366,13 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
                 continue
 
             try:
-                result = crear_tarea(
-                    lista_id=list_id,
-                    nombre=nombre_act,
-                    descripcion=descripcion,
+                result = create_task(
+                    list_id=list_id,
+                    name=nombre_act,
+                    description=descripcion,
                     due_date=fecha_fin or None,
                     tags=tags,
-                    prioridad=prioridad,
+                    priority=prioridad,
                 )
                 task_id = result.get("id", "")
                 existing_tasks[task_key] = {

@@ -19,6 +19,8 @@ from datetime import datetime
 from collections import defaultdict
 from typing import Optional
 
+from chart_utils import hbar, comparison
+
 
 # ---------------------------------------------------------------------------
 # Loaders (duplicated from analyze_costs.py for standalone use)
@@ -192,6 +194,15 @@ def _daily_totals(usage: list[dict]) -> dict[str, dict]:
         daily[day]["input_tokens"] += int(entry.get("input_tokens", 0) or 0)
         daily[day]["output_tokens"] += int(entry.get("output_tokens", 0) or 0)
     return dict(daily)
+
+
+def _worst_case_daily_rate(usage: list[dict]) -> float:
+    """Returns the highest tokens/day from historical usage."""
+    daily = _daily_totals(usage)
+    if not daily:
+        return 0.0
+    max_day = max(daily.values(), key=lambda d: d["input_tokens"] + d["output_tokens"])
+    return float(max_day["input_tokens"] + max_day["output_tokens"])
 
 
 # ---------------------------------------------------------------------------
@@ -379,6 +390,35 @@ def forecast(usage_path: str, catalog_path: str, horizon_days: int = 30) -> dict
     # Sort by projected cost descending
     model_forecasts.sort(key=lambda x: -x["projected_cost_usd"])
 
+    # --- Worst-case & average projections ---
+    worst_daily = _worst_case_daily_rate(usage)
+    worst_total_tokens = worst_daily * horizon_days
+    worst_input = worst_total_tokens * (proj_input / (proj_input + proj_output)) if (proj_input + proj_output) > 0 else worst_total_tokens / 2
+    worst_output = worst_total_tokens - worst_input
+
+    worst_cost = 0.0
+    for model_id, hist in model_hist.items():
+        model = catalog_dict.get(model_id, {})
+        pricing = model.get("pricing", {})
+        pp = float(pricing.get("prompt", 0) or 0)
+        cp = float(pricing.get("completion", 0) or 0)
+        share = hist["calls"] / total_hist_calls if total_hist_calls else 0
+        worst_cost += worst_input * share * pp + worst_output * share * cp
+
+    n_days = len(daily)
+    avg_daily_input = sum(daily_input) / n_days if n_days else 0
+    avg_daily_output = sum(daily_output) / n_days if n_days else 0
+    avg_input = avg_daily_input * horizon_days
+    avg_output = avg_daily_output * horizon_days
+    avg_cost = 0.0
+    for model_id, hist in model_hist.items():
+        model = catalog_dict.get(model_id, {})
+        pricing = model.get("pricing", {})
+        pp = float(pricing.get("prompt", 0) or 0)
+        cp = float(pricing.get("completion", 0) or 0)
+        share = hist["calls"] / total_hist_calls if total_hist_calls else 0
+        avg_cost += avg_input * share * pp + avg_output * share * cp
+
     # --- Alternatives ---
     alternatives = _find_alternatives(model_forecasts, catalog, catalog_dict)
 
@@ -404,6 +444,26 @@ def forecast(usage_path: str, catalog_path: str, horizon_days: int = 30) -> dict
         "by_model": model_forecasts,
         "alternatives": alternatives,
         "subscription_efficiency": _compute_efficiency(proj_by_model, catalog_dict, aliases),
+        "projections": {
+            "trend": {
+                "total_cost_usd": total_proj_cost,
+                "total_tokens": round(proj_input + proj_output),
+                "months_capped": 0,
+                "total_overage_usd": 0.0,
+            },
+            "worst_case": {
+                "total_cost_usd": round(worst_cost, 4),
+                "total_tokens": round(worst_total_tokens),
+                "months_capped": round(horizon_days / 30),
+                "total_overage_usd": round(max(0, worst_cost - 60 * (horizon_days / 30)), 4),
+            },
+            "average": {
+                "total_cost_usd": round(avg_cost, 4),
+                "total_tokens": round(avg_input + avg_output),
+                "months_capped": 0,
+                "total_overage_usd": 0.0,
+            },
+        },
     }
 
 
@@ -424,14 +484,12 @@ def _print_forecast(report: dict, horizon: int) -> None:
     print(f"  Projected tokens   : {report['projected_input_tokens'] + report['projected_output_tokens']:,}")
 
     print("\nBy model (projected cost):")
-    for m in report["by_model"][:8]:
-        intel = f"  IQ:{m['intelligence_index']:.1f}" if m.get("intelligence_index") else ""
-        print(
-            f"  {m['model_id']:<45} "
-            f"${m['projected_cost_usd']:.4f}  "
-            f"({m['usage_share_pct']:.1f}%)"
-            f"{intel}"
-        )
+    top_models = report["by_model"][:8]
+    if top_models:
+        max_cost = max(m["projected_cost_usd"] for m in top_models)
+        for m in top_models:
+            suffix = f"${m['projected_cost_usd']:.2f}  ({m['usage_share_pct']:.1f}%)"
+            print(hbar(m["model_id"], m["projected_cost_usd"], max_cost, suffix))
 
     if report["alternatives"]:
         print("\nCost-saving alternatives:")
@@ -445,6 +503,18 @@ def _print_forecast(report: dict, horizon: int) -> None:
                     f"(${opt['potential_savings_usd']:.4f})"
                     f"{intel}"
                 )
+
+    proj = report.get("projections", {})
+    if proj:
+        print(f"\n=== {horizon}-Day Projections ===")
+        items = [
+            ("Trend:", proj["trend"]["total_cost_usd"], f"${proj['trend']['total_cost_usd']:.2f}"),
+            ("Average:", proj["average"]["total_cost_usd"], f"${proj['average']['total_cost_usd']:.2f}"),
+            ("Worst case:", proj["worst_case"]["total_cost_usd"], f"${proj['worst_case']['total_cost_usd']:.2f}"),
+        ]
+        print(comparison(items))
+        if proj["worst_case"]["total_overage_usd"] > 0:
+            print(f"  Worst-case overage: ${proj['worst_case']['total_overage_usd']:.2f}")
 
     if report.get("subscription_efficiency"):
         print("\n=== Subscription Efficiency ===")
@@ -483,6 +553,9 @@ def main() -> None:
     parser.add_argument("--days", "-d", type=int, default=30, help="Forecast horizon in days (default: 30)")
     parser.add_argument("--output", "-o", default=None, help="Save JSON report to this path")
     args = parser.parse_args()
+
+    if args.days > 365:
+        print(f"Warning: --days {args.days} exceeds 365. Forecast may be unreliable.")
 
     report = forecast(args.usage, args.catalog, args.days)
 

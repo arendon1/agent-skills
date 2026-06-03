@@ -13,6 +13,7 @@ Each session = one usage record. Sessions without token data are skipped.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -56,7 +57,7 @@ def _get_db_path(db_path: str | None = None) -> Path:
     candidates = [
         home / ".local" / "share" / "opencode" / "opencode.db",
         home / "Library" / "Application Support" / "opencode" / "opencode.db",
-        Path(sys.prefix) / ".." / "Local" / "opencode" / "opencode.db",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "opencode" / "opencode.db",
     ]
     for c in candidates:
         if c.exists():

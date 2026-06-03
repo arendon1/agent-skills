@@ -1,0 +1,17 @@
+{
+  "skill_name": "analyze-llm-model",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Export my usage from OpenCode and analyze the costs",
+      "expected_output": "Agent prompts user for source selection, runs export_usage.py --source opencode, then analyze_costs.py, and presents a cost breakdown.",
+      "expectations": [
+        "Agent asks which LLM surface to extract from",
+        "Agent runs scripts/export_usage.py --source opencode",
+        "A usage.json file is produced with timestamp, model_id, input_tokens, output_tokens fields",
+        "Agent runs scripts/analyze_costs.py on the exported usage",
+        "Agent presents a per-model cost breakdown"
+      ]
+    }
+  ]
+}

@@ -14,3 +14,15 @@ uv.lock
 
 # IDE
 .vscode/
+
+# AI tooling
+.agents/
+.gemini/
+.claude/
+.opencode/
+.openspec/
+
+# Generated runtime files
+analyze-llm-model/catalog.json
+analyze-llm-model/usage.json
+docs/superpowers/

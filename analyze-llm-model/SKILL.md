@@ -4,12 +4,13 @@ language: en
 description: >-
   Fetches live model data from OpenRouter and Artificial Analysis APIs, merges
   benchmarks with pricing, runs deep cost analysis on usage logs, exports usage
-  from LLM surfaces (OpenCode, VS Code, etc.), and forecasts
-  future spend with cheaper-model alternatives.
+  from LLM surfaces (OpenCode, VS Code, etc.), analyzes subscription efficiency,
+  and forecasts future spend with cheaper-model alternatives.
   Use when comparing LLM costs or quality, analyzing total API spend from
-  usage logs, exporting agent usage for cost analysis, forecasting future LLM
-  costs, finding cheaper alternatives, or when the user asks about model pricing,
-  intelligence index, speed, or token costs across providers.
+  usage logs, exporting agent usage for cost analysis, evaluating subscription
+  cost efficiency, forecasting future LLM costs, finding cheaper alternatives,
+  or when the user asks about model pricing, intelligence index, speed, or
+  token costs across providers.
 metadata:
   version: "1.0.0"
   risk_tier: LOW
@@ -68,7 +69,17 @@ python scripts/fetch_models.py --aa-only --output catalog.json
 ### /analyze-llm-model analyze-costs
 
 Reads a usage log file and the catalog, then produces a cost breakdown by
-model with totals, percentages, and per-call averages.
+model with totals, percentages, and per-call averages. **Resolves private-provider
+model IDs** (e.g. `opencode-go/*`) to OpenRouter equivalents via `references/aliases.json`.
+**Computes subscription efficiency** for token-budget providers by comparing
+subscription cost vs. OpenRouter pay-per-token equivalent.
+
+**Agent pre-flight:** Before running, check if subscription pricing is fresh:
+```bash
+python scripts/fetch_subscriptions.py
+```
+If the exit code is 1, dispatch subagents to research current pricing, then
+write `references/subscriptions.json`. Proceed once cache is fresh.
 
 script: `analyze_costs.py`
 
@@ -84,6 +95,8 @@ python scripts/analyze_costs.py usage.csv  --catalog catalog.json --output repor
 - Calls, input tokens, output tokens (global + per model)
 - Cost % share per model (sorted by spend)
 - Unknown models that could not be priced
+- **Subscription efficiency** — per-provider cost vs OpenRouter equivalent
+- **Alias resolution** — private models matched to OpenRouter catalog
 
 ---
 
@@ -130,6 +143,9 @@ using? I can extract from: OpenCode." Then run the dispatcher with `--source`.
 ## Typical Analysis Pipeline
 
 ```bash
+# Step 0 (agent): refresh subscription pricing if stale
+python scripts/fetch_subscriptions.py
+
 # Step 1: Build the catalog
 python scripts/fetch_models.py --output catalog.json
 
@@ -137,7 +153,7 @@ python scripts/fetch_models.py --output catalog.json
 python scripts/export_usage.py --source opencode --output usage.json
 # (or manually provide a usage log — see references/usage-format.md)
 
-# Step 3: Cost breakdown
+# Step 3: Cost breakdown (now with aliases + subscription efficiency)
 python scripts/analyze_costs.py usage.json --catalog catalog.json --output cost_report.json
 
 # Step 4: 30-day forecast + alternatives
@@ -172,10 +188,13 @@ python scripts/forecast.py usage.json --catalog catalog.json --days 30 --output 
 | OpenRouter API schema | `references/openrouter-api.md` |
 | Artificial Analysis API schema | `references/artificialanalysis-api.md` |
 | Usage log format spec | `references/usage-format.md` |
+| Model aliases | `references/aliases.json` |
+| Subscription pricing | `references/subscriptions.json` |
 
 ## Scripts
 
 script: `export_usage.py` — Dispatcher for usage extraction from LLM surfaces.
+script: `fetch_subscriptions.py` — Cache-gate for subscription pricing (30-day TTL).
 script: `bridges/opencode.py` — OpenCode SQLite usage bridge.
 script: `bridges/base.py` — Bridge protocol definition.
 script: `client_openrouter.py` — OpenRouter HTTP client (models endpoint).

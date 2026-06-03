@@ -2,6 +2,7 @@
 Bridge registry — auto-discovers bridge modules in this directory.
 """
 
+import importlib
 from pathlib import Path
 from typing import Any
 
@@ -24,8 +25,10 @@ def discover_bridges() -> dict[str, Any]:
 
         name = entry.stem
         try:
-            mod = __import__(f"bridges.{name}", fromlist=["SOURCE_HELP", "extract"])
-        except ImportError:
+            mod = importlib.import_module(f".{name}", package=__package__)
+        except ImportError as e:
+            import sys
+            print(f"Warning: Failed to import bridge '{name}': {e}", file=sys.stderr)
             continue
 
         if hasattr(mod, "SOURCE_HELP") and hasattr(mod, "extract"):
@@ -47,9 +50,13 @@ def discover_stubs() -> dict[str, str]:
     for entry in stubs_dir.iterdir():
         if entry.suffix != ".py":
             continue
+        if entry.name == "__init__.py":
+            continue
         try:
-            mod = __import__(f"bridges._stubs.{entry.stem}", fromlist=["SOURCE_HELP"])
-        except ImportError:
+            mod = importlib.import_module(f"._stubs.{entry.stem}", package=__package__)
+        except ImportError as e:
+            import sys
+            print(f"Warning: Failed to import stub '{entry.stem}': {e}", file=sys.stderr)
             continue
         if hasattr(mod, "SOURCE_HELP"):
             stubs[entry.stem] = mod.SOURCE_HELP

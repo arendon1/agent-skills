@@ -93,9 +93,11 @@ python scripts/analyze_costs.py usage.csv  --catalog catalog.json --output repor
 **Output includes:**
 - Total USD spent
 - Calls, input tokens, output tokens (global + per model)
-- Cost % share per model (sorted by spend)
+- Cost % share per model (sorted by spend) — **rendered as horizontal bars**
 - Unknown models that could not be priced
-- **Subscription efficiency** — per-provider cost vs OpenRouter equivalent
+- **Subscription efficiency** — monthly-bucketed with per-provider cap logic
+- **Monthly sparklines** — cap usage trends per provider
+- **Model jumping detection** — sessions with model switches flagged
 - **Alias resolution** — private models matched to OpenRouter catalog
 
 ---
@@ -114,8 +116,9 @@ python scripts/forecast.py usage.csv  --catalog catalog.json --days 90 --output 
 ```
 
 **Output includes:**
-- Projected total cost, calls, tokens for the horizon period
-- Per-model projected cost with usage share
+- Projected total cost, calls, tokens for the horizon period (up to 365 days)
+- Per-model projected cost with usage share — **rendered as horizontal bars**
+- **Multi-baseline projections** — trend, worst-case, and average with comparison bars
 - Up to 3 cheaper alternatives per top-cost model (requires `aa` enrichment in catalog)
 
 ---
@@ -195,6 +198,7 @@ python scripts/forecast.py usage.json --catalog catalog.json --days 30 --output 
 
 script: `export_usage.py` — Dispatcher for usage extraction from LLM surfaces.
 script: `fetch_subscriptions.py` — Cache-gate for subscription pricing (30-day TTL).
+script: `chart_utils.py` — ASCII chart rendering (horizontal bars, sparklines, gauges).
 script: `bridges/opencode.py` — OpenCode SQLite usage bridge.
 script: `bridges/base.py` — Bridge protocol definition.
 script: `client_openrouter.py` — OpenRouter HTTP client (models endpoint).

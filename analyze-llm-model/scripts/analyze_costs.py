@@ -14,6 +14,7 @@ Usage log format: see references/usage-format.md
 import csv
 import json
 import argparse
+import subprocess
 from pathlib import Path
 from collections import defaultdict
 
@@ -98,71 +99,167 @@ def load_subscriptions() -> dict | None:
     return json.loads(subs_path.read_text(encoding="utf-8"))
 
 
-def _compute_efficiency(by_model: dict, catalog: dict[str, dict], aliases: dict[str, str]) -> list[dict]:
-    subs = load_subscriptions()
+def _monthly_efficiency(usage: list[dict], catalog: dict[str, dict], aliases: dict[str, str], subs: dict) -> dict:
     if not subs:
-        return []
+        return {"monthly": [], "summary": {}}
 
     providers = subs.get("providers", {})
-    results = []
 
-    for prov_id, prov_info in providers.items():
-        prov_type = prov_info.get("type", "api_only")
-        if prov_type == "api_only":
+    monthly_provider_stats: dict[str, dict] = defaultdict(
+        lambda: defaultdict(lambda: {"input": 0, "output": 0, "or_cost": 0.0})
+    )
+
+    for entry in usage:
+        model_id = entry.get("model_id", "")
+        provider = _provider_for_model(model_id)
+        if not provider or provider not in providers:
+            continue
+        if providers[provider].get("type") == "api_only":
             continue
 
-        prov_input = 0
-        prov_output = 0
-        for model_id, stats in by_model.items():
-            if _provider_for_model(model_id) == prov_id:
-                prov_input += stats["input_tokens"]
-                prov_output += stats["output_tokens"]
-
-        if prov_input == 0 and prov_output == 0:
+        ts = entry.get("timestamp", "")
+        if not ts:
             continue
+        month = ts[:7]
 
-        or_cost = 0.0
-        for model_id, stats in by_model.items():
-            if _provider_for_model(model_id) != prov_id:
+        inp = int(entry.get("input_tokens", 0) or 0)
+        out = int(entry.get("output_tokens", 0) or 0)
+
+        resolved = aliases.get(model_id, model_id)
+        model = catalog.get(resolved)
+        cost = 0.0
+        if model:
+            pricing = model.get("pricing", {})
+            prompt_price = float(pricing.get("prompt", 0) or 0)
+            completion_price = float(pricing.get("completion", 0) or 0)
+            cost = inp * prompt_price + out * completion_price
+
+        monthly_provider_stats[month][provider]["input"] += inp
+        monthly_provider_stats[month][provider]["output"] += out
+        monthly_provider_stats[month][provider]["or_cost"] += cost
+
+    monthly_records = []
+
+    for month in sorted(monthly_provider_stats.keys()):
+        for prov_id, prov_info in providers.items():
+            stats = monthly_provider_stats[month].get(prov_id)
+            if not stats:
                 continue
-            resolved = aliases.get(model_id, model_id)
-            model = catalog.get(resolved)
-            if model:
-                pricing = model.get("pricing", {})
-                prompt_price = float(pricing.get("prompt", 0) or 0)
-                completion_price = float(pricing.get("completion", 0) or 0)
-                or_cost += stats["input_tokens"] * prompt_price + stats["output_tokens"] * completion_price
+            if prov_info.get("type") == "api_only":
+                continue
 
-        if prov_type == "token_budget":
+            or_cost = stats["or_cost"]
+            inp = stats["input"]
+            out = stats["output"]
+
             tiers = prov_info.get("tiers", [])
             for tier in tiers:
-                monthly = tier.get("price_monthly_usd", 0)
-                if monthly <= 0:
+                monthly_price = tier.get("price_monthly_usd", 0)
+                if monthly_price <= 0:
                     continue
-                ratio = or_cost / monthly
-                results.append({
+
+                if prov_id == "opencode-go":
+                    cap = prov_info.get("limits", {}).get("per_month_usd", 60)
+                    if or_cost <= cap:
+                        sub_value = or_cost
+                        overage = 0.0
+                    else:
+                        sub_value = cap
+                        overage = or_cost - cap
+                    cap_used_pct = round((or_cost / cap) * 100, 1) if cap > 0 else 0.0
+                    subscription_cost_usd = monthly_price
+
+                elif prov_id == "github-copilot":
+                    credit_usd_rate = prov_info.get("credit_usd_rate", 0.01)
+                    credits_used = or_cost / credit_usd_rate if credit_usd_rate > 0 else 0
+                    credit_allowance = tier.get("credits_monthly", 0)
+                    sub_value = min(or_cost, credit_allowance * credit_usd_rate)
+                    cap = credit_allowance * credit_usd_rate
+                    cap_used_pct = round((or_cost / cap) * 100, 1) if cap > 0 else 0.0
+                    overage = max(0.0, or_cost - cap)
+                    subscription_cost_usd = monthly_price
+
+                else:
+                    cap = monthly_price
+                    sub_value = min(or_cost, cap)
+                    overage = max(0.0, or_cost - cap)
+                    cap_used_pct = round((or_cost / cap) * 100, 1) if cap > 0 else 0.0
+                    subscription_cost_usd = monthly_price
+
+                efficiency_ratio = round(sub_value / subscription_cost_usd, 2) if subscription_cost_usd > 0 else 0.0
+
+                monthly_records.append({
                     "provider": prov_id,
                     "tier": tier["name"],
-                    "price_monthly_usd": monthly,
-                    "type": prov_type,
-                    "tokens_input": prov_input,
-                    "tokens_output": prov_output,
-                    "openrouter_equivalent_usd": round(or_cost, 4),
-                    "savings_usd": round(or_cost - monthly, 4),
-                    "efficiency_ratio": round(ratio, 2),
+                    "month": month,
+                    "tokens_input": inp,
+                    "tokens_output": out,
+                    "openrouter_cost_usd": round(or_cost, 4),
+                    "subscription_value_usd": round(sub_value, 4),
+                    "cap_used_pct": cap_used_pct,
+                    "overage_paid_usd": round(overage, 4),
+                    "subscription_cost_usd": round(subscription_cost_usd, 4),
+                    "efficiency_ratio": efficiency_ratio,
                 })
-        elif prov_type == "rate_access":
-            results.append({
-                "provider": prov_id,
-                "type": prov_type,
-                "tiers": prov_info.get("tiers", []),
-                "tokens_input": prov_input,
-                "tokens_output": prov_output,
-                "openrouter_equivalent_usd": round(or_cost, 4),
-                "note": "Rate-access subscription — provides usage limits and model access, not a token budget. Direct cost comparison not applicable."
-            })
 
-    return results
+    if not monthly_records:
+        return {"monthly": [], "summary": {}}
+
+    seen_month_prov = {}
+    for r in monthly_records:
+        key = (r["month"], r["provider"])
+        if key not in seen_month_prov or r["subscription_cost_usd"] < seen_month_prov[key]["subscription_cost_usd"]:
+            seen_month_prov[key] = r
+
+    total_subscription_paid = sum(r["subscription_cost_usd"] for r in seen_month_prov.values())
+    total_subscription_value = sum(r["subscription_value_usd"] for r in seen_month_prov.values())
+
+    all_months = set(r["month"] for r in monthly_records)
+    total_months = len(all_months)
+
+    capped_pairs = set()
+    total_overage_sum = 0.0
+    for r in monthly_records:
+        if r["cap_used_pct"] >= 100:
+            capped_pairs.add((r["month"], r["provider"]))
+        total_overage_sum += r["overage_paid_usd"]
+
+    months_capped = len(capped_pairs)
+
+    overall_efficiency = round(total_subscription_value / total_subscription_paid, 2) if total_subscription_paid > 0 else 0.0
+
+    return {
+        "monthly": monthly_records,
+        "summary": {
+            "total_months": total_months,
+            "total_subscription_paid": round(total_subscription_paid, 4),
+            "total_subscription_value": round(total_subscription_value, 4),
+            "overall_efficiency": overall_efficiency,
+            "months_capped": months_capped,
+            "total_overage": round(total_overage_sum, 4),
+        },
+    }
+
+
+def _detect_model_jumps(session_ids: list[str]) -> dict[str, bool]:
+    if not session_ids:
+        return {}
+    ids_str = ", ".join(f"'{sid}'" for sid in session_ids)
+    try:
+        result = subprocess.run(
+            ["opencode", "db",
+             f"SELECT DISTINCT session_id FROM session_message WHERE type = 'model-switched' AND session_id IN ({ids_str})",
+             "--format", "json"],
+            capture_output=True, text=True, timeout=10)
+    except (FileNotFoundError, OSError):
+        return {}
+    if result.returncode != 0:
+        return {}
+    try:
+        rows = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {}
+    return {r["session_id"]: True for r in rows if isinstance(r, dict)}
 
 
 # ---------------------------------------------------------------------------
@@ -185,23 +282,19 @@ def _model_cost(model: dict, input_tokens: int, output_tokens: int) -> float:
 # ---------------------------------------------------------------------------
 
 def analyze(usage: list[dict], catalog: dict[str, dict]) -> dict:
-    """
-    Compute cost breakdown from usage log against the model catalog.
-
-    Returns a report dict with:
-    - summary: totals across all models
-    - by_model: per-model breakdown sorted by total cost (descending)
-    - unknown_models: model IDs that appeared in usage but not in catalog
-    """
     by_model: dict[str, dict] = defaultdict(lambda: {
         "calls": 0,
         "input_tokens": 0,
         "output_tokens": 0,
         "total_cost": 0.0,
+        "sessions": 0,
+        "sessions_with_model_jumps": 0,
     })
     unknown_models: set[str] = set()
 
     aliases = load_aliases()
+    model_sessions: dict[str, set[str]] = defaultdict(set)
+    session_ids: set[str] = set()
 
     for entry in usage:
         model_id: str = entry.get("model_id", "unknown")
@@ -209,6 +302,7 @@ def analyze(usage: list[dict], catalog: dict[str, dict]) -> dict:
         model = catalog.get(resolved_id)
         inp = int(entry.get("input_tokens", 0) or 0)
         out = int(entry.get("output_tokens", 0) or 0)
+        sid = entry.get("session_id", "")
 
         cost = 0.0
         if model:
@@ -223,10 +317,29 @@ def analyze(usage: list[dict], catalog: dict[str, dict]) -> dict:
         stats["total_cost"] += cost
         stats["resolved_id"] = resolved_id
 
+        if sid:
+            provider = _provider_for_model(model_id)
+            if provider in ("opencode-go", "github-copilot"):
+                session_ids.add(sid)
+                model_sessions[model_id].add(sid)
+
+    model_jumps = _detect_model_jumps(list(session_ids))
+
+    for model_id, sessions in model_sessions.items():
+        by_model[model_id]["sessions"] = len(sessions)
+        by_model[model_id]["sessions_with_model_jumps"] = sum(1 for s in sessions if s in model_jumps)
+
     total_cost = sum(v["total_cost"] for v in by_model.values())
     total_calls = sum(v["calls"] for v in by_model.values())
     total_input = sum(v["input_tokens"] for v in by_model.values())
     total_output = sum(v["output_tokens"] for v in by_model.values())
+
+    total_sessions = len(session_ids)
+    jumped_sessions = len(model_jumps)
+    pct_jumped = round(jumped_sessions / total_sessions * 100, 1) if total_sessions else 0.0
+
+    subs = load_subscriptions()
+    subscription_efficiency = _monthly_efficiency(usage, catalog, aliases, subs) if subs else {"monthly": [], "summary": {}}
 
     sorted_models = sorted(by_model.items(), key=lambda x: x[1]["total_cost"], reverse=True)
 
@@ -266,7 +379,12 @@ def analyze(usage: list[dict], catalog: dict[str, dict]) -> dict:
             for model_id, stats in sorted_models
         ],
         "unknown_models": sorted(unknown_models),
-        "subscription_efficiency": _compute_efficiency(by_model, catalog, aliases),
+        "subscription_efficiency": subscription_efficiency,
+        "model_jumps": {
+            "total_sessions": total_sessions,
+            "jumped_sessions": jumped_sessions,
+            "pct": pct_jumped,
+        },
     }
 
 
@@ -275,6 +393,8 @@ def analyze(usage: list[dict], catalog: dict[str, dict]) -> dict:
 # ---------------------------------------------------------------------------
 
 def _print_report(report: dict) -> None:
+    from chart_utils import hbar, gauge, sparkline
+
     s = report["summary"]
     print("\n=== Cost Analysis Summary ===")
     print(f"  Total cost     : ${s['total_cost_usd']:.4f} USD")
@@ -284,15 +404,12 @@ def _print_report(report: dict) -> None:
     print(f"  Avg in/out     : {s['avg_input_tokens_per_call']:.0f} / {s['avg_output_tokens_per_call']:.0f} tokens")
 
     print("\nTop models by spend:")
-    for m in report["by_model"][:8]:
-        intel = f"  IQ:{m['intelligence_index']:.1f}" if m["intelligence_index"] else ""
-        tps = f"  {m['tokens_per_second']:.0f}tok/s" if m["tokens_per_second"] else ""
-        print(
-            f"  {m['model_id']:<45} "
-            f"${m['total_cost_usd']:.4f}  "
-            f"({m['cost_share_pct']:.1f}%)"
-            f"{intel}{tps}"
-        )
+    top = report["by_model"][:8]
+    if top:
+        max_cost = max(m["total_cost_usd"] for m in top)
+        for m in top:
+            suffix = f"${m['total_cost_usd']:.2f}  ({m['cost_share_pct']:.1f}%)"
+            print(hbar(m["model_id"], m["total_cost_usd"], max_cost, suffix))
 
     if report["unknown_models"]:
         print(f"\nWarning: {len(report['unknown_models'])} model(s) not found in catalog (no pricing):")
@@ -300,34 +417,32 @@ def _print_report(report: dict) -> None:
             print(f"  - {mid}")
         print("  Tip: re-run fetch_models.py to refresh the catalog.")
 
-    if report.get("subscription_efficiency"):
-        print("\n=== Subscription Efficiency ===")
-        for se in report["subscription_efficiency"]:
-            if se["type"] == "token_budget":
-                ratio_str = f"{se['efficiency_ratio']}x"
-                print(
-                    f"\n  {se['provider']} / {se['tier']} tier "
-                    f"(${se['price_monthly_usd']:.2f}/mo):"
-                )
-                print(f"    Tokens: {se['tokens_input']:,} in / {se['tokens_output']:,} out")
-                print(f"    OpenRouter equivalent: ${se['openrouter_equivalent_usd']:.4f} USD")
-                savings = se["savings_usd"]
-                if savings > 0:
-                    print(f"    Savings: ${savings:.4f} USD  |  Efficiency ratio: {ratio_str}")
-                elif savings < 0:
-                    print(f"    Overspend: ${-savings:.4f} USD  |  Efficiency ratio: {ratio_str}")
-                else:
-                    print(f"    Break-even  |  Efficiency ratio: {ratio_str}")
-            elif se["type"] == "rate_access":
-                tier_names = ", ".join(
-                    f"{t['name']} (${t.get('price_monthly_usd', 0)}/mo)"
-                    for t in se.get("tiers", [])
-                )
-                print(f"\n  {se['provider']}:")
-                print(f"    {se['note']}")
-                print(f"    Tokens: {se['tokens_input']:,} in / {se['tokens_output']:,} out")
-                print(f"    OpenRouter equivalent: ${se['openrouter_equivalent_usd']:.4f} USD")
-                print(f"    Available tiers: {tier_names}")
+    eff = report.get("subscription_efficiency", {})
+    monthly = eff.get("monthly", [])
+    if monthly:
+        print("\n=== Monthly Efficiency ===")
+        by_provider = {}
+        for m in monthly:
+            by_provider.setdefault(m["provider"], []).append(m)
+        for prov_id, entries in by_provider.items():
+            caps = [e["cap_used_pct"] for e in entries]
+            months = " ".join(e["month"][2:] for e in entries[-12:])
+            print(f"\n  {prov_id}:")
+            print("  " + sparkline(caps, months[-12:]))
+            last = entries[-1]
+            print("  " + gauge(prov_id.split("-")[0][:6], last["efficiency_ratio"]))
+        summary = eff.get("summary", {})
+        if summary:
+            print(f"\n  {summary['total_months']} months, ${summary['total_subscription_paid']:.2f} paid, ${summary['total_subscription_value']:.2f} value")
+            if summary.get("total_overage", 0) > 0:
+                print(f"  Overages: ${summary['total_overage']:.2f}")
+            if summary.get("months_capped", 0) > 0:
+                print(f"  {summary['months_capped']} month(s) hit the cap")
+
+    mj = report.get("model_jumps", {})
+    if mj and mj.get("total_sessions", 0) > 0:
+        print(f"\nModel jumping detected in {mj['jumped_sessions']} of {mj['total_sessions']} sessions ({mj['pct']}%).")
+        print("Subagent model usage is untracked at the DB level.")
 
 
 def main() -> None:

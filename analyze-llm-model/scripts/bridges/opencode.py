@@ -14,6 +14,7 @@ Each session = one usage record. Sessions without token data are skipped.
 
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -92,18 +93,17 @@ def _epoch_ms_to_iso(epoch_ms: int) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _query_sessions(db_path: Path) -> list[dict]:
+_QUERY = (
+    "SELECT id, model, tokens_input, tokens_output, time_created "
+    "FROM session "
+    "WHERE tokens_input > 0 OR tokens_output > 0 "
+    "ORDER BY time_created"
+)
+
+
+def _query_sessions_via_cli() -> list[dict]:
     result = subprocess.run(
-        [
-            _openode_bin(), "db",
-            (
-                "SELECT id, model, tokens_input, tokens_output, time_created "
-                "FROM session "
-                "WHERE tokens_input > 0 OR tokens_output > 0 "
-                "ORDER BY time_created"
-            ),
-            "--format", "json",
-        ],
+        [_openode_bin(), "db", _QUERY, "--format", "json"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -118,14 +118,28 @@ def _query_sessions(db_path: Path) -> list[dict]:
 
     if not isinstance(rows, list):
         rows = []
+    return rows
 
+
+def _query_sessions_via_sqlite(db_path: Path) -> list[dict]:
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.execute(_QUERY)
+        rows = [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
     return rows
 
 
 def extract(output_path: str, **kwargs) -> list[dict]:
-    db_path = _get_db_path(kwargs.get("db_path"))
+    user_path = kwargs.get("db_path")
+    db_path = _get_db_path(user_path)
 
-    rows = _query_sessions(db_path)
+    if user_path:
+        rows = _query_sessions_via_sqlite(db_path)
+    else:
+        rows = _query_sessions_via_cli()
     if not rows:
         print("Warning: No sessions with token data found.")
         return []

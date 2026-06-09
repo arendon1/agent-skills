@@ -1,34 +1,40 @@
 # AGENTS.md
 
-Collection of **agent skills** built with [skill-forge](skill-forge/SKILL.md). Each subdirectory is an independent, deployable skill.
+> Runtime conventions for pi in the `agent-skills` project.
 
-## Constraints
+## §G GOAL
 
-- Skills must be entirely in `en-US` or `es-CO`. No mixing.
-- SKILL.md stays under 500 lines.
-- Frontmatter uses `name:` (lowercase-hyphens), `description:` with "Use when..." pattern.
-- Skill directory structure: `SKILL.md`, `scripts/`, `references/`. Optionally `examples/`, `evals/`.
+Collection of agent skills — each subdirectory is an independent, deployable skill.
+pi builds, audits, and maintains skills here using skill-forge.
 
-## Creating skills
+## §D DISCOVERY
 
-Scaffold with skill-forge:
+Skills come and go. pi MUST discover skills dynamically by scanning subdirectories
+for `SKILL.md` files. NEVER hardcode a skill list — the active set is whatever
+directories exist right now. The harness lockfile (if present) is for the harness,
+not for pi.
+
+## §C CONSTRAINTS
+
+- **Language:** Skills in `en-US` or `es-CO`. No mixing within a single skill.
+- **Size:** `SKILL.md` must stay under 500 lines.
+- **Frontmatter:** `name:` (lowercase-hyphens), `description:` with "Use when..." pattern.
+- **Structure:** `SKILL.md`, `scripts/`, `references/`. Optional: `examples/`, `evals/`.
+- **Commits:** Conventional commits — `feat`, `fix`, `refactor`, `chore`.
+- **Python:** `uv` for dependency management. `uv.lock` and `.venv/` are gitignored.
+
+## §X CROSS-SKILL DEPENDENCIES
+
+`gestionar-cursos/scripts/cli_clickup.py` imports from `use-clickup/scripts/` at runtime.
+Changes to `use-clickup` module/function names break `gestionar-cursos`. Check both when
+renaming.
+
+## §S SKILL-FORGE
+
 ```
+# Scaffold a new skill
 python skill-forge/scripts/init.py <name> --path .
-```
 
-Validate structure:
-```
+# Validate a skill's structure
 python skill-forge/scripts/audit.py <skill-dir>
 ```
-
-## Cross-skill dependencies
-
-`gestionar-cursos/scripts/cli_clickup.py` imports from `use-clickup/scripts/` at runtime via `sys.path`. Changes to `use-clickup` module/function names break `gestionar-cursos`. Check both when renaming.
-
-## Commits
-
-Conventional commits: `feat`, `fix`, `refactor`, `chore`.
-
-## Python toolchain
-
-Skills use `uv` for dependency management. `uv.lock` and `.venv/` are gitignored at the root level. Some skills have their own `.gitignore`.

@@ -17,6 +17,7 @@ class ClickUpClient:
 
     def __init__(self):
         self.api_key = self._get_api_key()
+        self.team_id = self._get_team_id()
         self.session = self._create_session()
 
     def _get_api_key(self) -> str:
@@ -43,11 +44,21 @@ class ClickUpClient:
             "2. Or export the variable: export CLICKUP_API_KEY=your_api_key"
         )
 
+    def _get_team_id(self) -> Optional[str]:
+        """
+        Resolves the default team/workspace ID in order:
+        1. .env in current workspace (CLICKUP_TEAM)
+        2. CLICKUP_TEAM environment variable
+        3. None — caller must resolve team at runtime
+        """
+        team_id = os.getenv("CLICKUP_TEAM")
+        return team_id or None
+
     def _create_session(self) -> requests.Session:
         """Creates an HTTP session with common headers."""
         session = requests.Session()
         session.headers.update({
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": self.api_key,
             "Content-Type": "application/json",
             "Accept": "application/json"
         })
@@ -132,6 +143,11 @@ def get_client() -> ClickUpClient:
     if _client is None:
         _client = ClickUpClient()
     return _client
+
+
+def get_team_id() -> Optional[str]:
+    """Returns the default team/workspace ID from CLICKUP_TEAM env var, or None."""
+    return get_client().team_id
 
 
 from datetime import datetime

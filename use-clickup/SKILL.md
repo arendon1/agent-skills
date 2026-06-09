@@ -17,10 +17,18 @@ with comprehensive internal documentation in `references/` for advanced capabili
 
 ## Authentication
 
-script: `client.py` — shared API client for all ClickUp operations. The API key is resolved in order:
+script: `client.py` — shared API client for all ClickUp operations. Authentication and
+team configuration are resolved from environment in order:
+
+**API key:**
 1. `.env` file in current workspace (`CLICKUP_API_KEY` variable)
 2. `CLICKUP_API_KEY` environment variable
 3. Clear error with instructions if not found
+
+**Default team (optional):**
+1. `.env` file in current workspace (`CLICKUP_TEAM` variable)
+2. `CLICKUP_TEAM` environment variable
+3. `None` — caller must specify team at runtime
 
 ## Workflows
 

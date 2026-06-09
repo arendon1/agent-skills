@@ -30,6 +30,20 @@ team configuration are resolved from environment in order:
 2. `CLICKUP_TEAM` environment variable
 3. `None` — caller must specify team at runtime
 
+## Caching
+
+All GET requests are cached automatically with endpoint-aware TTLs:
+
+| Tier | Endpoint pattern | TTL | Reasoning |
+|------|-----------------|-----|-----------|
+| Static | `/user`, `/team`, `/team/{id}/space` | 30 min | Rarely changes |
+| Structural | `/space/{id}`, `/folder`, `/list` endpoints | 5 min | Folder/list structure stable |
+| Tasks | `/list/{id}/task`, `/team/{id}/task` | 1 min | Task lists change often |
+
+**Cache invalidation:** Any POST, PUT, or DELETE call clears the entire cache.
+Cache is stored at `use-clickup/.cache/api_cache.json` and survives across
+script invocations.
+
 ## Workflows
 
 ### /use-clickup create-task

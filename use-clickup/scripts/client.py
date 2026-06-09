@@ -1,12 +1,126 @@
 """
 Base HTTP client for the ClickUp API.
-Handles authentication and request configuration.
+Handles authentication, request configuration, and response caching.
 """
 
+import hashlib
+import json
 import os
+import re
+import time
+from pathlib import Path
+from typing import Optional, Dict, Any
+
 import requests
-from typing import Optional
 from dotenv import load_dotenv
+
+
+# ---------------------------------------------------------------------------
+# Cache
+# ---------------------------------------------------------------------------
+
+class ClickUpCache:
+    """File-based response cache with endpoint-aware TTL."""
+
+    CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache"
+    CACHE_FILE = CACHE_DIR / "api_cache.json"
+
+    # TTL in seconds by endpoint pattern
+    TTL_STATIC = 1800       # 30 min — user, teams, spaces
+    TTL_STRUCTURAL = 300    # 5 min — folders, lists
+    TTL_TASKS = 60          # 1 min — task lists (change frequently)
+
+    TTL_PATTERNS = [
+        (re.compile(r"^/user$"), TTL_STATIC),
+        (re.compile(r"^/team$"), TTL_STATIC),
+        (re.compile(r"^/team/\d+/space"), TTL_STATIC),
+        (re.compile(r"^/space/\d+$"), TTL_STRUCTURAL),
+        (re.compile(r"^/space/\d+/folder"), TTL_STRUCTURAL),
+        (re.compile(r"^/folder/\d+$"), TTL_STRUCTURAL),
+        (re.compile(r"^/folder/\d+/list"), TTL_STRUCTURAL),
+        (re.compile(r"^/space/\d+/list"), TTL_STRUCTURAL),
+        (re.compile(r"^/list/\d+/task"), TTL_TASKS),
+        (re.compile(r"^/team/\d+/task"), TTL_TASKS),
+        (re.compile(r"^/tasks"), TTL_TASKS),
+    ]
+    DEFAULT_TTL = 300  # 5 min for unknown GET endpoints
+
+    def __init__(self):
+        self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        self._data: Dict[str, Dict[str, Any]] = self._load()
+
+    def _load(self) -> dict:
+        """Load cache from file, return empty dict on any error."""
+        if not self.CACHE_FILE.exists():
+            return {}
+        try:
+            with open(self.CACHE_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _save(self):
+        """Write cache to file atomically."""
+        tmp = self.CACHE_FILE.with_suffix(".tmp")
+        with open(tmp, "w") as f:
+            json.dump(self._data, f, indent=2)
+        tmp.replace(self.CACHE_FILE)
+
+    @staticmethod
+    def _cache_key(method: str, endpoint: str, params: Optional[dict] = None) -> str:
+        """Generate a deterministic cache key."""
+        raw = f"{method}:{endpoint}"
+        if params:
+            raw += ":" + json.dumps(params, sort_keys=True, default=str)
+        return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    def _ttl_for(self, endpoint: str) -> int:
+        """Resolve TTL for an endpoint by pattern matching."""
+        for pattern, ttl in self.TTL_PATTERNS:
+            if pattern.search(endpoint):
+                return ttl
+        return self.DEFAULT_TTL
+
+    def get(self, method: str, endpoint: str, params: Optional[dict] = None) -> Optional[dict]:
+        """Return cached response if valid, else None."""
+        key = self._cache_key(method, endpoint, params)
+        entry = self._data.get(key)
+        if not entry:
+            return None
+        ttl = self._ttl_for(endpoint)
+        if time.time() - entry["ts"] > ttl:
+            del self._data[key]
+            return None
+        return entry["response"]
+
+    def set(self, method: str, endpoint: str, response: dict, params: Optional[dict] = None):
+        """Store a response in the cache."""
+        key = self._cache_key(method, endpoint, params)
+        self._data[key] = {
+            "ts": time.time(),
+            "response": response,
+        }
+        self._save()
+
+    def invalidate(self):
+        """Clear the entire cache."""
+        self._data = {}
+        if self.CACHE_FILE.exists():
+            self.CACHE_FILE.unlink(missing_ok=True)
+
+class CachedResponse:
+    """Minimal response-like object for cached data."""
+
+    def __init__(self, data: dict):
+        self._json = data
+        self.status_code = 200
+
+    def json(self) -> dict:
+        return self._json
+
+    def raise_for_status(self):
+        pass  # cached responses are always successful
+
 
 class ClickUpClient:
     """ClickUp API client with error handling and retries."""
@@ -18,6 +132,7 @@ class ClickUpClient:
     def __init__(self):
         self.api_key = self._get_api_key()
         self.team_id = self._get_team_id()
+        self.cache = ClickUpCache()
         self.session = self._create_session()
 
     def _get_api_key(self) -> str:
@@ -66,12 +181,15 @@ class ClickUpClient:
 
     def request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """
-        Executes an HTTP request with automatic retries.
+        Executes an HTTP request with automatic retries and caching.
+
+        GET requests check the cache first. POST/PUT/DELETE invalidate
+        the cache before executing.
 
         Args:
             method: GET, POST, PUT, DELETE
             endpoint: API path (e.g., /tasks)
-            **kwargs: Additional arguments for requests
+            **kwargs: Additional arguments for requests (params, json, etc.)
 
         Returns:
             Response from requests
@@ -80,6 +198,19 @@ class ClickUpClient:
             RuntimeError on authentication error
             requests.exceptions.RequestException if it fails after retries
         """
+        # Mutations invalidate the entire cache
+        if method in ("POST", "PUT", "DELETE"):
+            self.cache.invalidate()
+
+        # Check cache for GET requests
+        if method == "GET":
+            params = kwargs.get("params")
+            cached = self.cache.get(method, endpoint, params)
+            if cached is not None:
+                # Return a synthetic response-like object
+                cached_response = CachedResponse(cached)
+                return cached_response  # type: ignore[return-value]
+
         url = f"{self.BASE_URL}{endpoint}"
 
         for attempt in range(self.MAX_RETRIES):
@@ -106,6 +237,13 @@ class ClickUpClient:
 
                 # If successful or non-recoverable error, return
                 if response.status_code < 500:
+                    # Cache successful GET responses
+                    if method == "GET" and response.status_code < 400:
+                        try:
+                            params = kwargs.get("params")
+                            self.cache.set(method, endpoint, response.json(), params)
+                        except Exception:
+                            pass  # never let cache failures break the request
                     return response
 
                 # Server error - retry

@@ -15,6 +15,18 @@ metadata:
 Skill for complete ClickUp management. Essential workflows only,
 with comprehensive internal documentation in `references/` for advanced capabilities.
 
+## API Versions
+
+ClickUp exposes two API versions for different resource types:
+
+| Version | Base URL | Resources |
+|---------|---------|-----------|
+| v2 | `api.clickup.com/api/v2` | Tasks, Lists, Folders, Spaces, Comments, Checklists, Tags, Custom Fields, Goals |
+| v3 | `api.clickup.com/api/v3` | Docs, Chat (channels, messages, reactions) |
+
+The client routes to the correct version. Use `client.get()` for v2 resources,
+`client.v3_get()` for v3 resources (Docs, Chat).
+
 ## Authentication
 
 script: `client.py` — shared API client for all ClickUp operations. Authentication and

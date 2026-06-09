@@ -126,6 +126,7 @@ class ClickUpClient:
     """ClickUp API client with error handling and retries."""
 
     BASE_URL = "https://api.clickup.com/api/v2"
+    V3_BASE_URL = "https://api.clickup.com/api/v3"
     TIMEOUT = 30  # seconds
     MAX_RETRIES = 3
 
@@ -179,7 +180,7 @@ class ClickUpClient:
         })
         return session
 
-    def request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+    def request(self, method: str, endpoint: str, base_url: Optional[str] = None, **kwargs) -> requests.Response:
         """
         Executes an HTTP request with automatic retries and caching.
 
@@ -188,7 +189,9 @@ class ClickUpClient:
 
         Args:
             method: GET, POST, PUT, DELETE
-            endpoint: API path (e.g., /tasks)
+            endpoint: API path (e.g., /tasks, /workspaces/{id}/docs)
+            base_url: Override base URL (default: BASE_URL for v2).
+                      Use V3_BASE_URL for Docs/Chat endpoints.
             **kwargs: Additional arguments for requests (params, json, etc.)
 
         Returns:
@@ -198,6 +201,9 @@ class ClickUpClient:
             RuntimeError on authentication error
             requests.exceptions.RequestException if it fails after retries
         """
+        if base_url is None:
+            base_url = self.BASE_URL
+
         # Mutations invalidate the entire cache
         if method in ("POST", "PUT", "DELETE"):
             self.cache.invalidate()
@@ -211,7 +217,7 @@ class ClickUpClient:
                 cached_response = CachedResponse(cached)
                 return cached_response  # type: ignore[return-value]
 
-        url = f"{self.BASE_URL}{endpoint}"
+        url = f"{base_url}{endpoint}"
 
         for attempt in range(self.MAX_RETRIES):
             try:
@@ -270,6 +276,19 @@ class ClickUpClient:
 
     def delete(self, endpoint: str, **kwargs):
         return self.request("DELETE", endpoint, **kwargs)
+
+    # v3 API methods (Docs, Chat)
+    def v3_get(self, endpoint: str, **kwargs):
+        return self.request("GET", endpoint, base_url=self.V3_BASE_URL, **kwargs)
+
+    def v3_post(self, endpoint: str, **kwargs):
+        return self.request("POST", endpoint, base_url=self.V3_BASE_URL, **kwargs)
+
+    def v3_put(self, endpoint: str, **kwargs):
+        return self.request("PUT", endpoint, base_url=self.V3_BASE_URL, **kwargs)
+
+    def v3_delete(self, endpoint: str, **kwargs):
+        return self.request("DELETE", endpoint, base_url=self.V3_BASE_URL, **kwargs)
 
 
 # Global client instance (lazy loading)

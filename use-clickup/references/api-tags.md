@@ -29,7 +29,7 @@ Returns all tags configured in a space.
 {
   "tags": [
     {
-      "name": "gradable",
+      "name": "backend",
       "tag_fg": "#ffffff",
       "tag_bg": "#6bc950",
       "creator": 183

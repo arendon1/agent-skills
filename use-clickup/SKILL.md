@@ -3,7 +3,7 @@ name: use-clickup
 description: >-
   Task and list management in ClickUp via the official API.
   Use when creating tasks, updating dates, searching activities,
-  and organizing course lists.
+  and managing lists.
 language: en-US
 metadata:
   version: "1.0.0"
@@ -32,9 +32,9 @@ script: `create_task.py`
 **Example:**
 ```
 /use-clickup create-task abc123 "Initial Test" \
-  --description "## Instructions\nRead chapter 1" \
+  --description "## Instructions\nRun the integration suite" \
   --due_date 2026-02-01 \
-  --tags gradable,midterm \
+  --tags backend,critical \
   --priority high
 ```
 
@@ -65,7 +65,7 @@ script: `search_task.py`
 
 **Example:**
 ```
-/use-clickup search-task --name "Midterm" --tag gradable
+/use-clickup search-task --name "Backend tests" --tag backend
 ```
 
 ---
@@ -77,7 +77,7 @@ script: `create_list.py`
 
 **Example:**
 ```
-/use-clickup create-list folder123 "DATABASES 2 - 2601B04G1"
+/use-clickup create-list folder123 "Sprint 23 — Backend Refactor"
 ```
 
 ---

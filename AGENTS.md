@@ -16,6 +16,9 @@ not for pi.
 
 ## §C CONSTRAINTS
 
+- **Agnosticism (core):** Skills MUST be deployable agnostically — no hard references to
+  any specific agent, model, harness, or AI surface (pi, OpenCode, VS Code, Antigravity,
+  Claude Code, etc.). A skill works the same regardless of where it runs.
 - **Language:** Skills in `en-US` or `es-CO`. No mixing within a single skill.
 - **Size:** `SKILL.md` must stay under 500 lines.
 - **Frontmatter:** `name:` (lowercase-hyphens), `description:` with "Use when..." pattern.

@@ -30,6 +30,11 @@ python skill-forge/scripts/init.py my-skill --path .
 python skill-forge/scripts/audit.py my-skill
 ```
 
+## Principles
+
+- **Agnostic by default.** Skills never reference a specific agent, model, harness, or
+  AI surface. Deployable anywhere.
+
 ## Conventions
 
 - Skills are written in `en-US` or `es-CO` (never mixed within one skill)

@@ -76,6 +76,18 @@ script: `search_task.py`
 /use-clickup search-task --name "Backend tests" --tag backend
 ```
 
+For workspace-wide queries (no list ID needed), use the Python API directly:
+```python
+from search_task import search_workspace_tasks
+
+# All tasks in the default workspace, including closed
+results = search_workspace_tasks(
+    team_id="90132304521",
+    include_closed=True
+)
+# Results are auto-sorted by date_closed descending when include_closed=True
+```
+
 ---
 
 ### /use-clickup create-list

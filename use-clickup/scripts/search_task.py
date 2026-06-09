@@ -19,13 +19,13 @@ def search_tasks(
     limit: int = 50
 ) -> List[Dict]:
     """
-    Searches tasks with optional filters.
+    Searches tasks within a specific list with optional filters.
 
     Args:
         name: Name (or partial) to search
         tag: Filter by tag
-        list_id: Filter by specific list
-        space_id: Filter by space
+        list_id: Filter by specific list (required)
+        space_id: Not directly supported — use search_workspace_tasks for space-level queries
         limit: Maximum tasks to return (default 50)
 
     Returns:
@@ -33,25 +33,15 @@ def search_tasks(
     """
     client = get_client()
 
-    # Build query params
+    if not list_id:
+        raise ValueError(
+            "list_id is required for list-level search. "
+            "Use search_workspace_tasks() for team/space-level queries."
+        )
+
+    endpoint = f"/list/{list_id}/task"
     params = {"limit": limit}
 
-    # ClickUp API has limited filtering on /tasks
-    # For name search, we get tasks and filter client-side
-
-    if list_id:
-        endpoint = f"/list/{list_id}/task"
-    elif space_id:
-        # Space tasks require intermediate folder/list
-        raise ValueError(
-            "To filter by space, specify list_id or folder_id"
-        )
-    else:
-        raise ValueError(
-            "list_id is required for task search"
-        )
-
-    # Get tasks
     response = client.get(endpoint, params=params)
 
     if response.status_code != 200:
@@ -66,14 +56,12 @@ def search_tasks(
     results = []
 
     for task in tasks:
-        # Filter by name if specified
         if name:
             similarity = calculate_similarity(name, task.get("name", ""))
-            if similarity < 0.6:  # Fuzzy match threshold
+            if similarity < 0.6:
                 continue
             task["_similarity"] = similarity
 
-        # Filter by tag if specified
         if tag:
             task_tags = task.get("tags", [])
             if tag not in task_tags:
@@ -81,11 +69,69 @@ def search_tasks(
 
         results.append(task)
 
-    # Sort by similarity if applicable
     if name:
         results.sort(key=lambda t: t.get("_similarity", 0), reverse=True)
 
     return results
+
+
+def search_workspace_tasks(
+    team_id: str,
+    space_ids: Optional[List[str]] = None,
+    include_closed: bool = False,
+    limit: int = 50,
+    order_by: Optional[str] = None,
+    reverse: bool = False
+) -> List[Dict]:
+    """
+    Searches tasks across an entire workspace (team).
+
+    Uses GET /team/{team_id}/task — the recommended endpoint for
+    cross-space queries when you don't know specific list IDs.
+
+    Args:
+        team_id: ClickUp team/workspace ID (from CLICKUP_TEAM env var or explicit)
+        space_ids: Optional list of space IDs to filter by
+        include_closed: Include closed/completed tasks (default False)
+        limit: Maximum tasks to return (default 50)
+        order_by: Sort field — supported: 'created', 'updated'.
+                  Note: 'closed' is NOT supported server-side; sort client-side instead.
+        reverse: Reverse sort order (True = descending)
+
+    Returns:
+        List of task dicts, sorted by date_closed desc if include_closed is True
+    """
+    client = get_client()
+    params: Dict = {"limit": limit}
+
+    if space_ids:
+        params["space_ids[]"] = space_ids
+    if include_closed:
+        params["include_closed"] = "true"
+    if order_by and order_by != "closed":
+        params["order_by"] = order_by
+    if reverse:
+        params["reverse"] = "true"
+
+    endpoint = f"/team/{team_id}/task"
+    response = client.get(endpoint, params=params)
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Error searching workspace tasks: {response.status_code} - {response.text}"
+        )
+
+    data = response.json()
+    tasks = data.get("tasks", [])
+
+    # Client-side sort by closed date (server doesn't support order_by=closed)
+    if include_closed:
+        tasks.sort(
+            key=lambda t: t.get("date_closed") or "0",
+            reverse=True
+        )
+
+    return tasks
 
 
 def format_results(tasks: List[Dict]) -> str:

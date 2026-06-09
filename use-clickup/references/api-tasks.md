@@ -63,7 +63,7 @@ Returns tasks in a list.
 
 ## Get Filtered Team Tasks
 
-`GET /team/{teamId}/tasks`
+`GET /team/{team_id}/task`
 
 Returns tasks filtered across the workspace.
 

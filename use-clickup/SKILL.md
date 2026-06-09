@@ -178,6 +178,8 @@ canonical reference for forming API queries.
 | `date-formatting.md` | Timestamps (ms), ISO conversion helpers | `iso_to_milliseconds()`, `milliseconds_to_iso()` |
 | `error-handling.md` | HTTP codes, rate limits, retry strategy | Status codes 200-503, backoff logic |
 | `api-user.md` | Authenticated user verification | `GET /user` |
+| `api-chat.md` | Chat channels, messages, reactions (v3) | `GET /workspaces/{id}/chat/channels`, `POST .../messages`, `POST .../replies` |
+| `api-docs.md` | Docs & pages (v3) | `GET /workspaces/{id}/docs`, `POST .../docs`, `GET .../pages` |
 
 ### How to use
 

@@ -60,7 +60,7 @@ Returns tasks in a list.
 **Query params:** `archived`, `page`, `limit`, `include_closed`, `subtasks`
 
 > **CRITICAL — include_closed:** When tasks are in a closed/done status
-> (including custom statuses like `calificado`, `terminado`), they are hidden
+> (any status with type `closed` or `done`), they are hidden
 > by default. **Always pass `include_closed=true`** to see completed tasks.
 > Without it, lists with only closed tasks will appear empty (`task_count: 0`).
 

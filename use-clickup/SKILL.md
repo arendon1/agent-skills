@@ -171,7 +171,7 @@ MUST know these before querying:
 | Quirk | Where documented | Workaround |
 |-------|-----------------|------------|
 | Archived folders hide their lists from `GET /folder/{id}/list` | `api-folders.md`, `api-lists.md` | Fetch folder details (`GET /folder/{id}`) — lists are embedded inline under `lists` key |
-| `include_closed=true` is mandatory for closed tasks | `api-tasks.md` | Always pass `include_closed=true` when querying tasks; lists with only closed tasks appear empty otherwise |
+| `include_closed=true` is mandatory for closed tasks | `api-tasks.md` | Always pass `include_closed=true` when querying tasks; lists with only closed tasks appear empty otherwise. Custom statuses with type `done`/`closed` are invisible without this flag — discover them via `GET /space/{id}` → `statuses[].type` |
 | Team-level `GET /team/{id}/task` ignores archived folders | `api-tasks.md` | Discover archived folders first, then query each list individually |
 | `order_by=closed` returns 500 | `api-tasks.md` | Sort client-side on `date_closed` instead |
 | `Authorization: Bearer <token>` fails for PATs | `client.py` | Use raw token without Bearer prefix: `Authorization: <token>` |

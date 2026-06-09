@@ -60,9 +60,15 @@ Returns tasks in a list.
 **Query params:** `archived`, `page`, `limit`, `include_closed`, `subtasks`
 
 > **CRITICAL — include_closed:** When tasks are in a closed/done status
-> (any status with type `closed` or `done`), they are hidden
-> by default. **Always pass `include_closed=true`** to see completed tasks.
-> Without it, lists with only closed tasks will appear empty (`task_count: 0`).
+> (any status with type `closed` or `done`, including custom statuses created
+> per space), they are hidden by default. **Always pass `include_closed=true`**
+> to see completed tasks. Without it, lists with only closed tasks will appear
+> empty (`task_count: 0`).
+>
+> To discover which statuses are considered closed in a space, check the
+> space's status list: `GET /space/{space_id}` → `statuses[]` → `type` field
+> (`open`, `custom`, `done`, `closed`). Any status with type `done` or `closed`
+> requires `include_closed=true` to appear in task queries.
 
 ---
 

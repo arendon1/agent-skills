@@ -28,9 +28,14 @@ not for pi.
 
 ## §X CROSS-SKILL DEPENDENCIES
 
-`gestionar-cursos/scripts/cli_clickup.py` imports from `use-clickup/scripts/` at runtime.
-Changes to `use-clickup` module/function names break `gestionar-cursos`. Check both when
-renaming.
+**`gestionar-cursos` → `use-clickup`**: `gestionar-cursos/scripts/cli_clickup.py`
+imports from `use-clickup/scripts/` at runtime via `sys.path`. Changes to `use-clickup`
+module/function names break `gestionar-cursos`. Check both when renaming.
+
+**Architectural rule:** `use-clickup` is a generic ClickUp API wrapper — it MUST NOT
+contain domain-specific constraints (workspace IDs, course terminology, academic tags).
+Any workspace or space-level constraints belong in the consuming skill (`gestionar-cursos`).
+This keeps `use-clickup` deployable agnostically across any ClickUp workspace.
 
 ## §S SKILL-FORGE
 

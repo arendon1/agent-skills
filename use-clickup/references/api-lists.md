@@ -44,7 +44,9 @@ Creates a list directly in a space without a folder.
 
 Returns all lists in a folder.
 
-**Response:** `{ "lists": [...] }`
+> **WARNING:** When the parent folder is archived, this endpoint returns an
+> empty array even though lists exist. Use `GET /folder/{id}` and read the
+> `lists` key from the folder response instead.
 
 ---
 
@@ -52,6 +54,7 @@ Returns all lists in a folder.
 
 `GET /space/{space_id}/list`
 
-Returns lists directly in a space (not in folders).
+Returns lists directly in a space (not in folders). Pass `?archived=true`
+to include archived lists.
 
 **Response:** `{ "lists": [...] }`

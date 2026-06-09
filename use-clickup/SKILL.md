@@ -162,3 +162,16 @@ canonical reference for forming API queries.
    with the endpoint and payload from the reference.
 3. **Unknown behavior:** Test against the live API first, then update the reference
    file so the next agent benefits from the discovery.
+
+### Known API Quirks
+
+These are non-obvious behaviors discovered through live testing. Every agent
+MUST know these before querying:
+
+| Quirk | Where documented | Workaround |
+|-------|-----------------|------------|
+| Archived folders hide their lists from `GET /folder/{id}/list` | `api-folders.md`, `api-lists.md` | Fetch folder details (`GET /folder/{id}`) — lists are embedded inline under `lists` key |
+| `include_closed=true` is mandatory for closed tasks | `api-tasks.md` | Always pass `include_closed=true` when querying tasks; lists with only closed tasks appear empty otherwise |
+| Team-level `GET /team/{id}/task` ignores archived folders | `api-tasks.md` | Discover archived folders first, then query each list individually |
+| `order_by=closed` returns 500 | `api-tasks.md` | Sort client-side on `date_closed` instead |
+| `Authorization: Bearer <token>` fails for PATs | `client.py` | Use raw token without Bearer prefix: `Authorization: <token>` |

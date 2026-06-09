@@ -59,6 +59,11 @@ Returns tasks in a list.
 
 **Query params:** `archived`, `page`, `limit`, `include_closed`, `subtasks`
 
+> **CRITICAL — include_closed:** When tasks are in a closed/done status
+> (including custom statuses like `calificado`, `terminado`), they are hidden
+> by default. **Always pass `include_closed=true`** to see completed tasks.
+> Without it, lists with only closed tasks will appear empty (`task_count: 0`).
+
 ---
 
 ## Get Filtered Team Tasks
@@ -99,6 +104,10 @@ tasks = search_workspace_tasks(
   Use client-side sorting on `date_closed` instead.
 - Tasks returned include `list`, `folder`, and `space` nested objects
   with `id` and `name` fields.
+- **Archived folders are invisible** to this endpoint. Tasks inside
+  archived folders will NOT appear in team-level queries. To find
+  them: fetch folders with `?archived=true`, get their embedded
+  `lists`, then query each list directly with `include_closed=true`.
 
 ---
 

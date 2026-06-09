@@ -27,6 +27,9 @@ Returns all folders in a space.
 
 **Query params:** `archived` (boolean)
 
+> **IMPORTANT:** Archived folders are hidden by default. Always pass `?archived=true`
+> to discover all folders in a space.
+
 **Response:**
 ```json
 {
@@ -42,3 +45,14 @@ Returns all folders in a space.
   ]
 }
 ```
+
+## Get Folder Details
+
+`GET /folder/{folder_id}`
+
+Returns full folder details **including its lists embedded inline**.
+
+> **CRITICAL:** When a folder is archived, `GET /folder/{id}/list` returns an
+> empty array — but the lists still exist! They are embedded in the folder
+> response under the `lists` key. Always fetch folder details first to
+> discover lists in archived folders.

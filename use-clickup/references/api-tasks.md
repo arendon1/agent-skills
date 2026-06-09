@@ -65,20 +65,40 @@ Returns tasks in a list.
 
 `GET /team/{team_id}/task`
 
-Returns tasks filtered across the workspace.
+Returns tasks filtered across the workspace. This is the recommended endpoint
+for cross-list queries when you don't have a specific list ID.
 
 **Query params:**
-| Param | Description |
-|-------|-------------|
-| `list_ids` | Filter by list IDs |
-| `folder_ids` | Filter by folder IDs |
-| `space_ids` | Filter by space IDs |
-| `include_closed` | Include closed tasks |
-| `subtasks` | Include subtasks |
-| `order_by` | Sort field |
-| `reverse` | Reverse sort |
-| `page` | Page number |
-| `limit` | Results per page |
+| Param | Type | Description |
+|-------|------|-------------|
+| `list_ids[]` | array | Filter by list IDs |
+| `folder_ids[]` | array | Filter by folder IDs |
+| `space_ids[]` | array | Filter by space IDs |
+| `include_closed` | boolean | Include closed/completed tasks |
+| `subtasks` | boolean | Include subtasks |
+| `order_by` | string | Sort field: `created`, `updated`. Note: `closed` returns 500 — sort client-side instead. |
+| `reverse` | boolean | Reverse sort order |
+| `page` | integer | Page number (0-indexed) |
+| `limit` | integer | Results per page |
+
+**Python usage:**
+```python
+from search_task import search_workspace_tasks
+
+tasks = search_workspace_tasks(
+    team_id="90132304521",
+    include_closed=True,
+    space_ids=["901311224662"],
+    limit=50
+)
+# Results auto-sorted by date_closed desc when include_closed=True
+```
+
+**Notes:**
+- `order_by=closed` is NOT supported server-side (returns 500).
+  Use client-side sorting on `date_closed` instead.
+- Tasks returned include `list`, `folder`, and `space` nested objects
+  with `id` and `name` fields.
 
 ---
 

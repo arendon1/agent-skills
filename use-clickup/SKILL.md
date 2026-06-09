@@ -127,16 +127,38 @@ script: `view_lists.py`
 | 429 | Rate limit | Yes | Backoff 1s, 2s, 4s |
 | 500 | Server error | Yes | Retry 3x |
 
-## Internal References
+## References — Full API Summary
 
-Full API documentation in `references/`:
-- `api-tasks.md` — All task endpoints
-- `api-lists.md` — List CRUD
-- `api-folders.md` — Folder CRUD
-- `api-spaces.md` — Space CRUD
-- `api-comments.md` — Comments
-- `api-checklists.md` — Checklists
-- `api-tags.md` — Tag management
-- `api-custom-fields.md` — Custom fields
-- `date-formatting.md` — ISO to milliseconds conversion
-- `error-handling.md` — Error codes and retry strategies
+ALL ClickUp API documentation lives in `references/`. Agents MUST search these
+files first before making any external lookup — they are designed to be the
+canonical reference for forming API queries.
+
+> **Canonical source:** https://developer.clickup.com/reference  
+> If these references are stale (API behavior doesn't match), cross-check
+> against the live docs above and update the reference files.
+
+### Index
+
+| File | Covers | Key endpoints |
+|------|--------|--------------|
+| `api-tasks.md` | Task CRUD, team-level queries, global search | `POST /list/{id}/task`, `PUT /task/{id}`, `GET /list/{id}/task`, `GET /team/{id}/task`, `GET /tasks` |
+| `api-lists.md` | List CRUD (folder & folderless) | `POST /list`, `POST /space/{id}/list`, `GET /folder/{id}/list`, `GET /space/{id}/list` |
+| `api-folders.md` | Folder CRUD | `POST /space/{id}/folder`, `GET /space/{id}/folder` |
+| `api-spaces.md` | Space & team discovery | `GET /team/{id}/space`, `GET /team` |
+| `api-comments.md` | Task & list comments | `POST /task/{id}/comment`, `GET /task/{id}/comment`, `POST /list/{id}/comment` |
+| `api-checklists.md` | Checklists & items | `POST /task/{id}/checklist`, `POST /checklist/{id}/checklist_item` |
+| `api-tags.md` | Space tag management | `GET /space/{id}/tag`, `POST /space/{id}/tag` |
+| `api-custom-fields.md` | Task custom fields | `POST /task/{id}/field/{id}`, `GET /list/{id}/field` |
+| `date-formatting.md` | Timestamps (ms), ISO conversion helpers | `iso_to_milliseconds()`, `milliseconds_to_iso()` |
+| `error-handling.md` | HTTP codes, rate limits, retry strategy | Status codes 200-503, backoff logic |
+| `api-user.md` | Authenticated user verification | `GET /user` |
+
+### How to use
+
+1. **Forming a query:** Read the relevant reference file(s). Each one documents
+   request/response schemas, query params, and examples.
+2. **Scripts are wrappers:** `scripts/*.py` call these endpoints. If a script
+   doesn't support a parameter you need, use the raw `client.get()` / `client.post()`
+   with the endpoint and payload from the reference.
+3. **Unknown behavior:** Test against the live API first, then update the reference
+   file so the next agent benefits from the discovery.

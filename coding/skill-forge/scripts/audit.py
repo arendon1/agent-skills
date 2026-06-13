@@ -122,9 +122,9 @@ def get_skill_info(skill_path: Path) -> Dict:
     lines = content.split('\n')
 
     documented_scripts = set()
-    for m in re.finditer(r'(?:scripts?|script)[\s:]+[`"]?(\w+\.(?:py|sh|js|ts|rb))', content, re.IGNORECASE):
+    for m in re.finditer(r'(?:scripts?|script)[\s:>]+[`"]?([\w-]+\.(?:py|sh|js|ts|rb|mjs))', content, re.IGNORECASE):
         documented_scripts.add(m.group(1).lower())
-    for m in re.finditer(r'\|`?(\w+\.(?:py|sh|js|ts|rb))`?\|', content):
+    for m in re.finditer(r'\|\s*`?([\w-]+\.(?:py|sh|js|ts|rb|mjs))\s*`?\s*\|', content):
         documented_scripts.add(m.group(1).lower())
 
     scripts_dir = skill_path / "scripts"

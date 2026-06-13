@@ -28,16 +28,10 @@ from rich.panel import Panel
 console = Console()
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-SKILLS_ROOT = os.path.dirname(os.path.dirname(THIS_DIR))
-USE_CLICKUP_DIR = os.path.join(SKILLS_ROOT, "use-clickup", "scripts")
-sys.path.insert(0, USE_CLICKUP_DIR)
 sys.path.insert(0, THIS_DIR)
 
-from client import get_client
-from create_task import create_task
-from update_task import update_task
-from create_list import create_list
-from view_lists import view_lists
+# ClickUp operations are delegated to the use-clickup skill at agent level.
+# See SKILL.md for instructions on how the agent orchestrates between skills.
 
 CLICKUP_SPACE_ID = "901311224662"
 CLICKUP_SPACE_NAME = "Universidad"

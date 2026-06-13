@@ -43,8 +43,8 @@ companion skill. Orchestration happens at the agent conversation level, not
 through code-level imports.
 
 **`gestionar-cursos` → `use-clickup`**: `gestionar-cursos` SKILL.md instructs the
-agent to load `use-clickup` for ClickUp API operations. The `sys.path` import in
-`cli_clickup.py` will be removed as part of the category restructuring.
+agent to load `use-clickup` for ClickUp API operations. The runtime import in
+`cli_clickup.py` has been removed — orchestration is agent-level, not code-level.
 
 **Architectural rule:** `use-clickup` is a generic ClickUp API wrapper — it MUST
 NOT contain domain-specific constraints (workspace IDs, course terminology,
@@ -56,8 +56,8 @@ across any ClickUp workspace.
 
 ```
 # Scaffold a new skill
-python skill-forge/scripts/init.py <name> --path .
+python coding/skill-forge/scripts/init.py <name> --path .
 
 # Validate a skill's structure
-python skill-forge/scripts/audit.py <skill-dir>
+python coding/skill-forge/scripts/audit.py <skill-dir>
 ```

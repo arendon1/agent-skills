@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
@@ -59,6 +60,48 @@ def _headers() -> dict[str, str]:
     return h
 
 
+def _request_with_retry(
+    url: str, headers: dict[str, str], max_retries: int = 3
+) -> requests.Response:
+    """
+    Realiza un GET con retry y exponential backoff.
+
+    Maneja HTTP 429 (rate limit) y errores de red transitorios.
+    Espera 2, 4, 8 segundos entre reintentos.
+    """
+    last_exception = None
+    for attempt in range(max_retries + 1):
+        try:
+            resp = requests.get(url, headers=headers, timeout=30)
+            if resp.status_code == 429:
+                retry_after = resp.headers.get("Retry-After", "5")
+                wait = int(retry_after) if retry_after.isdigit() else 2**attempt
+                print(
+                    f"Rate limit alcanzado. Esperando {wait}s... "
+                    f"(intento {attempt + 1}/{max_retries + 1})",
+                    file=sys.stderr,
+                )
+                if attempt < max_retries:
+                    time.sleep(wait)
+                    continue
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            if attempt < max_retries:
+                wait = 2**attempt
+                print(
+                    f"Error de red: {e}. Reintentando en {wait}s... "
+                    f"(intento {attempt + 1}/{max_retries + 1})",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+            else:
+                raise
+
+    raise last_exception  # type: ignore[misc]
+
+
 def search_by_keyword(args: argparse.Namespace) -> dict[str, Any]:
     """
     Busca artículos por palabra clave usando /paper/search.
@@ -87,8 +130,7 @@ def search_by_keyword(args: argparse.Namespace) -> dict[str, Any]:
     print(f"Buscando en Semantic Scholar: {args.query}", file=sys.stderr)
 
     try:
-        resp = requests.get(url, headers=_headers(), timeout=30)
-        resp.raise_for_status()
+        resp = _request_with_retry(url, _headers())
         data = resp.json()
     except requests.exceptions.RequestException as e:
         print(f"Error en la búsqueda Semantic Scholar: {e}", file=sys.stderr)
@@ -114,11 +156,12 @@ def search_by_title(args: argparse.Namespace) -> dict[str, Any]:
     print(f"Verificando título en Semantic Scholar: {args.match}", file=sys.stderr)
 
     try:
-        resp = requests.get(url, headers=_headers(), timeout=30)
-        resp.raise_for_status()
+        resp = _request_with_retry(url, _headers())
         data = resp.json()
     except requests.exceptions.RequestException as e:
         print(f"Error en la verificación Semantic Scholar: {e}", file=sys.stderr)
+        if hasattr(e, "response") and e.response is not None:
+            print(f"Respuesta del servidor: {e.response.text[:500]}", file=sys.stderr)
         sys.exit(1)
 
     return data.get("data", [])

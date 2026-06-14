@@ -133,6 +133,7 @@ def principal():
 
     parser.add_argument(
         'archivo',
+        nargs='?',
         help='Archivo Typst (.typ) a compilar'
     )
 
@@ -160,6 +161,9 @@ def principal():
             sys.exit(0)
         else:
             sys.exit(1)
+
+    if not args.archivo:
+        parser.error('Se requiere el archivo .typ a compilar')
 
     # Verificar Typst
     if not verificar_typst():

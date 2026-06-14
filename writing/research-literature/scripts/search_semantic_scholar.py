@@ -181,10 +181,20 @@ def format_results(
 
 
 def to_bibtex(results: dict[str, Any]) -> str:
-    """Convierte los resultados a formato BibTeX."""
+    """Convierte los resultados a formato BibTeX con claves únicas."""
     entries: list[str] = []
+    used_keys: set[str] = set()
+
     for i, r in enumerate(results["results"]):
         cite_key = _make_cite_key(r, i)
+        # Desambiguar si la clave ya existe
+        if cite_key in used_keys:
+            suffix = ord("a")
+            while f"{cite_key}{chr(suffix)}" in used_keys:
+                suffix += 1
+            cite_key = f"{cite_key}{chr(suffix)}"
+        used_keys.add(cite_key)
+
         entry_type = "article"
 
         lines = [f"@{entry_type}{{{cite_key},"]

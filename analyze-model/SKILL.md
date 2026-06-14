@@ -1,5 +1,5 @@
 ---
-name: analyze-llm-model
+name: analyze-model
 language: en
 description: >-
   Fetches live model data from OpenRouter and Artificial Analysis APIs, merges
@@ -16,7 +16,7 @@ metadata:
   risk_tier: LOW
 ---
 
-# analyze-llm-model
+# analyze-model
 
 Queries **OpenRouter** and **Artificial Analysis** APIs to build a live model
 catalog, then uses that catalog as the source of truth for cost analysis and
@@ -36,7 +36,7 @@ API keys resolved in this order for each provider:
 
 ## Workflows
 
-### /analyze-llm-model fetch-catalog
+### /analyze-model fetch-catalog
 
 Fetches and merges model data from both APIs into a local catalog JSON.
 
@@ -66,7 +66,7 @@ python scripts/fetch_models.py --aa-only --output catalog.json
 
 ---
 
-### /analyze-llm-model analyze-costs
+### /analyze-model analyze-costs
 
 Reads a usage log file and the catalog, then produces a cost breakdown by
 model with totals, percentages, and per-call averages. **Resolves private-provider
@@ -102,7 +102,7 @@ python scripts/analyze_costs.py usage.csv  --catalog catalog.json --output repor
 
 ---
 
-### /analyze-llm-model forecast
+### /analyze-model forecast
 
 Projects future costs over a configurable horizon (default 30 days) using
 linear trend extrapolation from historical usage. Includes cheaper-model
@@ -123,7 +123,7 @@ python scripts/forecast.py usage.csv  --catalog catalog.json --days 90 --output 
 
 ---
 
-### /analyze-llm-model export-usage
+### /analyze-model export-usage
 
 Exports usage data from an LLM surface into the standard usage log format that
 `analyze_costs.py` and `forecast.py` consume.

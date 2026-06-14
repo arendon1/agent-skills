@@ -1,5 +1,5 @@
 """
-Artificial Analysis API client for the analyze-llm-model skill.
+Artificial Analysis API client for the analyze-model skill.
 
 Requires: ARTIFICIAL_ANALYSIS_API_KEY in .env or environment variable.
 Rate limit: 1,000 requests per day (free tier).

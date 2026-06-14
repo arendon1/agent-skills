@@ -1,5 +1,5 @@
 """
-OpenRouter API client for the analyze-llm-model skill.
+OpenRouter API client for the analyze-model skill.
 
 Public models endpoint works without an API key.
 Optional: set OPENROUTER_API_KEY in .env or environment for authenticated requests.

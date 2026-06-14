@@ -1,5 +1,5 @@
 """
-ASCII chart utilities for analyze-llm-model output.
+ASCII chart utilities for analyze-model output.
 
 Zero-dependency rendering: horizontal bars, sparklines, gauges, comparison charts.
 All functions return strings for stdout — no file writes, no external renderers.

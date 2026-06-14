@@ -1,6 +1,6 @@
-# Escritura Académica
+# Generar Paper
 
-Contexto del skill `escritura-academica`: generación de documentos académicos en español colombiano (es-CO) con formato APA 7 y validación estricta de citas para trabajos universitarios. El skill cubre todo el flujo: búsqueda de fuentes → extracción de metadatos → validación de citas → formateo BibTeX → composición Typst → compilación a PDF.
+Contexto del skill `generar-paper`: pipeline de validación de citas y composición tipográfica para documentos académicos en español colombiano (es-CO) con formato APA 7 (estudiante). Recibe fuentes ya identificadas — no las busca. Cubre: extracción de metadatos → validación de citas (Tier C con fallback a Tier B) → formateo BibTeX → composición Typst → compilación a PDF. La búsqueda de fuentes se hace con el skill complementario `research-literature`.
 
 ## Lenguaje
 
@@ -36,9 +36,9 @@ _Evitar_: fuente informal, recurso web
 
 ### Herramientas externas
 
-**EXA**:
-API de búsqueda web semántica optimizada para agentes de IA. Se usa para descubrir artículos académicos mediante búsqueda por similitud semántica con categoría `research paper`. Requiere clave de API configurada en variable de entorno `EXA_API_KEY`.
-_Evitar_: Google Scholar, buscador académico
+**research-literature**:
+Skill complementario encargado de buscar y descubrir fuentes académicas usando EXA, Semantic Scholar y Google Scholar. `generar-paper` consume sus salidas (DOIs, PMIDs, URLs).
+_Evitar_: buscar dentro de este skill, discovery
 
 **CrossRef**:
 API de metadatos académicos. Provee datos estructurados (título, autores, año, revista) a partir de un DOI. Se usa tanto para extraer metadatos como para verificar citas por contenido.

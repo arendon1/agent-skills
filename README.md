@@ -3,22 +3,9 @@
 Personal collection of AI agent skills. Each subdirectory is an independent,
 deployable skill built with [skill-forge](skill-forge/SKILL.md).
 
-## Structure
-
-```
-agent-skills/
-├── skill-forge/         # Skill scaffolding and auditing toolkit
-├── use-clickup/         # ClickUp API integration
-├── gestionar-cursos/    # Course management (depends on use-clickup)
-├── analyze-llm-model/   # LLM cost/quality analysis
-├── escritura-academica/ # Academic writing assistant
-├── git-master/          # Proactive version control for AI agents
-├── make-a-diagram/      # Mermaid diagram generation
-└── README.md
-```
-
-Skills are discovered dynamically — the directory listing is the source of truth.
-New skills can be added as directories at any time.
+Skills are self-contained directories at the repo root. Each contains a
+`SKILL.md` and supporting files. Discovered dynamically — the directory listing
+is the source of truth.
 
 ## Quick start
 

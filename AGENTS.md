@@ -12,12 +12,7 @@ pi builds, audits, and maintains skills here using skill-forge.
 Skills come and go. pi MUST discover skills dynamically by scanning subdirectories
 for `SKILL.md` files. NEVER hardcode a skill list — the active set is whatever
 directories exist right now. The harness lockfile (if present) is for the harness,
-not for pi.
-
-Skills are organized into **category directories** at the repo root. Categories
-are a discovery aid — agents scan recursively and the directory path encodes
-grouping without harness-specific metadata. No category directory shall contain a
-`SKILL.md` itself; they are containers, not skills.
+not for pi. Every skill lives in its own directory at the repo root.
 
 ## §C CONSTRAINTS
 
@@ -28,9 +23,6 @@ grouping without harness-specific metadata. No category directory shall contain 
 - **Size:** `SKILL.md` must stay under 500 lines.
 - **Frontmatter:** `name:` (lowercase-hyphens), `description:` with "Use when..." pattern.
 - **Structure:** `SKILL.md`, `scripts/`, `references/`. Optional: `examples/`, `evals/`.
-- **Categories:** `kebab-case` directory names at repo root. Single-word preferred;
-  multi-word uses hyphens (e.g., `academic-writing`). Categories are discovery
-  groupings, not deployment rules — they are purely organizational.
 - **Commits:** Conventional commits — `feat`, `fix`, `refactor`, `chore`.
 - **Python:** `uv` for dependency management. `uv.lock` and `.venv/` are gitignored.
 
@@ -56,8 +48,8 @@ across any ClickUp workspace.
 
 ```
 # Scaffold a new skill
-python coding/skill-forge/scripts/init.py <name> --path .
+python skill-forge/scripts/init.py <name> --path .
 
 # Validate a skill's structure
-python coding/skill-forge/scripts/audit.py <skill-dir>
+python skill-forge/scripts/audit.py <skill-dir>
 ```

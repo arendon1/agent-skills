@@ -7,7 +7,7 @@ description: >-
   "qué investigaciones hay sobre...".
 language: es-CO
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   trit: 0
   risk_tier: CAUTION
 ---

@@ -158,7 +158,7 @@ para el flujo de integración.
 
 - **Python 3.10+** — para todos los scripts
 - **`exa-py`** — SDK de Python para EXA API (`pip install exa-py`)
-- **`requests`** — para Semantic Scholar API (incluido en la biblioteca estándar en la mayoría de instalaciones, pero listado como dependencia explícita)
+- **`requests`** — para Semantic Scholar API (`pip install requests`)
 
 ## Habilidades complementarias
 

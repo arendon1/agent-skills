@@ -105,6 +105,14 @@ no devuelven resultados suficientes.
 
 ### 3. Entregar fuentes
 
+Cuando se usan múltiples herramientas, combinar los resultados con `merge_results.py`
+para eliminar duplicados antes de entregar a `generar-paper`:
+
+```bash
+python scripts/merge_results.py exa_results.json semantic_results.json \
+  --output unified.json
+```
+
 El skill produce un archivo JSON estructurado con las fuentes encontradas:
 
 ```json
@@ -153,6 +161,7 @@ para el flujo de integración.
 |--------|----------|
 | `scripts/search_exa.py` | Búsqueda semántica con EXA API vía `exa-py` |
 | `scripts/search_semantic_scholar.py` | Búsqueda con Semantic Scholar API REST |
+| `scripts/merge_results.py` | Combinar y deduplicar resultados de múltiples fuentes |
 
 ## Dependencias
 

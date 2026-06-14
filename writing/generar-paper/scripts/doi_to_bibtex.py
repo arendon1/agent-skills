@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-DOI to BibTeX Converter
-Quick utility to convert DOIs to BibTeX format using CrossRef API.
+Conversor de DOI a BibTeX
+Convierte DOIs a formato BibTeX usando la API de CrossRef.
 """
 
 import sys
@@ -11,26 +11,26 @@ import time
 import json
 from typing import Optional, List
 
-class DOIConverter:
-    """Convert DOIs to BibTeX entries using CrossRef API."""
-    
+class ConversorDOI:
+    """Convierte DOIs a entradas BibTeX usando la API de CrossRef."""
+
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'DOIConverter/1.0 (Citation Management Tool; mailto:support@example.com)'
+            'User-Agent': 'ConversorDOI/2.0 (Herramienta de Gestión de Citas; mailto:support@example.com)'
         })
-    
-    def doi_to_bibtex(self, doi: str) -> Optional[str]:
+
+    def doi_a_bibtex(self, doi: str) -> Optional[str]:
         """
-        Convert a single DOI to BibTeX format.
-        
+        Convierte un solo DOI a formato BibTeX.
+
         Args:
             doi: Digital Object Identifier
-            
+
         Returns:
-            BibTeX string or None if conversion fails
+            Cadena BibTeX o None si la conversión falla
         """
-        # Clean DOI (remove URL prefix if present)
+        # Limpiar DOI (quitar prefijo URL si está presente)
         doi = doi.strip()
         if doi.startswith('https://doi.org/'):
             doi = doi.replace('https://doi.org/', '')
@@ -38,167 +38,167 @@ class DOIConverter:
             doi = doi.replace('http://doi.org/', '')
         elif doi.startswith('doi:'):
             doi = doi.replace('doi:', '')
-        
-        # Request BibTeX from CrossRef content negotiation
+
+        # Solicitar BibTeX mediante negociación de contenido de CrossRef
         url = f'https://doi.org/{doi}'
         headers = {
             'Accept': 'application/x-bibtex',
-            'User-Agent': 'DOIConverter/1.0 (Citation Management Tool)'
+            'User-Agent': 'ConversorDOI/2.0 (Herramienta de Gestión de Citas)'
         }
-        
+
         try:
             response = self.session.get(url, headers=headers, timeout=15)
-            
+
             if response.status_code == 200:
                 bibtex = response.text.strip()
-                # CrossRef sometimes returns entries with @data type, convert to @misc
+                # CrossRef a veces devuelve entradas con tipo @data, convertir a @misc
                 if bibtex.startswith('@data{'):
                     bibtex = bibtex.replace('@data{', '@misc{', 1)
                 return bibtex
             elif response.status_code == 404:
-                print(f'Error: DOI not found: {doi}', file=sys.stderr)
+                print(f'Error: DOI no encontrado: {doi}', file=sys.stderr)
                 return None
             else:
-                print(f'Error: Failed to retrieve BibTeX for {doi} (status {response.status_code})', file=sys.stderr)
+                print(f'Error: Falló la obtención de BibTeX para {doi} (estado {response.status_code})', file=sys.stderr)
                 return None
-                
+
         except requests.exceptions.Timeout:
-            print(f'Error: Request timeout for DOI: {doi}', file=sys.stderr)
+            print(f'Error: Tiempo de espera agotado para el DOI: {doi}', file=sys.stderr)
             return None
         except requests.exceptions.RequestException as e:
-            print(f'Error: Request failed for {doi}: {e}', file=sys.stderr)
+            print(f'Error: Falló la solicitud para {doi}: {e}', file=sys.stderr)
             return None
-    
-    def convert_multiple(self, dois: List[str], delay: float = 0.5) -> List[str]:
+
+    def convertir_multiples(self, dois: List[str], espera: float = 0.5) -> List[str]:
         """
-        Convert multiple DOIs to BibTeX.
-        
+        Convierte múltiples DOIs a BibTeX.
+
         Args:
-            dois: List of DOIs
-            delay: Delay between requests (seconds) for rate limiting
-            
+            dois: Lista de DOIs
+            espera: Espera entre solicitudes (segundos) para límite de tasa
+
         Returns:
-            List of BibTeX entries (excludes failed conversions)
+            Lista de entradas BibTeX (excluye conversiones fallidas)
         """
-        bibtex_entries = []
-        
+        entradas_bibtex = []
+
         for i, doi in enumerate(dois):
-            print(f'Converting DOI {i+1}/{len(dois)}: {doi}', file=sys.stderr)
-            bibtex = self.doi_to_bibtex(doi)
-            
+            print(f'Convirtiendo DOI {i+1}/{len(dois)}: {doi}', file=sys.stderr)
+            bibtex = self.doi_a_bibtex(doi)
+
             if bibtex:
-                bibtex_entries.append(bibtex)
-            
-            # Rate limiting
-            if i < len(dois) - 1:  # Don't delay after last request
-                time.sleep(delay)
-        
-        return bibtex_entries
+                entradas_bibtex.append(bibtex)
+
+            # Límite de tasa
+            if i < len(dois) - 1:  # No esperar después de la última solicitud
+                time.sleep(espera)
+
+        return entradas_bibtex
 
 
-def main():
-    """Command-line interface."""
+def principal():
+    """Interfaz de línea de comandos."""
     parser = argparse.ArgumentParser(
-        description='Convert DOIs to BibTeX format using CrossRef API',
-        epilog='Example: python doi_to_bibtex.py 10.1038/s41586-021-03819-2'
+        description='Convierte DOIs a formato BibTeX usando la API de CrossRef',
+        epilog='Ejemplo: python doi_to_bibtex.py 10.1038/s41586-021-03819-2'
     )
-    
+
     parser.add_argument(
         'dois',
         nargs='*',
-        help='DOI(s) to convert (can provide multiple)'
+        help='DOI(s) a convertir (puede pasar varios)'
     )
-    
+
     parser.add_argument(
         '-i', '--input',
-        help='Input file with DOIs (one per line)'
+        help='Archivo de entrada con DOIs (uno por línea)'
     )
-    
+
     parser.add_argument(
         '-o', '--output',
-        help='Output file for BibTeX (default: stdout)'
+        help='Archivo de salida para BibTeX (por defecto: stdout)'
     )
-    
+
     parser.add_argument(
         '--delay',
         type=float,
         default=0.5,
-        help='Delay between requests in seconds (default: 0.5)'
+        help='Espera entre solicitudes en segundos (por defecto: 0.5)'
     )
-    
+
     parser.add_argument(
         '--format',
         choices=['bibtex', 'json'],
         default='bibtex',
-        help='Output format (default: bibtex)'
+        help='Formato de salida (por defecto: bibtex)'
     )
-    
+
     args = parser.parse_args()
-    
-    # Collect DOIs from command line and/or file
+
+    # Recolectar DOIs desde línea de comandos y/o archivo
     dois = []
-    
+
     if args.dois:
         dois.extend(args.dois)
-    
+
     if args.input:
         try:
             with open(args.input, 'r', encoding='utf-8') as f:
-                file_dois = [line.strip() for line in f if line.strip()]
-                dois.extend(file_dois)
+                dois_archivo = [line.strip() for line in f if line.strip()]
+                dois.extend(dois_archivo)
         except FileNotFoundError:
-            print(f'Error: Input file not found: {args.input}', file=sys.stderr)
+            print(f'Error: Archivo de entrada no encontrado: {args.input}', file=sys.stderr)
             sys.exit(1)
         except Exception as e:
-            print(f'Error reading input file: {e}', file=sys.stderr)
+            print(f'Error al leer el archivo de entrada: {e}', file=sys.stderr)
             sys.exit(1)
-    
+
     if not dois:
         parser.print_help()
         sys.exit(1)
-    
-    # Convert DOIs
-    converter = DOIConverter()
-    
+
+    # Convertir DOIs
+    conversor = ConversorDOI()
+
     if len(dois) == 1:
-        bibtex = converter.doi_to_bibtex(dois[0])
+        bibtex = conversor.doi_a_bibtex(dois[0])
         if bibtex:
-            bibtex_entries = [bibtex]
+            entradas_bibtex = [bibtex]
         else:
             sys.exit(1)
     else:
-        bibtex_entries = converter.convert_multiple(dois, delay=args.delay)
-    
-    if not bibtex_entries:
-        print('Error: No successful conversions', file=sys.stderr)
+        entradas_bibtex = conversor.convertir_multiples(dois, espera=args.delay)
+
+    if not entradas_bibtex:
+        print('Error: No hubo conversiones exitosas', file=sys.stderr)
         sys.exit(1)
-    
-    # Format output
+
+    # Formatear salida
     if args.format == 'bibtex':
-        output = '\n\n'.join(bibtex_entries) + '\n'
+        salida = '\n\n'.join(entradas_bibtex) + '\n'
     else:  # json
-        output = json.dumps({
-            'count': len(bibtex_entries),
-            'entries': bibtex_entries
+        salida = json.dumps({
+            'total': len(entradas_bibtex),
+            'entradas': entradas_bibtex
         }, indent=2)
-    
-    # Write output
+
+    # Escribir salida
     if args.output:
         try:
             with open(args.output, 'w', encoding='utf-8') as f:
-                f.write(output)
-            print(f'Successfully wrote {len(bibtex_entries)} entries to {args.output}', file=sys.stderr)
+                f.write(salida)
+            print(f'Se escribieron {len(entradas_bibtex)} entradas en {args.output}', file=sys.stderr)
         except Exception as e:
-            print(f'Error writing output file: {e}', file=sys.stderr)
+            print(f'Error al escribir el archivo de salida: {e}', file=sys.stderr)
             sys.exit(1)
     else:
-        print(output)
-    
-    # Summary
+        print(salida)
+
+    # Resumen
     if len(dois) > 1:
-        success_rate = len(bibtex_entries) / len(dois) * 100
-        print(f'\nConverted {len(bibtex_entries)}/{len(dois)} DOIs ({success_rate:.1f}%)', file=sys.stderr)
+        tasa_exito = len(entradas_bibtex) / len(dois) * 100
+        print(f'\nConvertidos {len(entradas_bibtex)}/{len(dois)} DOIs ({tasa_exito:.1f}%)', file=sys.stderr)
 
 
 if __name__ == '__main__':
-    main()
+    principal()

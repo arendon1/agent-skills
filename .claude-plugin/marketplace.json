@@ -30,6 +30,7 @@
       "skills": [
         "./domain/analyze-model",
         "./domain/generar-paper",
+        "./domain/geo-map-svg",
         "./domain/gestionar-cursos",
         "./domain/make-a-diagram",
         "./domain/research-literature",

@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "pluginRoot": "."
+  },
+  "plugins": [
+    {
+      "name": "process",
+      "source": ".",
+      "skills": [
+        "./lessons"
+      ]
+    },
+    {
+      "name": "utility",
+      "source": ".",
+      "skills": [
+        "./caveman",
+        "./skill-forge"
+      ]
+    }
+  ]
+}

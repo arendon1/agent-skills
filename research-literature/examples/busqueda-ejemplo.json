@@ -1,0 +1,63 @@
+{
+  "query": "transformer attention mechanisms in NLP",
+  "timestamp": "2026-06-14T10:30:00",
+  "sources_used": ["exa", "semantic_scholar"],
+  "total_results": 5,
+  "deduplicated": 0,
+  "results": [
+    {
+      "title": "Attention Is All You Need",
+      "authors": ["Vaswani, Ashish", "Shazeer, Noam", "Parmar, Niki"],
+      "year": 2017,
+      "doi": "10.48550/arXiv.1706.03762",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
+      "source": "semantic_scholar",
+      "citation_count": 138492,
+      "venue": "NeurIPS",
+      "fields_of_study": ["Computer Science", "Artificial Intelligence"]
+    },
+    {
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "authors": ["Devlin, Jacob", "Chang, Ming-Wei", "Lee, Kenton"],
+      "year": 2019,
+      "doi": "10.18653/v1/N19-1423",
+      "url": "https://aclanthology.org/N19-1423/",
+      "abstract": "We introduce a new language representation model called BERT...",
+      "source": "exa",
+      "citation_count": 102384,
+      "also_found_in": ["semantic_scholar"]
+    },
+    {
+      "title": "Language Models are Few-Shot Learners",
+      "authors": ["Brown, Tom B.", "Mann, Benjamin", "Ryder, Nick"],
+      "year": 2020,
+      "doi": "10.48550/arXiv.2005.14165",
+      "url": "https://arxiv.org/abs/2005.14165",
+      "abstract": "We demonstrate that scaling up language models greatly improves task-agnostic, few-shot performance...",
+      "source": "semantic_scholar",
+      "citation_count": 45821
+    },
+    {
+      "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+      "authors": ["Hu, Edward J.", "Shen, Yelong", "Wallis, Phillip"],
+      "year": 2022,
+      "doi": "10.48550/arXiv.2106.09685",
+      "url": "https://arxiv.org/abs/2106.09685",
+      "abstract": "We propose Low-Rank Adaptation, or LoRA, which freezes the pre-trained model weights...",
+      "source": "exa",
+      "citation_count": 12453
+    },
+    {
+      "title": "Training language models to follow instructions with human feedback",
+      "authors": ["Ouyang, Long", "Wu, Jeffrey", "Jiang, Xu"],
+      "year": 2022,
+      "doi": null,
+      "url": "https://arxiv.org/abs/2203.02155",
+      "abstract": "Making language models bigger does not inherently make them better at following a user's intent...",
+      "source": "semantic_scholar",
+      "citation_count": 18923,
+      "also_found_in": ["exa"]
+    }
+  ]
+}

@@ -30,11 +30,25 @@
       ]
     },
     {
+      "name": "domain",
+      "source": ".",
+      "skills": [
+        "./analyze-model",
+        "./generar-paper",
+        "./gestionar-cursos",
+        "./make-a-diagram",
+        "./research-literature",
+        "./use-clickup"
+      ]
+    },
+    {
       "name": "utility",
       "source": ".",
       "skills": [
         "./bootstrap",
         "./caveman",
+        "./skill-add",
+        "./skill-find",
         "./skill-forge"
       ]
     }

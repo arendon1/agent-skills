@@ -1,0 +1,83 @@
+---
+config:
+  theme: neutral
+  layout: elk
+---
+flowchart TB
+    INIT["cli_init.py: scrape Moodle, create local files and clickup.json"]
+    CLICKUP_JSON["clickup.json: space.id fixed, folder/list = null"]
+    PGA["PGA.md: activity table with name, weight, ISO dates"]
+    AGENTS["AGENTS.md: course metadata, CLICKUP_LIST_ID"]
+    CACHE["_cache/snapshot.json: URL-activity index, last sync timestamp"]
+
+    PROMPT1{"Sync with ClickUp?"}
+    CK_SYNC["cli_clickup.py: resolve IDs and sync tasks"]
+
+    STEP1["1/3: Resolve Folder (find-or-create)"]
+    STEP2["2/3: Resolve List (find-or-create, update AGENTS.md)"]
+    STEP3["3/3: Sync Tasks (parse PGA, classify, create/update)"]
+    TAGGER["_clasificar_actividad(): name + weight -> tags + priority"]
+
+    FOLDER[("ClickUp Folder: 2026-2-B1")]
+    LIST[("ClickUp List: CURSO - CODIGO")]
+    TASKS[("ClickUp Tasks: 1 per PGA row, name, due_date, tags, priority")]
+
+    ESTADO["cli_estado.py: detect changes vs Moodle"]
+    DIFF["Compare sidebar URLs, extract dates (parallel per unit)"]
+    REPORT["Diff report: new, changed, deleted"]
+    PROMPT2{"Update ClickUp?"}
+
+    MOODLE[("Moodle Course Page: PGA table and sidebar")]
+
+    %% INIT flow
+    INIT -->|"scrape and extract"| MOODLE
+    INIT -->|"write"| PGA
+    INIT -->|"write with null IDs"| CLICKUP_JSON
+    INIT -->|"create initial"| CACHE
+    INIT --> PROMPT1
+
+    %% CLICKUP SYNC flow
+    PROMPT1 -->|"yes"| CK_SYNC
+    CK_SYNC -->|"read"| CLICKUP_JSON
+    CK_SYNC --> STEP1
+    STEP1 --> FOLDER
+    STEP1 --> STEP2
+    STEP2 --> LIST
+    STEP2 -->|"update CLICKUP_LIST_ID"| AGENTS
+    STEP2 -->|"update list_id"| CLICKUP_JSON
+    STEP2 --> STEP3
+    STEP3 -->|"read activities"| PGA
+    PGA --> TAGGER
+    TAGGER --> STEP3
+    STEP3 -->|"create or update tasks"| TASKS
+    STEP3 -->|"update tasks map"| CLICKUP_JSON
+
+    %% ESTADO flow
+    ESTADO -->|"load"| CACHE
+    ESTADO -->|"scrape sidebar"| MOODLE
+    ESTADO --> DIFF
+    DIFF --> REPORT
+    DIFF -->|"save new"| CACHE
+    REPORT --> PROMPT2
+    PROMPT2 -->|"yes: dates changed or new activities"| CK_SYNC
+
+    %% Styles
+    style INIT fill:#4a90d9,color:#fff
+    style CK_SYNC fill:#4a90d9,color:#fff
+    style ESTADO fill:#4a90d9,color:#fff
+    style CLICKUP_JSON fill:#f5e6c8,stroke:#c4a55a
+    style PGA fill:#f5e6c8,stroke:#c4a55a
+    style AGENTS fill:#f5e6c8,stroke:#c4a55a
+    style CACHE fill:#f5e6c8,stroke:#c4a55a
+    style FOLDER fill:#c8e6c9,stroke:#66bb6a
+    style LIST fill:#c8e6c9,stroke:#66bb6a
+    style TASKS fill:#c8e6c9,stroke:#66bb6a
+    style MOODLE fill:#c8e6c9,stroke:#66bb6a
+    style PROMPT1 fill:#ffcc80,stroke:#fb8c00
+    style PROMPT2 fill:#ffcc80,stroke:#fb8c00
+    style STEP1 fill:#e8e8e8,stroke:#999
+    style STEP2 fill:#e8e8e8,stroke:#999
+    style STEP3 fill:#e8e8e8,stroke:#999
+    style TAGGER fill:#e8e8e8,stroke:#999
+    style DIFF fill:#e8e8e8,stroke:#999
+    style REPORT fill:#e8e8e8,stroke:#999

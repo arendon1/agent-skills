@@ -124,8 +124,17 @@ HARNESS_NAMES = [
 # Unambiguous tool-API names (capitalized or snake-case tool calls).
 TOOL_APIS = [r"TodoWrite", r"soul_recall", r"\bsoul_recall\b"]
 # Slash-command syntax in body: /word or /word:word. Require 2+ chars and exclude
-# relative paths (./x, ../x) and obvious URL/path contexts.
-SLASH_CMD = re.compile(r"(?<![A-Za-z0-9/_.])/(?!docs/|opt/|usr/|tmp/|var/|etc/|home/|dev/|proc/|sys/)[a-z][a-z0-9-]{1,}(?::[a-z0-9-]+)?(?![A-Za-z0-9/_])")
+# relative paths (./x, ../x) and HTML closing tags (</word>).
+SLASH_CMD = re.compile(r"(?<![A-Za-z0-9/_.<])/(?!docs/|opt/|usr/|tmp/|var/|etc/|home/|dev/|proc/|sys/)[a-z][a-z0-9-]{1,}(?::[a-z0-9-]+)?(?![A-Za-z0-9/_])")
+
+
+def strip_code(text: str) -> str:
+    """Remove fenced code blocks and inline code so heuristic scans don't flag
+    API paths, HTML tags, or commands that live inside code."""
+    text = re.sub(r"```[\s\S]*?```", "", text)
+    text = re.sub(r"~~~[\s\S]*?~~~", "", text)
+    text = re.sub(r"`[^`]*`", "", text)
+    return text
 
 
 def agnosticism_violations(body: str) -> list[tuple[str, str, str]]:
@@ -137,11 +146,12 @@ def agnosticism_violations(body: str) -> list[tuple[str, str, str]]:
     for pat in TOOL_APIS:
         for m in re.finditer(pat, body):
             out.append(("FAIL", f"tool API '{pat}'", m.group(0)))
-    # slash-command syntax: warn (paths/URLs can false-positive)
-    for m in SLASH_CMD.finditer(body):
+    # slash-command syntax: warn (scan prose only, not code — API paths/HTML live in code)
+    prose = strip_code(body)
+    for m in SLASH_CMD.finditer(prose):
         token = m.group(0)
         # skip obvious URLs/paths
-        ctx = body[max(0, m.start() - 2) : m.end() + 2]
+        ctx = prose[max(0, m.start() - 2) : m.end() + 2]
         if "://" in ctx or token.startswith("//"):
             continue
         out.append(("WARN", "slash-command syntax (use prose 'run the X loop')", token))

@@ -1,0 +1,91 @@
+---
+config:
+  theme: neutral
+---
+sequenceDiagram
+    autonumber
+
+    box Agent
+        participant Agent
+    end
+
+    box Local Scripts
+        participant Init as cli_init
+        participant Estado as cli_estado
+        participant Clickup as cli_clickup
+    end
+
+    box Storage
+        participant FS as Local FS
+        participant Moodle
+        participant API as ClickUp API
+    end
+
+    Note over Agent,API: === INIT FLOW ===
+
+    Agent->>Init: gestionar-cursos init URL
+    Init->>Moodle: scrape course page
+    Moodle-->>Init: HTML (PGA table, sidebar)
+    Init->>FS: create course folder, AGENTS.md, PGA.md
+    Init->>FS: write clickup.json (folder/list = null)
+    Init->>FS: create _cache/snapshot.json
+    Init-->>Agent: course initialized
+
+    Note over Agent,API: === SYNC PROMPT ===
+
+    Agent->>Agent: ¿Sincronizar con ClickUp?
+    Agent->>Clickup: cli_clickup.py PERIODO_DIR
+
+    Note over Clickup,API: === CLICKUP SYNC ===
+
+    Clickup->>FS: read clickup.json
+    Clickup->>API: [1/3] find-or-create folder
+    API-->>Clickup: folder.id
+
+    loop each course in clickup.json
+        Clickup->>API: [2/3] find-or-create list
+        API-->>Clickup: list.id
+        Clickup->>FS: update AGENTS.md CLICKUP_LIST_ID
+        Clickup->>FS: update clickup.json list_id
+
+        Clickup->>FS: read PGA.md
+        loop each activity in PGA
+            Clickup->>Clickup: classify (tags + priority)
+            alt new task
+                Clickup->>API: [3/3] create task
+                API-->>Clickup: task.id
+            else date changed
+                Clickup->>API: [3/3] update task
+                API-->>Clickup: ok
+            else unchanged
+                Note over Clickup: skip
+            end
+        end
+    end
+
+    Clickup->>FS: save updated clickup.json
+    Clickup-->>Agent: sync complete
+
+    Note over Agent,API: === LATER: ESTADO FLOW ===
+
+    Agent->>Estado: estado CARPETA (auto or manual)
+    Estado->>FS: load _cache/snapshot.json
+    Estado->>Moodle: scrape sidebar
+    Moodle-->>Estado: current activities
+
+    Estado->>Estado: diff URLs (new | deleted | existing)
+
+    par extract dates per unit
+        Estado->>Moodle: quiz/assign dates (unit 1)
+        Estado->>Moodle: quiz/assign dates (unit 2)
+        Estado->>Moodle: quiz/assign dates (unit 3)
+    end
+
+    Estado->>Estado: diff dates vs snapshot
+    Estado->>FS: save updated snapshot
+    Estado-->>Agent: diff report
+
+    Note over Agent,API: === RE-SYNC PROMPT ===
+
+    Agent->>Agent: ¿Actualizar ClickUp?
+    Agent->>Clickup: cli_clickup.py (creates new tasks, updates dates)

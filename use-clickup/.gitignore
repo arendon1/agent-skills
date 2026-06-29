@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+
+# Cache
+.cache/
+references/api.md.resolved
+references/api.md.resolved.*
+references/api.md.metadata.json

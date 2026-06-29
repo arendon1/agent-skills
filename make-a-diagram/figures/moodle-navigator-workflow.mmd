@@ -1,0 +1,43 @@
+flowchart TD
+    Start([🚀 Start]) --> AuthCheck{🔐 Auth Check}
+
+    AuthCheck -->|Unauthenticated| Stop([⛔ Stop - Login Required])
+    AuthCheck -->|Authenticated| CourseDiscovery
+
+    subgraph "📋 Course Discovery"
+        CourseDiscovery[📍 Navigate to my/courses.php] --> ScanDashboard[👁️ Scan Dashboard]
+        ScanDashboard --> ExtractMeta[📊 Extract: Name, Code, URL]
+        ExtractMeta --> UserConfirm{❓ User Confirms?}
+        UserConfirm -->|No| Cancel([❌ Abort])
+        UserConfirm -->|Yes| SelectCourse[✅ Select Course URL]
+    end
+
+    SelectCourse --> InitCheck{📦 Init or Sync?}
+
+    subgraph "🔧 /curso-init (Deep Scaffolding)"
+        InitFlow[🧭 Navigate to Course] --> DeepExtract[📚 Extract: PGA, Cronograma, Sections]
+        DeepExtract --> ExtractH5P[🎮 Find H5P - Create HTML Proxies]
+        ExtractH5P --> ValidateTeams[🔗 Validate Teams Links]
+        ValidateTeams --> Scaffold[📁 Run scaffold_course.py]
+        Scaffold --> CreateFiles[📄 Create: AGENTS.md, sitemap.md, Folders]
+        CreateFiles --> ReviewFiles[✏️ Review & Fill PENDIENTE]
+    end
+
+    subgraph "🔄 /curso-sync (Sitemap & Content)"
+        SyncFlow[🧭 Navigate to Course] --> SidebarSweep[📑 Expand Sidebar - Extract ALL Links]
+        SidebarSweep --> BuildSitemap[🗺️ Update sitemap.md with Permanent Links]
+        BuildSitemap --> DownloadMats[📥 Download Materials via Sitemap Links]
+        DownloadMats --> RunSync[🔄 Run sync_course.py]
+        RunSync --> LockNav[🔒 LOCK: Future nav MUST use sitemap.md]
+    end
+
+    InitCheck -->|Init| InitFlow
+    InitCheck -->|Sync| SyncFlow
+
+    ReviewFiles --> Done([✅ Done - Course Ready])
+    LockNav --> Done
+
+    style Start fill:#4CAF50,color:#fff
+    style Done fill:#4CAF50,color:#fff
+    style Stop fill:#f44336,color:#fff
+    style Cancel fill:#ff9800,color:#fff

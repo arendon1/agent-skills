@@ -1,0 +1,78 @@
+{
+  "last_updated": "2026-06-03T12:00:00Z",
+  "cache_ttl_days": 30,
+  "providers": {
+    "opencode-go": {
+      "name": "OpenCode Go",
+      "type": "token_budget",
+      "tiers": [
+        {"name": "Go", "price_monthly_usd": 10, "token_budget_usd": 60}
+      ],
+      "model_pricing_per_1m": {
+        "deepseek-v4-pro": {"input": 1.74, "output": 3.48, "cached_read": 0.0145},
+        "deepseek-v4-flash": {"input": 0.14, "output": 0.28, "cached_read": 0.0028},
+        "minimax-m2.7": {"input": 0.30, "output": 1.20, "cached_read": 0.06},
+        "kimi-k2.6": {"input": 0.95, "output": 4.00, "cached_read": 0.16},
+        "minimax-m2.5": {"input": 0.30, "output": 1.20, "cached_read": 0.06},
+        "kimi-k2.5": {"input": 0.60, "output": 3.00, "cached_read": 0.10},
+        "qwen3.7-max": {"input": 2.50, "output": 7.50, "cached_read": 0.50},
+        "qwen3.6-plus": {"input": 0.50, "output": 3.00, "cached_read": 0.05},
+        "glm-5.1": {"input": 1.40, "output": 4.40, "cached_read": 0.26},
+        "glm-5": {"input": 1.00, "output": 3.20, "cached_read": 0.20},
+        "mimo-v2.5": {"input": 0.14, "output": 0.28, "cached_read": 0.0028},
+        "mimo-v2.5-pro": {"input": 1.74, "output": 3.48, "cached_read": 0.0145},
+        "minimax-m3": {"input": 0.60, "output": 2.40, "cached_read": 0.12}
+      },
+      "limits": {"per_5h_usd": 12, "per_week_usd": 30, "per_month_usd": 60}
+    },
+    "github-copilot": {
+      "name": "GitHub Copilot",
+      "type": "token_budget",
+      "credit_usd_rate": 0.01,
+      "tiers": [
+        {"name": "Free", "price_monthly_usd": 0, "credits_monthly": 0},
+        {"name": "Pro", "price_monthly_usd": 10, "credits_monthly": 15},
+        {"name": "Pro+", "price_monthly_usd": 39, "credits_monthly": 70},
+        {"name": "Max", "price_monthly_usd": 100, "credits_monthly": 200}
+      ]
+    },
+    "anthropic": {
+      "name": "Anthropic Claude",
+      "type": "rate_access",
+      "tiers": [
+        {"name": "Pro", "price_monthly_usd": 20, "usage_multiplier": 1},
+        {"name": "Max 5x", "price_monthly_usd": 100, "usage_multiplier": 5},
+        {"name": "Max 20x", "price_monthly_usd": 200, "usage_multiplier": 20}
+      ]
+    },
+    "openai": {
+      "name": "OpenAI ChatGPT",
+      "type": "rate_access",
+      "tiers": [
+        {"name": "Plus", "price_monthly_usd": 20},
+        {"name": "Pro 5x", "price_monthly_usd": 100},
+        {"name": "Pro 20x", "price_monthly_usd": 200}
+      ]
+    },
+    "deepseek": {
+      "name": "DeepSeek API",
+      "type": "api_only"
+    },
+    "minimax": {
+      "name": "MiniMax API",
+      "type": "api_only"
+    },
+    "moonshot-kimi": {
+      "name": "Moonshot Kimi API",
+      "type": "api_only"
+    },
+    "zhipu-glm": {
+      "name": "Zhipu GLM API",
+      "type": "api_only"
+    },
+    "alibaba-qwen": {
+      "name": "Alibaba Qwen API",
+      "type": "api_only"
+    }
+  }
+}

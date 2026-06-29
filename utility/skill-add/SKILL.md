@@ -70,14 +70,14 @@ The skill lands in the repo's skill directory. Ensure:
 Run the constitution enforcer on the new skill:
 
 ```
-python skill-forge/scripts/audit.py <skill-name>
+python utility/skill-forge/scripts/audit.py <skill-name>
 ```
 
 ### If PASS
 
 The skill is integrated. Regenerate the manifest:
 ```
-python skill-forge/scripts/manifest.py
+python utility/skill-forge/scripts/manifest.py
 ```
 Commit: `feat(<skill>): integrate external skill <source>`.
 

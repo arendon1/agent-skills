@@ -1,6 +1,7 @@
 # AGENTS.md
 
 > Constitution + runtime conventions for the **agent-skills** skill system.
+> See `README.md` for install paths and what this repo produces at a glance.
 > Every skill in this repo is validated against this document. `skill-forge audit`
 > enforces the rules marked MUST/MUST NOT below.
 

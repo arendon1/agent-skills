@@ -12,7 +12,9 @@
         "./debug",
         "./deepen",
         "./design",
+        "./dispatch",
         "./domain-modeling",
+        "./git",
         "./grill",
         "./handoff",
         "./lessons",
@@ -22,6 +24,8 @@
         "./review",
         "./spec",
         "./tdd",
+        "./teach",
+        "./triage",
         "./verify"
       ]
     },
@@ -29,6 +33,7 @@
       "name": "utility",
       "source": ".",
       "skills": [
+        "./bootstrap",
         "./caveman",
         "./skill-forge"
       ]

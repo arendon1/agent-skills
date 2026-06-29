@@ -8,11 +8,18 @@
       "source": ".",
       "skills": [
         "./build",
+        "./check",
         "./debug",
+        "./deepen",
         "./design",
+        "./domain-modeling",
         "./grill",
+        "./handoff",
         "./lessons",
         "./plan",
+        "./prototype",
+        "./research",
+        "./review",
         "./spec",
         "./tdd",
         "./verify"

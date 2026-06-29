@@ -7,7 +7,11 @@
       "name": "process",
       "source": ".",
       "skills": [
-        "./lessons"
+        "./design",
+        "./grill",
+        "./lessons",
+        "./plan",
+        "./spec"
       ]
     },
     {

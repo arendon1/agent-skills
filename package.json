@@ -1,0 +1,23 @@
+{
+  "name": "agent-skills",
+  "version": "1.0.0",
+  "description": "A cohesive, self-triggering skill system for coding agents. Merges mechanisms from Cavekit, Superpowers, and Matt Pocock into one agnostic architecture.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "skills",
+    "sdd",
+    "tdd",
+    "workflow",
+    "agent-skills"
+  ],
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./.pi/extensions/agent-skills.ts"
+    ],
+    "skills": [
+      "."
+    ]
+  }
+}

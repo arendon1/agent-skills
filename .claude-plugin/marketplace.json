@@ -7,11 +7,15 @@
       "name": "process",
       "source": ".",
       "skills": [
+        "./build",
+        "./debug",
         "./design",
         "./grill",
         "./lessons",
         "./plan",
-        "./spec"
+        "./spec",
+        "./tdd",
+        "./verify"
       ]
     },
     {

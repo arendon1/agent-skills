@@ -10,9 +10,10 @@
 //      top of the conversation, unless already present.
 //
 // Modeled on superpowers/.pi/extensions/superpowers.ts. Adapted for agent-skills:
-// skills at repo root (not a skills/ subdir), bootstrap/SKILL.md as injection.
+// skills at the repo root in category buckets (process/ domain/ utility/),
+// bootstrap/SKILL.md (in the utility/ bucket) as injection.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -21,9 +22,16 @@ const BOOTSTRAP_MARKER = "agent-skills:bootstrap injection for pi";
 
 const extensionDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(extensionDir, "../..");
-// Skills live at the repo root, each in its own directory (AGENTS.md §2).
+// Skills live in category buckets: <layer>/<skill>/ (AGENTS.md §2).
 const skillsDir = packageRoot;
-const bootstrapSkillPath = resolve(skillsDir, "bootstrap", "SKILL.md");
+// bootstrap lives in the utility/ bucket (invocation: bootstrap). Search known
+// buckets so the adapter survives a future reorg; fall back to repo root.
+const bootstrapSkillPath = [
+  resolve(skillsDir, "utility", "bootstrap", "SKILL.md"),
+  resolve(skillsDir, "process", "bootstrap", "SKILL.md"),
+  resolve(skillsDir, "domain", "bootstrap", "SKILL.md"),
+  resolve(skillsDir, "bootstrap", "SKILL.md"),
+].find((p) => existsSync(p)) ?? resolve(skillsDir, "utility", "bootstrap", "SKILL.md");
 
 let cachedBootstrap: string | null | undefined;
 

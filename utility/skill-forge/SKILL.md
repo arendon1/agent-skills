@@ -32,19 +32,19 @@ and are enforced here.
 
 ```
 # Scaffold a new skill with constitution-compliant frontmatter
-python skill-forge/scripts/init.py <name>
-python skill-forge/scripts/init.py grill --invocation user --layer process \
+python utility/skill-forge/scripts/init.py <name>
+python utility/skill-forge/scripts/init.py grill --invocation user --layer process \
     --loop grill --deliverable "PRD.md + plan folder"
-python skill-forge/scripts/use-clickup --layer domain --provides clickup-api
+python utility/skill-forge/scripts/init.py use-clickup --layer domain --provides clickup-api
 
 # Validate a skill (exit 0 = PASS, 1 = FAIL)
-python skill-forge/scripts/audit.py <name>
-python skill-forge/scripts/audit.py <name> --strict   # warnings -> failures
+python utility/skill-forge/scripts/audit.py <name>
+python utility/skill-forge/scripts/audit.py <name> --strict   # warnings -> failures
 
 # Generate the harness-discovery manifest, grouped by layer
-python skill-forge/scripts/manifest.py                 # write .claude-plugin/marketplace.json
-python skill-forge/scripts/manifest.py --check         # fail if stale
-python skill-forge/scripts/manifest.py --print         # stdout only
+python utility/skill-forge/scripts/manifest.py                 # write .claude-plugin/marketplace.json
+python utility/skill-forge/scripts/manifest.py --check         # fail if stale
+python utility/skill-forge/scripts/manifest.py --print         # stdout only
 ```
 
 ## WHAT AUDIT ENFORCES

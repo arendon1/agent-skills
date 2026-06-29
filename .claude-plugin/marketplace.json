@@ -1,55 +1,49 @@
 {
-  "metadata": {
-    "pluginRoot": "."
-  },
   "plugins": [
     {
       "name": "process",
-      "source": ".",
       "skills": [
-        "./build",
-        "./check",
-        "./debug",
-        "./deepen",
-        "./design",
-        "./dispatch",
-        "./domain-modeling",
-        "./git",
-        "./grill",
-        "./handoff",
-        "./lessons",
-        "./plan",
-        "./prototype",
-        "./research",
-        "./review",
-        "./spec",
-        "./tdd",
-        "./teach",
-        "./triage",
-        "./verify"
+        "./process/build",
+        "./process/check",
+        "./process/debug",
+        "./process/deepen",
+        "./process/design",
+        "./process/dispatch",
+        "./process/domain-modeling",
+        "./process/git",
+        "./process/grill",
+        "./process/handoff",
+        "./process/lessons",
+        "./process/plan",
+        "./process/prototype",
+        "./process/research",
+        "./process/review",
+        "./process/spec",
+        "./process/tdd",
+        "./process/teach",
+        "./process/triage",
+        "./process/verify"
       ]
     },
     {
       "name": "domain",
-      "source": ".",
       "skills": [
-        "./analyze-model",
-        "./generar-paper",
-        "./gestionar-cursos",
-        "./make-a-diagram",
-        "./research-literature",
-        "./use-clickup"
+        "./domain/analyze-model",
+        "./domain/generar-paper",
+        "./domain/gestionar-cursos",
+        "./domain/make-a-diagram",
+        "./domain/research-literature",
+        "./domain/use-clickup"
       ]
     },
     {
       "name": "utility",
-      "source": ".",
       "skills": [
-        "./bootstrap",
-        "./caveman",
-        "./skill-add",
-        "./skill-find",
-        "./skill-forge"
+        "./utility/bootstrap",
+        "./utility/caveman",
+        "./utility/skill-add",
+        "./utility/skill-find",
+        "./utility/skill-forge"
       ]
     }
   ]

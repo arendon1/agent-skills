@@ -98,8 +98,16 @@ def find_skill(identifier: str) -> Path | None:
         if p.is_dir() and (p.parent / "SKILL.md").exists():
             return p.parent
     cwd = Path.cwd()
-    candidates = [cwd / identifier, cwd / "skills" / identifier]
+    # Skills live in category buckets: <layer>/<skill>/ (AGENTS.md §2).
+    # Search the layer buckets first, then the repo root, then ancestors.
+    candidates = []
+    for layer in ("process", "domain", "utility"):
+        candidates.append(cwd / layer / identifier)
+    candidates.append(cwd / identifier)
+    candidates.append(cwd / "skills" / identifier)  # legacy Matt-style layout
     for parent in cwd.parents:
+        for layer in ("process", "domain", "utility"):
+            candidates.append(parent / layer / identifier)
         candidates.append(parent / identifier)
     for c in candidates:
         if (c / "SKILL.md").exists():

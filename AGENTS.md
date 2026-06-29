@@ -41,9 +41,12 @@ without coupling any skill to a specific harness.
 ## §2 DISCOVERY
 
 Skills come and go. The agent MUST discover skills dynamically by scanning
-subdirectories for `SKILL.md` files. NEVER hardcode a skill list — the active set
-is whatever directories exist right now. Every skill lives in its own directory
-at the repo root. The adapter (Layer 4) registers this directory for discovery.
+the category buckets for `SKILL.md` files. NEVER hardcode a skill list — the
+active set is whatever directories exist right now. Every skill lives in its
+own directory under its layer's category folder: `process/`, `domain/`, or
+`utility/` at the repo root (e.g. `process/grill/SKILL.md`). The adapter
+(Layer 4) registers the repo root for discovery; `skill-forge audit` and
+`manifest.py` resolve a skill name to its bucket (`<layer>/<name>`).
 
 ---
 
@@ -311,10 +314,14 @@ capabilities deployable agnostically across any workspace.
 
 ```
 # Scaffold a new skill
-python skill-forge/scripts/init.py <name>
+python utility/skill-forge/scripts/init.py <name>
 
 # Validate a skill against the constitution (§F/§T/§L/§A0); exit 0 = PASS
-python skill-forge/scripts/audit.py <name>
+python utility/skill-forge/scripts/audit.py <name>
+
+# Regenerate the harness-discovery manifest, grouped by layer
+python utility/skill-forge/scripts/manifest.py            # write
+python utility/skill-forge/scripts/manifest.py --check    # fail if stale
 
 # Discover external skills (optional utility)
 npx skills find <query>          # via skill-find

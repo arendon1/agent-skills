@@ -4,7 +4,7 @@ language: en-US
 description: >-
   Fetches live model data from OpenRouter and Artificial Analysis APIs, merges
   benchmarks with pricing, runs deep cost analysis on usage logs, exports usage
-  from LLM surfaces (OpenCode, VS Code, etc.), analyzes subscription efficiency,
+  from LLM surfaces (OpenCode, Pi, VS Code, etc.), analyzes subscription efficiency,
   and forecasts future spend with cheaper-model alternatives.
   Use when comparing LLM costs or quality, analyzing total API spend from
   usage logs, exporting agent usage for cost analysis, evaluating subscription
@@ -137,6 +137,7 @@ script: `export_usage.py`
 
 ```bash
 python scripts/export_usage.py --source opencode --output usage.json
+python scripts/export_usage.py --source pi --output usage.json
 python scripts/export_usage.py                    # interactive: pick a source
 python scripts/export_usage.py --list-sources      # show available bridges
 python scripts/export_usage.py --list-all          # include planned sources
@@ -159,6 +160,7 @@ python scripts/fetch_models.py --output catalog.json
 
 # Step 2: Export your usage from an LLM surface
 python scripts/export_usage.py --source opencode --output usage.json
+python scripts/export_usage.py --source pi --output usage.json
 # (or manually provide a usage log — see references/usage-format.md)
 
 # Step 3: Cost breakdown (now with aliases + subscription efficiency)
@@ -179,6 +181,7 @@ python scripts/forecast.py usage.json --catalog catalog.json --days 30 --output 
 | 30-day forecast | `python scripts/forecast.py <usage> --catalog catalog.json --days 30` |
 | OpenRouter only | `python scripts/fetch_models.py --or-only --output catalog.json` |
 | Export usage (opencode) | `python scripts/export_usage.py --source opencode --output usage.json` |
+| Export usage | `python scripts/export_usage.py --source pi --output usage.json` |
 | List export sources | `python scripts/export_usage.py --list-sources` |
 
 ## Error Handling
@@ -205,6 +208,7 @@ script: `export_usage.py` — Dispatcher for usage extraction from LLM surfaces.
 script: `fetch_subscriptions.py` — Cache-gate for subscription pricing (30-day TTL).
 script: `chart_utils.py` — ASCII chart rendering (horizontal bars, sparklines, gauges).
 script: `bridges/opencode.py` — SQLite usage bridge for that surface.
+script: `bridges/pi.py` — JSONL usage bridge for that surface (per-message usage + logged cost).
 script: `bridges/base.py` — Bridge protocol definition.
 script: `client_openrouter.py` — OpenRouter HTTP client (models endpoint).
 script: `client_aa.py` — Artificial Analysis HTTP client (LLMs endpoint).

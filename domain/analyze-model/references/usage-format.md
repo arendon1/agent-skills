@@ -74,6 +74,26 @@ OpenCode does not currently expose a machine-readable usage log file. Workaround
 1. **Manual tracking**: Add a logging wrapper that appends to a `usage.json` file on each completion.
 2. **OpenRouter activity**: If you route through OpenRouter, export activity from the dashboard.
 
+### Pi
+
+Pi stores every session as a JSONL file at `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`.
+Each assistant message carries a `usage` block with `input`, `output`, `cacheRead`, `cacheWrite`,
+`reasoning`, `totalTokens`, and a per-message `cost` breakdown. The bridge at
+`scripts/bridges/pi.py` walks every session file and emits one record per assistant
+message in the standard log format.
+
+The Pi bridge emits the full superset of fields — the standard `input_tokens`,
+`output_tokens`, and `timestamp` are always present, plus extras
+(`provider`, `cache_read_tokens`, `cache_write_tokens`, `reasoning_tokens`,
+`cost_total_usd`, `session_id`, `cwd`) which `analyze_costs.py` and `forecast.py`
+ignore unless you opt in.
+
+Match the `model` field against OpenRouter IDs directly — Pi already uses the
+canonical `provider/model` form (e.g. `openai/gpt-5.6-luna-pro`,
+`minimax/minimax-m3`). When Pi uses a private proxy (e.g. `glm-5.2` short slug
+for OpenCode Go subscription routes), fall back to the aliases in
+`references/aliases.json` or to the public OpenRouter catalog for matching.
+
 ### OpenRouter Dashboard
 
 1. Go to https://openrouter.ai/activity

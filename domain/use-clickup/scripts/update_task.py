@@ -10,6 +10,7 @@ def update_task(
     name: Optional[str] = None,
     description: Optional[str] = None,
     due_date: Optional[str] = None,
+    start_date: Optional[str] = None,
     priority: Optional[str] = None,
     tags: Optional[List[str]] = None,
     status: Optional[str] = None,
@@ -22,7 +23,8 @@ def update_task(
         task_id: ID of the task to update
         name: New name (optional)
         description: New description (optional)
-        due_date: New date in ISO 8601 (optional)
+        due_date: New date in ISO 8601 (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, optional)
+        start_date: Start date in ISO 8601 (same format as due_date, optional)
         priority: New priority (optional)
         tags: New tags (replaces current ones)
         status: New status (e.g., "in progress", "complete")
@@ -31,7 +33,9 @@ def update_task(
         Dict with updated task data
 
     Note: Custom fields cannot be updated with PUT /tasks/{task_id}.
-    Use the specific endpoint for custom fields.
+    Use the specific endpoint for custom fields. When a time component is
+    present in start_date/due_date, the corresponding *_date_time flag is set
+    to True so ClickUp preserves the epoch exactly.
     """
     client = get_client()
 
@@ -50,8 +54,16 @@ def update_task(
     if due_date is not None:
         try:
             payload["due_date"] = iso_to_milliseconds(due_date)
+            payload["due_date_time"] = "T" in due_date
         except ValueError as e:
-            raise ValueError(f"Invalid date: {e}")
+            raise ValueError(f"Invalid due_date: {e}")
+
+    if start_date is not None:
+        try:
+            payload["start_date"] = iso_to_milliseconds(start_date)
+            payload["start_date_time"] = "T" in start_date
+        except ValueError as e:
+            raise ValueError(f"Invalid start_date: {e}")
 
     if priority is not None:
         PRIORITIES = {"urgent": 1, "high": 2, "normal": 3, "low": 4}

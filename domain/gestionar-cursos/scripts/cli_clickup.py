@@ -69,7 +69,7 @@ def _clasificar_actividad(nombre: str, valor_str: str) -> tuple[list[str], str]:
     if valor_num >= 15 or "parcial" in nombre_lower:
         tags.append("parcial")
         prioridad = "urgente"
-    elif any(kw in nombre_lower for kw in ["cuestionario", "prueba", "quiz"]):
+    elif any(kw in nombre_lower for kw in ["cuestionario", "prueba", "quiz", "examen", "lección"]):
         tags.append("quiz")
         prioridad = "normal"
     elif "foro" in nombre_lower:
@@ -178,6 +178,35 @@ def _parsear_pga_md(pga_path: str) -> list[dict]:
                 })
 
     return actividades
+
+
+def _normalizar_nombre(nombre: str) -> str:
+    """Quita sufijos '(X%)' / '(N/A)' del nombre para matching snapshot↔PGA."""
+    return re.sub(r"\s*\([^)]*%[^)]*\)\s*$", "", nombre).strip()
+
+
+def _parsear_snapshot(ruta_curso: str) -> dict[str, dict[str, str]]:
+    """Lee _cache/snapshot.json y devuelve {nombre_normalizado: {fecha_apertura, fecha_cierre}}.
+
+    Fuente de verdad de fechas reales de Moodle (ver "Fuente de Verdad de
+    Fechas" en SKILL.md). Devuelve {} si la snapshot no existe o no tiene fechas.
+    """
+    path = os.path.join(ruta_curso, "_cache", "snapshot.json")
+    if not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        snap = json.load(f)
+    fechas: dict[str, dict[str, str]] = {}
+    for _key, act in snap.get("actividades", {}).items():
+        nombre = act.get("nombre", "")
+        if not nombre:
+            continue
+        norm = _normalizar_nombre(nombre)
+        fa = act.get("fecha_apertura", "")
+        fc = act.get("fecha_cierre", "")
+        if fa or fc:
+            fechas[norm] = {"fecha_apertura": fa, "fecha_cierre": fc}
+    return fechas
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +333,11 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
             continue
 
         list_name = course_info.get("list_name", course_key)
-        existing_tasks = course_info.get("tasks", {})
+        existing_tasks_raw = course_info.get("tasks", {})
+        existing_tasks: dict[str, dict] = {}
+        for k, v in existing_tasks_raw.items():
+            existing_tasks[_task_key(k)] = v
+        course_info["tasks"] = existing_tasks
 
         ruta_curso = _encontrar_ruta_curso(periodo_dir, course_key)
         if not ruta_curso:
@@ -317,45 +350,70 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
             console.print(f"  [dim]{course_key}: PGA.md sin actividades[/dim]")
             continue
 
+        # Fuente de verdad: fechas reales extraídas de Moodle por `estado`.
+        # Ver "Fuente de Verdad de Fechas" en SKILL.md.
+        snapshot_fechas = _parsear_snapshot(ruta_curso)
+        if snapshot_fechas:
+            console.print(f"    [dim]snapshot: {len(snapshot_fechas)} actividades con fechas reales[/dim]")
+        else:
+            console.print(f"    [yellow]sin snapshot — usando fechas del PGA (pueden estar desactualizadas)[/yellow]")
+
         console.print(f"\n  [bold]{course_key}[/bold] — {len(actividades)} actividades en PGA")
 
         for act in actividades:
             nombre_act = act["actividad"]
             task_key = _task_key(nombre_act)
 
+            # Reconciliar fechas: snapshot (Moodle real) es autoritativa;
+            # PGA es respaldo para actividades no visitables o sin snapshot.
+            norm = _normalizar_nombre(nombre_act)
+            snap = snapshot_fechas.get(norm, {})
+            fecha_inicio = snap.get("fecha_apertura") or act.get("fecha_inicio", "")
+            fecha_fin = snap.get("fecha_cierre") or act.get("fecha_fin", "")
+
             if task_key in existing_tasks:
-                # Check if due date changed
+                # Check if start or due DATE changed (compare day-level only
+                # to avoid spurious updates from time-precision mismatch:
+                # clickup.json stores '2026-07-12T23:59', PGA stores '2026-07-12').
                 existing_due = existing_tasks[task_key].get("due_date", "")
-                fecha_fin = act.get("fecha_fin", "")
-                if fecha_fin and existing_due != fecha_fin:
+                existing_start = existing_tasks[task_key].get("start_date", "")
+                fin_day = fecha_fin[:10] if fecha_fin else ""
+                ini_day = fecha_inicio[:10] if fecha_inicio else ""
+                ex_due_day = existing_due[:10] if existing_due else ""
+                ex_start_day = existing_start[:10] if existing_start else ""
+                changed = (fin_day and ex_due_day != fin_day) or \
+                          (ini_day and ex_start_day != ini_day)
+                if changed:
                     if not dry_run:
                         update_task(
                             task_id=existing_tasks[task_key]["id"],
-                            due_date=fecha_fin,
+                            due_date=fecha_fin or None,
+                            start_date=fecha_inicio or None,
                             name=nombre_act,
                         )
                         existing_tasks[task_key]["due_date"] = fecha_fin
-                    console.print(f"    [cyan]↻ actualizado:[/cyan] {nombre_act} → {fecha_fin}")
+                        existing_tasks[task_key]["start_date"] = fecha_inicio
+                    src = "snapshot" if snap else "PGA"
+                    console.print(f"    [cyan]↻ actualizado ({src}):[/cyan] {nombre_act} → {fecha_inicio or '-'}…{fecha_fin}")
                 else:
                     console.print(f"    [dim]✓ {nombre_act} (existente)[/dim]")
                 continue
 
             # New task
             tags, prioridad = _clasificar_actividad(nombre_act, act["valor"])
-            fecha_fin = act.get("fecha_fin", "")
             descripcion = (
                 f"## {nombre_act}\n\n"
                 f"- **Valor:** {act['valor']}\n"
                 f"- **Unidad:** {act['unidad']}\n"
                 f"- **Semana:** {act['semana']}\n"
-                f"- **Inicio:** {act['fecha_inicio']}\n"
+                f"- **Inicio:** {fecha_inicio}\n"
                 f"- **Fin:** {fecha_fin}\n"
             )
 
             if dry_run:
                 console.print(
                     f"    [green]+ (dry) {nombre_act}[/green] "
-                    f"| tags: {tags} | prioridad: {prioridad} | due: {fecha_fin}"
+                    f"| tags: {tags} | prioridad: {prioridad} | start: {fecha_inicio or '-'} | due: {fecha_fin}"
                 )
                 continue
 
@@ -365,6 +423,7 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
                     name=nombre_act,
                     description=descripcion,
                     due_date=fecha_fin or None,
+                    start_date=fecha_inicio or None,
                     tags=tags,
                     priority=prioridad,
                 )
@@ -372,12 +431,13 @@ def sync_clickup(periodo_dir: str, dry_run: bool = False):
                 existing_tasks[task_key] = {
                     "id": task_id,
                     "due_date": fecha_fin,
+                    "start_date": fecha_inicio,
                     "tags": tags,
                 }
                 total_tasks_created += 1
                 console.print(
                     f"    [green]+ {nombre_act}[/green] "
-                    f"| {prioridad} | {fecha_fin or 'sin fecha'}"
+                    f"| {prioridad} | start: {fecha_inicio or '-'} | {fecha_fin or 'sin fecha'}"
                 )
             except Exception as e:
                 console.print(f"    [red]ERROR creando '{nombre_act}':[/red] {e}")
@@ -406,7 +466,17 @@ def _task_key(nombre: str) -> str:
 
 
 def _encontrar_ruta_curso(periodo_dir: str, course_key: str) -> Optional[str]:
-    """Find course directory inside periodo_dir by matching AGENTS.md CODIGO."""
+    """Find course directory inside periodo_dir.
+
+    Matching priority:
+      1. Moodle course ID: course_key like 'CURSO_14822' ⟶ AGENTS.md URL 'id=14822'
+      2. Academic CODIGO: AGENTS.md '**CODIGO**: 2607B04G1' ⟶ unique per course
+    """
+    moodle_id_match = re.search(r"CURSO_(\d+)", course_key)
+    moodle_id = moodle_id_match.group(1) if moodle_id_match else None
+    codigo_match = re.search(r"CODIGO_?(\S+)", course_key)
+    codigo = codigo_match.group(1) if codigo_match else None
+
     for entry in os.scandir(periodo_dir):
         if not entry.is_dir():
             continue
@@ -415,12 +485,22 @@ def _encontrar_ruta_curso(periodo_dir: str, course_key: str) -> Optional[str]:
             continue
         with open(agents_path, encoding="utf-8") as f:
             content = f.read()
-        m = re.search(r"\*\*CODIGO\*\*:\s*(\S+)", content)
-        if not m:
-            continue
-        codigo = m.group(1)
-        if course_key.endswith(codigo) or course_key == codigo:
-            return entry.path
+
+        # 1) Match by Moodle ID in URL (most reliable, unique per course)
+        if moodle_id:
+            url_m = re.search(r"id=(\d+)", content)
+            if url_m and url_m.group(1) == moodle_id:
+                return entry.path
+
+        # 2) Fallback: match by CODIGO
+        if codigo:
+            code_m = re.search(r"\*\*CODIGO\*\*:\s*(\S+)", content)
+            if code_m and (course_key.endswith(code_m.group(1)) or course_key == code_m.group(1)):
+                return entry.path
+        else:
+            code_m = re.search(r"\*\*CODIGO\*\*:\s*(\S+)", content)
+            if code_m and code_m.group(1) in course_key:
+                return entry.path
     return None
 
 

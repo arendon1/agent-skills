@@ -323,21 +323,24 @@ def iso_to_milliseconds(iso_date: str) -> int:
         >>> iso_to_milliseconds("2026-01-26")
         1704067200000
     """
-    # Try simple YYYY-MM-DD format
-    try:
-        date = datetime.strptime(iso_date[:10], "%Y-%m-%d")
-        return int(date.timestamp() * 1000)
-    except ValueError:
-        pass
-
-    # Try full ISO format
+    # Try full ISO format first to preserve any time component (YYYY-MM-DDTHH:MM[:SS]).
+    # A naive datetime (no tz) is interpreted in the local system timezone, which
+    # for this skill is America/Bogota (UTC-5, no DST). Callers that need a
+    # specific timezone should pass an offset-aware ISO string.
     try:
         date = datetime.fromisoformat(iso_date.replace('Z', '+00:00'))
         return int(date.timestamp() * 1000)
     except ValueError:
         pass
 
-    raise ValueError(f"Invalid date format: {iso_date}. Use YYYY-MM-DD")
+    # Fallback: simple YYYY-MM-DD (midnight local)
+    try:
+        date = datetime.strptime(iso_date[:10], "%Y-%m-%d")
+        return int(date.timestamp() * 1000)
+    except ValueError:
+        pass
+
+    raise ValueError(f"Invalid date format: {iso_date}. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS]")
 
 
 def milliseconds_to_iso(milliseconds: int) -> str:

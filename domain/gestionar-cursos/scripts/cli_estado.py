@@ -4,7 +4,7 @@ CLI estado: /gestionar-cursos estado <CARPETA_CURSO>
 
 Compara _cache/snapshot.json contra el estado actual en Moodle.
 Detecta: actividades nuevas, fechas modificadas, actividades eliminadas.
-Usa paralelismo por unidad para extraer fechas de quiz/assign.
+Usa paralelismo por unidad para extraer fechas de quiz/assign/forum/lesson/workshop.
 """
 
 import argparse
@@ -139,7 +139,7 @@ def extraer_fechas_paralelo(actividades_por_unidad: dict[str, list[dict]],
     for unidad, acts in actividades_por_unidad.items():
         if not acts:
             continue
-        quiz_assign = [a for a in acts if a["tipo"] in ("quiz", "assign")]
+        quiz_assign = [a for a in acts if a["tipo"] in ("quiz", "assign", "forum", "lesson", "workshop")]
         if not quiz_assign:
             continue
 
@@ -316,7 +316,7 @@ def main():
     for item in sidebar_actual:
         key = _url_key(item["url"])
         fechas = fechas_actuales.get(key, {})
-        if item["tipo"] in ("quiz", "assign") and fechas:
+        if item["tipo"] in ("quiz", "assign", "forum", "lesson", "workshop") and fechas:
             item["fecha_apertura"] = fechas.get("fecha_apertura", "")
             item["fecha_cierre"] = fechas.get("fecha_cierre", "")
 

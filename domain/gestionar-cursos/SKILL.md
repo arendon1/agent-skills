@@ -224,9 +224,21 @@ uv run python cli_clickup.py "C:/Users/.../Universidad/2026-2-B1" --dry-run
 **Qué hace:**
 1. Resuelve `folder.id` en el espacio "Universidad" (crea folder si no existe)
 2. Por cada curso en `clickup.json` con `list_id: null`, resuelve/crea la lista
-3. Por cada actividad en `PGA.md` no sincronizada, crea tarea con tags y prioridad
+3. Por cada actividad **no sincronizada** crea tarea con tags y prioridad, usando
+   `start_date` y `due_date` según la fuente de verdad (ver
+   [Fuente de Verdad de Fechas](#fuente-de-verdad-de-fechas) más abajo):
+   - **Primario:** `_cache/snapshot.json` (`fecha_apertura`/`fecha_cierre`)
+     extraídas por `estado` de las páginas reales de Moodle.
+   - **Secundario (fallback):** `PGA.md` para actividades no visitables
+     (páginas, URLs) o si la snapshot no tiene fechas.
 4. Actualiza `AGENTS.md` con `CLICKUP_LIST_ID` y `clickup.json` con los IDs resueltos
-5. Si la tarea ya existe pero cambió la fecha, la actualiza automáticamente
+   y las fechas aplicadas (`start_date`/`due_date` ISO por tarea).
+5. Si la tarea ya existe pero cambió la fecha (según snapshot), la actualiza
+   automáticamente — **nunca** revierte una fecha real de Moodle por la del PGA.
+
+> **⚠ No reviertas con el PGA:** la sección [Fuente de Verdad de Fechas](#fuente-de-verdad-de-fechas)
+> explica por qué `PGA fecha_fin` no es autoritativa. Si `cli_clickup.py` se
+> ejecuta sin snapshot fresca, ejecuta `estado` primero.
 
 ### gestionar-cursos estado \<CARPETA\>
 
@@ -238,10 +250,15 @@ snapshot tiene más de 24h de antigüedad.
 1. Cargar `_cache/snapshot.json` (creado por `init`)
 2. Extraer barra lateral actual de Moodle
 3. Comparar URLs → detectar actividades nuevas, eliminadas y existentes
-4. En paralelo: un subproceso por unidad visita cada `quiz`/`assign` y extrae fechas
+4. En paralelo: un subproceso por unidad visita cada `quiz`/`assign`/`forum`/
+   `lesson`/`workshop` y extrae fechas de `div[data-region='activity-dates']`
+   (Abrió/Cierra/Vencimiento) → ISO 8601 en hora Colombia (UTC-5)
 5. Comparar fechas extraídas vs snapshot → detectar cambios de deadline
-6. Guardar nueva snapshot actualizada
+6. Guardar nueva snapshot actualizada (autoritativa para ClickUp)
 7. Reportar diff
+
+> La snapshot es la **fuente de verdad** para fechas. `cli_clickup.py` debe
+> preferirla sobre `PGA.md` (ver [Fuente de Verdad de Fechas](#fuente-de-verdad-de-fechas)).
 
 **Salida:** Reporte en conversación:
 
@@ -290,6 +307,55 @@ En archivos markdown se muestra dual:
 |-----------|--------------|-----------|
 | Prueba Inicial | 26/1/2026 (2026-01-26) | 1/2/2026 (2026-02-01) |
 ```
+
+## Fuente de Verdad de Fechas
+
+**Regla de oro: la fuente de verdad operativa de las fechas de entrega NO es
+el PGA (tabla DO-FR-66 del Microcurrículo), sino las fechas de apertura y
+cierre configuradas por el profesor en cada actividad de Moodle.**
+
+El PGA es un documento pedagógico de planeación. Una vez el curso está vivo, el
+profesor ajusta fechas directamente en Moodle (extiende plazos, cambia
+aperturas, reorganiza unidades). Si se confía ciegamente en el PGA para
+sincronizar ClickUp, se sobreescriben las fechas reales con las planeadas.
+
+**Dónde vive la fecha real en Moodle moderno:**
+```html
+<div data-region="activity-dates" class="activity-dates">
+  <div><strong>Abrió:</strong> lunes, 6 de julio de 2026, 00:00</div>
+  <div><strong>Cierra:</strong> domingo, 16 de agosto de 2026, 23:59</div>
+</div>
+```
+Para foros la etiqueta es **`<strong>Vencimiento:</strong>`** (una sola fecha).
+El extractor debe leer `div[data-region='activity-dates']` (NO tablas
+`.quizinfo`/`.assigninfo`, que son legacy) y convertir fechas en castellano
+("lunes, 6 de julio de 2026, 00:00") a ISO 8601.
+
+**Flujo correcto de sincronización de fechas:**
+1. El PGA se extrae en `init` como **referencias** de planeación.
+2. `estado` extrae las fechas reales de Moodle y las guarda en
+   `_cache/snapshot.json` (`fecha_apertura`/`fecha_cierre` por actividad).
+3. La sincronización con ClickUp (`cli_clickup.py`) **debe preferir
+   `snapshot.json` sobre `PGA.md`**. Si una actividad existe en la snapshot
+   con fechas no vacías, esas son las autoritativas; `PGA.md` solo se usa
+   como respaldo para actividades no visitables (páginas, URLs).
+4. Tras sincronizar, **actualizar `PGA.md`** para que refleje las fechas
+   reales y futuras re-sincronizaciones no reviertan el cambio.
+
+**Lección dura (2026-2-B1):** el primer `cli_clickup.py` usaba `PGA fecha_fin`
+como única fuente. Las fechas reales de LPA1 divergieron del PGA (profesor
+extendió Examen 02 hasta +42 días, abrió Tarea 04 dos semanas antes). Una
+re-ejecución de `clickup-sync` habría revertido todas las correcciones manuales.
+Usa siempre la snapshot de Moodle como autoridad.
+
+**Conversión de zona horaria para ClickUp:** las fechas de Moodle están en
+hora de Colombia (America/Bogota, UTC-5 fijo, sin DST). Al convertir a epoch
+ms para la API de ClickUp, usar `datetime.fromisoformat(s)` con `tzinfo=`
+explícito UTC-5 — NO `iso_to_milliseconds` de `use-clickup` (anteriormente
+ truncaba el componente horario vía `strptime(iso[:10])`; ahora arreglado).
+ Adicionalmente, forzar siempre `start_date_time=true` y `due_date_time=true`
+en el payload; si se omite, ClickUp re-normaliza la fecha a su propio huso y
+desplaza el epoch.
 
 ## Heurísticas de Extracción
 

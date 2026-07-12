@@ -17,6 +17,7 @@ def create_task(
     name: str,
     description: Optional[str] = None,
     due_date: Optional[str] = None,
+    start_date: Optional[str] = None,
     tags: Optional[List[str]] = None,
     priority: Optional[str] = None,
     markdown_description: bool = True
@@ -28,7 +29,8 @@ def create_task(
         list_id: Target list ID
         name: Task name
         description: Description (text or markdown)
-        due_date: Date in ISO 8601 format (YYYY-MM-DD)
+        due_date: Date in ISO 8601 (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+        start_date: Start date in ISO 8601 (same format as due_date)
         tags: List of tags to assign (no validation, defined by the orchestrating skill)
         priority: "urgent", "high", "normal", "low"
         markdown_description: Use markdown in description
@@ -39,6 +41,10 @@ def create_task(
     Raises:
         ValueError if priority is invalid
         RuntimeError if the API fails
+
+    Note: When a time component is present in start_date/due_date, the
+    corresponding *_date_time flag is set to True so ClickUp preserves the
+    epoch exactly (otherwise it re-normalizes to its own timezone).
     """
     client = get_client()
 
@@ -61,9 +67,16 @@ def create_task(
     if due_date:
         try:
             payload["due_date"] = iso_to_milliseconds(due_date)
-            payload["due_date_time"] = False  # Date only, no time
+            payload["due_date_time"] = "T" in due_date
         except ValueError as e:
-            raise ValueError(f"Invalid date: {e}")
+            raise ValueError(f"Invalid due_date: {e}")
+
+    if start_date:
+        try:
+            payload["start_date"] = iso_to_milliseconds(start_date)
+            payload["start_date_time"] = "T" in start_date
+        except ValueError as e:
+            raise ValueError(f"Invalid start_date: {e}")
 
     if tags:
         payload["tags"] = tags

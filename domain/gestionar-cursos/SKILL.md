@@ -64,76 +64,16 @@ explícitamente con `--periodo 2026-2 --bloque B1`.
 
 ## Integración con ClickUp
 
-El skill extrae y organiza los archivos locales. ClickUp es el sistema de
-registro para el seguimiento de completación de cada curso. **El skill nunca
-importa código de `use-clickup`.** La integración ocurre en el agente, que
-orquesta ambos skills.
+El skill extrae y organiza los archivos locales. ClickUp es el sistema
+de registro para el seguimiento de completación de cada curso. **El
+skill nunca importa código de `use-clickup`** — la integración ocurre
+en el agente, que orquesta ambos skills.
 
-**`clickup.json`:** un archivo por período académico en la raíz del workspace.
-Indexa space, folder, listas y tareas de todas las materias de ese período.
-`init` lo crea o lo extiende con la entrada del nuevo curso.
-
-**Estructura en ClickUp:**
-```
-Universidad (space, id fijo: 901311224662)
-└── 2026-2-B1 (folder, uno por período-bloque)
-    ├── HUMANIDADES II - 2601B04G1 (list, una por curso)
-    └── BASES DE DATOS 2 - 2601B05G2 (list)
-```
-
-**Flujo tras `init`:**
-1. Al terminar `init`, avisar al usuario: "¿Sincronizar con ClickUp?"
-2. Si confirma → ejecutar `cli_clickup.py`:
-```bash
-cd gestionar-cursos/scripts
-uv run python cli_clickup.py "C:/Users/.../Universidad/2026-2-B1"
-```
-3. Se puede previsualizar con `--dry-run` antes de confirmar
-
-`cli_clickup.py`:
-1. Resuelve `folder.id` y `list.id` en el espacio "Universidad" (crea si no existen)
-2. Crea tareas en ClickUp para cada actividad del PGA no sincronizada
-3. Actualiza `AGENTS.md` con `CLICKUP_LIST_ID` y `clickup.json` con los IDs resueltos
-
-**Flujo tras `estado`:**
-1. Ejecutar `cli_estado.py` → detectar cambios de fecha y nuevas actividades
-2. Preguntar: "¿Actualizar tareas en ClickUp con estos cambios?"
-3. Si confirma → `cli_clickup.py` actualiza fechas modificadas y crea tareas nuevas
-
-### Tags del Skill
-
-El skill define el conjunto canónico. `use-clickup` solo transporta los tags
-a la API; no define cuáles son válidos.
-
-**Tags de tipo de actividad (determinan prioridad):**
-
-| Tag | Criterio | Prioridad |
-|-----|----------|-----------|
-| `parcial` | Ponderación ≥15% o nombre contiene "parcial" | `urgente` |
-| `quiz` | Ponderación <15% o "cuestionario"/"prueba" | `normal` |
-| `actividad` | Assignment, seguimiento, tarea, trabajo | `alta` |
-| `foro` | Foro de discusión | `normal` |
-
-**Tags de evaluación:**
-
-| Tag | Significado |
-|-----|------------|
-| `evaluable` | Tiene nota en el PGA |
-| `no-evaluable` | Formativo, sin calificación |
-
-**Tags de soporte (combinables):**
-
-| Tag | Cuándo |
-|-----|--------|
-| `grupal` | Trabajo en equipo |
-| `entregable` | Requiere subir archivo o enlace |
-| `lectura` | Leer material obligatorio |
-| `repaso` | Estudiar para parcial/quiz |
-| `documento` | Redactar informe, ensayo |
-| `investigar` | Buscar fuentes, datos |
-| `practica` | Ejercicios, código, laboratorio |
-| `exposicion` | Preparar presentación |
-| `participacion` | Requiere intervenir en foro/clase |
+- **`clickup.json`:** índice de space/folder/lists/tareas por período.
+- **Tags canónicos:** ver `references/clickup-integracion.md` (tags
+  de tipo, evaluación, soporte + prioridades).
+- **Flujo:** `init` y `estado` preguntan al usuario si sincronizar;
+  `cli_clickup.py --dry-run` permite previsualizar antes de confirmar.
 
 ## Configuración LLM
 
@@ -282,6 +222,34 @@ la snapshot automáticamente.
 El agente también usa `use-clickup` para actualizar las tareas de ClickUp
 si detecta cambios de fecha o nuevas actividades.
 
+### gestionar-cursos foros \<CARPETA\>
+
+**Uso:** Extraer foros evaluables (>0% en título) y los hilos principales
+de compañeros (sin replies). El output va a `Unidad-X/Foros/<slug>.md`.
+Usa cache por `discuss_id` (query string de `discuss.php`) — re-ejecuciones
+no re-abren hilos ya guardados.
+
+**Cuándo correrlo:** durante `init` ya se invoca automáticamente para
+foros evaluables de cada unidad. También se puede correr manualmente
+cuando quieras actualizar los hilos tras varios días, o después de que
+`cli_estado.py` reporte hilos nuevos en foros.
+
+```bash
+cd gestionar-cursos/scripts
+uv run python cli_foros.py "C:/.../2026-2-B1/MATERIA"
+uv run python cli_foros.py "C:/.../2026-2-B1/MATERIA" --dry-run
+```
+
+**Qué extrae por foro (si es evaluable, regex `\(\d+%\)` con >0):**
+título + %, vencimiento, indicaciones, actividad a realizar, y hasta
+20 hilos principales (título, autor, fecha, último mensaje, réplicas,
+URL) con el primer post completo de cada uno. Foros introductorios
+(Avisos, Consultas, Presentación) NO se procesan aquí — siguen yendo
+a `COMUNICACION/`.
+
+Ver `references/foros-evaluables.md` para detalle de selectores HTML,
+formato de cache, casos edge, y el cap de 20.
+
 ## Política de Errores
 
 **Resiliente — nunca falla completamente.**
@@ -311,108 +279,33 @@ En archivos markdown se muestra dual:
 ## Fuente de Verdad de Fechas
 
 **Regla de oro: la fuente de verdad operativa de las fechas de entrega NO es
-el PGA (tabla DO-FR-66 del Microcurrículo), sino las fechas de apertura y
-cierre configuradas por el profesor en cada actividad de Moodle.**
+el PGA, sino las fechas de apertura y cierre configuradas por el profesor en
+cada actividad de Moodle.**
 
-El PGA es un documento pedagógico de planeación. Una vez el curso está vivo, el
-profesor ajusta fechas directamente en Moodle (extiende plazos, cambia
-aperturas, reorganiza unidades). Si se confía ciegamente en el PGA para
-sincronizar ClickUp, se sobreescriben las fechas reales con las planeadas.
+Flujo:
+1. `init` extrae el PGA como referencia de planeación.
+2. `estado` extrae las fechas reales de Moodle → `_cache/snapshot.json`.
+3. `cli_clickup.py` prefiere `snapshot.json` sobre `PGA.md`.
+4. Tras sincronizar, actualizar `PGA.md` para que refleje las fechas reales.
 
-**Dónde vive la fecha real en Moodle moderno:**
-```html
-<div data-region="activity-dates" class="activity-dates">
-  <div><strong>Abrió:</strong> lunes, 6 de julio de 2026, 00:00</div>
-  <div><strong>Cierra:</strong> domingo, 16 de agosto de 2026, 23:59</div>
-</div>
-```
-Para foros la etiqueta es **`<strong>Vencimiento:</strong>`** (una sola fecha).
-El extractor debe leer `div[data-region='activity-dates']` (NO tablas
-`.quizinfo`/`.assigninfo`, que son legacy) y convertir fechas en castellano
-("lunes, 6 de julio de 2026, 00:00") a ISO 8601.
-
-**Flujo correcto de sincronización de fechas:**
-1. El PGA se extrae en `init` como **referencias** de planeación.
-2. `estado` extrae las fechas reales de Moodle y las guarda en
-   `_cache/snapshot.json` (`fecha_apertura`/`fecha_cierre` por actividad).
-3. La sincronización con ClickUp (`cli_clickup.py`) **debe preferir
-   `snapshot.json` sobre `PGA.md`**. Si una actividad existe en la snapshot
-   con fechas no vacías, esas son las autoritativas; `PGA.md` solo se usa
-   como respaldo para actividades no visitables (páginas, URLs).
-4. Tras sincronizar, **actualizar `PGA.md`** para que refleje las fechas
-   reales y futuras re-sincronizaciones no reviertan el cambio.
-
-**Lección dura (2026-2-B1):** el primer `cli_clickup.py` usaba `PGA fecha_fin`
-como única fuente. Las fechas reales de LPA1 divergieron del PGA (profesor
-extendió Examen 02 hasta +42 días, abrió Tarea 04 dos semanas antes). Una
-re-ejecución de `clickup-sync` habría revertido todas las correcciones manuales.
-Usa siempre la snapshot de Moodle como autoridad.
-
-**Conversión de zona horaria para ClickUp:** las fechas de Moodle están en
-hora de Colombia (America/Bogota, UTC-5 fijo, sin DST). Al convertir a epoch
-ms para la API de ClickUp, usar `datetime.fromisoformat(s)` con `tzinfo=`
-explícito UTC-5 — NO `iso_to_milliseconds` de `use-clickup` (anteriormente
- truncaba el componente horario vía `strptime(iso[:10])`; ahora arreglado).
- Adicionalmente, forzar siempre `start_date_time=true` y `due_date_time=true`
-en el payload; si se omite, ClickUp re-normaliza la fecha a su propio huso y
-desplaza el epoch.
+Detalle, selectores HTML, y la lección dura del 2026-2-B1 en
+`references/fechas-fuente-de-verdad.md`.
 
 ## Heurísticas de Extracción
 
-### Enlaces Teams
+Reglas que el skill aplica al procesar cada tipo de módulo
+(Teams, H5P, pluginfile.php, nombres de actividades). Ver detalle
+en `references/extraccion-heuristicas.md`.
 
-SOLO capturar enlaces que apunten a `teams.microsoft.com/l/meetup-join/`.
-
-Si el enlace usa acortadores o redirección de Moodle (`mod/url/view.php`), **ignorar**.
-
-Si no hay enlace directo, marcar como `[PENDIENTE: Enlace no seguro o inexistente]`.
-
-### forcedownload
-
-Al descargar cualquier archivo de `pluginfile.php`, añadir:
-- Si URL tiene `?`: `&forcedownload=1`
-- Si URL no tiene `?`: `?forcedownload=1`
-
-### H5P
-
-Crear proxy HTML local:
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>[Nombre]</title>
-    <style>body { margin: 0; display: flex; justify-content: center; background: #000; overflow: hidden; height: 100vh; }</style>
-</head>
-<body>
-    <iframe src="https://aulavirtual.uniremington.edu.co/mod/hvp/embed.php?id=[ID]"
-            width="100%" height="100%" style="border:0;"
-            allowfullscreen="allowfullscreen"></iframe>
-    <script src="https://aulavirtual.uniremington.edu.co/mod/hvp/library/js/h5p-resizer.js" charset="UTF-8"></script>
-</body>
-</html>
-```
-
-Etiquetar en el mapa del sitio como `[Interactivo]`.
-
-### Enlaces de Grabaciones
-
-Los enlaces de grabaciones NO existen al inicio del curso. Se publican después.
-
-En el flujo `estado`, verificar si aparecieron nuevos enlaces de grabaciones y
-actualizar SESIONES_SINCRONAS.md.
-
-### Nombres de Archivos de Actividades
-
-Los nombres largos con patrones procesables se acortan automáticamente:
-
-- `Actividad de seguimiento (Calificable 10%) Disponible del 2 al 8 de febrero`
-  → `Seguimiento[10%].md`
-- `Unidad 1. Primer parcial (Calificable 25%) Disponible del 9 al 15 de febrero`
-  → `Parcial-1[25%].md`
-- `Prueba inicial (No calificable) Disponible hasta el 1 de febrero`
-  → `PruebaInicial[N/A].md`
-
-Las fechas ya quedan reflejadas dentro del contenido.
+Resumen:
+- **Teams:** solo URLs `teams.microsoft.com/l/meetup-join/`. Si no,
+  marcar como pendiente.
+- **forcedownload:** añadir `?forcedownload=1` o `&forcedownload=1`
+  a cualquier URL de `pluginfile.php`.
+- **H5P:** crear proxy HTML local con iframe + `h5p-resizer.js`.
+- **Nombres de actividades:** auto-acortar patrones como
+  `Actividad de seguimiento (Calificable 10%) Disponible...` →
+  `Seguimiento[10%].md`.
 
 ## Estructura de Carpetas Local
 
@@ -441,10 +334,12 @@ Las fechas ya quedan reflejadas dentro del contenido.
 │   │   ├── documento.pdf
 │   │   ├── presentacion.html      # H5P proxy
 │   │   └── Seguimiento_YouTube.md # Resumen de video YouTube
-│   └── actividades/
-│       ├── Seguimiento[10%].md
-│       ├── Parcial-1[25%].md
-│       └── Parcial-3[25%].md
+│   ├── actividades/
+│   │   ├── Seguimiento[10%].md
+│   │   ├── Parcial-1[25%].md
+│   │   └── Parcial-3[25%].md
+│   └── Foros/
+│       └── Foro_1_Seguridad_en_aplicaciones_web_6.md
 ├── Unidad-2/
 │   └── ...
 └── Unidad-3/
@@ -530,7 +425,10 @@ script: `cli_init.py` — entry point principal que orquesta el pipeline complet
 | `moodle_session.py` | Exportación de cookies Selenium → requests |
 | `verificar_sesion.py` | Detección de sesión activa en Moodle |
 | `extractor_modulos.py` | Extractores por tipo (page, quiz, forum, resource, folder, hvp, assign, url) |
-| `extractor_foro.py` | Discusiones de foros del profesor |
+| `extractor_foro.py` | Discusiones de foros del profesor (flujo intro/Avisos/Consultas) |
+| `extractor_foro_evaluable.py` | Foros evaluables (>0%): metadata + hilos principales, cap 20, cache por `discuss_id` |
+| `cli_foros.py` | CLI: `gestionar-cursos foros <CARPETA>` — renderiza foros evaluables a `Unidad-X/Foros/` |
+| `_procesar_foro_evaluable.py` | Wrapper usado por `cli_init` para procesar un foro evaluable dentro del loop por actividad |
 | `extractor_documentos.py` | PDF/DOCX/XLSX/PPTX → texto |
 | `extractor_youtube.py` | Subtítulos YouTube vía yt-dlp + resumen LLM |
 | `parsear_pga.py` | Tabla DO-FR-66, fechas ISO 8601 |

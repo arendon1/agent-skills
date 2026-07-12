@@ -29,6 +29,11 @@ from browser_api import (
     set_profile_dir,
 )
 from cli_init import _url_key
+from extractor_foro_evaluable import (
+    cargar_cache_foros,
+    es_evaluable,
+    extraer_datos_foro,
+)
 
 console = Console()
 BASE_URL = "https://aulavirtual.uniremington.edu.co"
@@ -192,6 +197,53 @@ def diff_fechas(snapshot_ant: dict, fechas_actuales: dict[str, dict]) -> list[di
     return cambios
 
 
+def revisar_hilos_foros_evaluables(
+    sidebar_actual: list[dict], ruta_curso: str
+) -> list[str]:
+    """
+    Para cada foro en una sección de unidad, lo visita, extrae su
+    listado de hilos, y compara contra el cache local. Devuelve una
+    lista de bloques markdown (uno por foro con cambios).
+    """
+    import re
+
+    _RE_UNIDAD = re.compile(r"^Unidad\s+(\d+)", re.IGNORECASE)
+    cache = cargar_cache_foros(ruta_curso)
+    bloques: list[str] = []
+
+    seccion_actual = ""
+    for item in sidebar_actual:
+        if item.get("tipo") == "seccion":
+            seccion_actual = item.get("nombre", "")
+            continue
+        if item.get("tipo") != "forum":
+            continue
+        if not _RE_UNIDAD.match((seccion_actual or "").strip()):
+            continue
+        if not es_evaluable(item.get("nombre", ""))[0]:
+            continue
+        nombre_foro = item.get("nombre", "")
+        try:
+            datos = extraer_datos_foro(item["url"])
+        except Exception as e:  # noqa: BLE001
+            bloques.append(f"### ⚠ {nombre_foro}\n- Error al revisar: {e}")
+            continue
+        ids_cacheados = {k for k, v in cache.items() if v.get("url")}
+        ids_actuales = {h["discuss_id"] for h in datos["hilos"]}
+        nuevos = sorted(ids_actuales - ids_cacheados)
+        removidos = sorted(ids_cacheados - ids_actuales)
+        if not nuevos and not removidos:
+            continue
+        partes = [f"### {nombre_foro}"]
+        if nuevos:
+            partes.append(f"- **Hilos nuevos ({len(nuevos)}):** {', '.join(nuevos)}")
+        if removidos:
+            partes.append(f"- **Hilos removidos ({len(removidos)}):** {', '.join(removidos)}")
+        bloques.append("\n".join(partes))
+
+    return bloques
+
+
 def generar_reporte(diff: dict, cambios_fecha: list[dict]) -> str:
     """Genera reporte markdown del diff."""
     nuevas = diff["nuevas"]
@@ -339,10 +391,22 @@ def main():
     reporte = generar_reporte(diff, cambios_fecha)
     console.print(Panel(reporte, title="[bold]Diff[/bold]", border_style="green"))
 
+    # Diff de hilos en foros evaluables
+    console.print("\n[bold cyan][5/5][/bold cyan] Revisando hilos en foros evaluables...")
+    reportes_foros = revisar_hilos_foros_evaluables(sidebar_actual, ruta_curso)
+    if reportes_foros:
+        bloque = "\n\n".join(reportes_foros)
+        console.print(Panel(bloque, title="[bold]Foros[/bold]", border_style="magenta"))
+    else:
+        console.print("    [dim]Sin foros evaluables en unidades.[/dim]")
+
     if args.sync and (diff["nuevas"] or cambios_fecha):
         console.print("\n[bold yellow]Sincronización pendiente:[/bold yellow]")
         console.print(f"  uv run python cli_init.py {url_curso} --destino "
                       f"{os.path.dirname(ruta_curso)}")
+    if args.sync and any("Hilos nuevos" in r for r in reportes_foros):
+        console.print("\n[bold magenta]Hilos nuevos detectados.[/bold magenta]")
+        console.print(f"  uv run python cli_foros.py {ruta_curso}")
 
 
 if __name__ == "__main__":

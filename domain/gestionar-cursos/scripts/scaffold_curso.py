@@ -113,6 +113,8 @@ def crear_subdirectorios(ruta_curso: str, unidades: list[dict]):
         subdirs.append(f"{nombre_unidad}/materiales")
         subdirs.append(f"{nombre_unidad}/actividades")
         subdirs.append(f"{nombre_unidad}/contenido")
+        # Carpeta para foros evaluables de la unidad (rellenada por cli_foros).
+        subdirs.append(f"{nombre_unidad}/Foros")
 
     for subdir in subdirs:
         os.makedirs(os.path.join(ruta_curso, subdir), exist_ok=True)

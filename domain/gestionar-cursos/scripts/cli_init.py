@@ -290,17 +290,25 @@ def _sync_curso(url: str, ruta_curso: str):
                 data = extraer_modulo_quiz(act["url"])
                 result_path = _guardar_quiz(act, data, ruta_curso)
             elif tipo == "forum":
-                from extractor_foro import extraer_discusiones_foro
-                nombre_profesor = checkpoint.get("nombre_profesor")
-                if not nombre_profesor:
-                    # Intentar cargar de checkpoint o detectar
-                    nombre_profesor = _detectar_profesor(act["url"])
-                if nombre_profesor:
-                    discusiones = extraer_discusiones_foro(act["url"], nombre_profesor)
-                    result_path = _guardar_foro(act, discusiones, ruta_curso)
+                # Foros evaluables (>0% en título) → flujo nuevo:
+                # metadata + hilos principales de compañeros → Unidad-X/Foros/<slug>.md
+                # Foros introductorios (Avisos, Consultas, Presentación) → flujo viejo (COMUNICACION/).
+                from extractor_foro_evaluable import es_evaluable
+                from _procesar_foro_evaluable import procesar_foro_en_unidad
+                evaluable, _pct = es_evaluable(act.get("nombre", ""))
+                if evaluable:
+                    result_path = procesar_foro_en_unidad(act, ruta_curso, console)
                 else:
-                    console.print(f"      [yellow]Saltando foro (no se detectó profesor):[/yellow] {act['nombre']}")
-                    result_path = ""
+                    from extractor_foro import extraer_discusiones_foro
+                    nombre_profesor = checkpoint.get("nombre_profesor")
+                    if not nombre_profesor:
+                        nombre_profesor = _detectar_profesor(act["url"])
+                    if nombre_profesor:
+                        discusiones = extraer_discusiones_foro(act["url"], nombre_profesor)
+                        result_path = _guardar_foro(act, discusiones, ruta_curso)
+                    else:
+                        console.print(f"      [yellow]Saltando foro (no se detectó profesor):[/yellow] {act['nombre']}")
+                        result_path = ""
             elif tipo == "resource":
                 from extractor_modulos import extraer_modulo_resource
                 data = extraer_modulo_resource(act["url"])
@@ -313,6 +321,26 @@ def _sync_curso(url: str, ruta_curso: str):
                 from extractor_modulos import extraer_modulo_hvp
                 data = extraer_modulo_hvp(act["url"])
                 result_path = _guardar_hvp(act, data, ruta_curso)
+            elif tipo == "assign":
+                from extractor_modulos import extraer_modulo_assign
+                data = extraer_modulo_assign(act["url"])
+                result_path = _guardar_assign(act, data, ruta_curso)
+            elif tipo == "url":
+                from extractor_modulos import extraer_modulo_url
+                data = extraer_modulo_url(act["url"])
+                result_path = _guardar_url(act, data, ruta_curso)
+            elif tipo == "choice":
+                from extractor_modulos import extraer_modulo_choice
+                data = extraer_modulo_choice(act["url"])
+                result_path = _guardar_choice(act, data, ruta_curso)
+            elif tipo == "lesson":
+                from extractor_modulos import extraer_modulo_lesson
+                data = extraer_modulo_lesson(act["url"])
+                result_path = _guardar_lesson(act, data, ruta_curso)
+            elif tipo == "workshop":
+                from extractor_modulos import extraer_modulo_workshop
+                data = extraer_modulo_workshop(act["url"])
+                result_path = _guardar_workshop(act, data, ruta_curso)
             else:
                 console.print(f"      [dim]Tipo no soportado:[/dim] {tipo} — {act['nombre']}")
                 result_path = ""
@@ -632,9 +660,12 @@ def _extraer_actividades_intro(sidebar: list[dict]) -> list[dict]:
 def _detectar_tipo_url(url: str) -> str:
     """Detecta tipo de módulo desde URL (versión standalone sin BeautifulSoup)."""
     for mod in ["page", "resource", "forum", "quiz", "folder", "url", "assign",
-                "hvp", "label"]:
+                "hvp", "label", "choice", "lesson", "workshop"]:
         if f"/mod/{mod}/" in url:
             return mod
+    # Detectar redirects de Teams
+    if "/l/meetup-join/" in url or "/l/channel/" in url:
+        return "url"
     return "unknown"
 
 
@@ -1081,20 +1112,26 @@ def _timestamp_foro(discusiones: list[dict]) -> str:
     return ""
 
 
-def _ruta_unidad_por_nombre(nombre_actividad: str, ruta_curso: str) -> str:
+def _ruta_unidad_por_nombre(nombre_actividad: str, ruta_curso: str, seccion: str = "") -> str:
     """
-    Determina a qué unidad pertenece una actividad basándose en su nombre
-    o en el sitemap. Fallback a 'Unidad-1' si no se puede determinar.
+    Determina a qué unidad pertenece una actividad basándose en su nombre,
+    la sección de la sidebar, o el sitemap. Fallback a 'Unidad-1'.
     """
-    # Heurística: buscar "Unidad X" o "Semana X" en el nombre
     import re
+    # 1. Usar sección de la sidebar (más confiable)
+    if seccion:
+        m_sec = re.search(r'(?:Unidad|Semana|Unit)\s*(\d+)', seccion, re.IGNORECASE)
+        if m_sec:
+            return os.path.join(ruta_curso, f"Unidad-{m_sec.group(1)}")
+    # 2. Heurística: buscar "Unidad X" o "Semana X" en el nombre de la actividad
     match = re.search(r'(?:Unidad|Semana|Unit)\s*(\d+)', nombre_actividad, re.IGNORECASE)
     if match:
         return os.path.join(ruta_curso, f"Unidad-{match.group(1)}")
-    # Si no hay match, buscar en carpetas existentes
-    for unidad_dir in sorted(os.listdir(ruta_curso)):
-        if unidad_dir.startswith("Unidad-"):
-            return os.path.join(ruta_curso, unidad_dir)
+    # 3. Si no hay match, buscar en carpetas existentes
+    if os.path.isdir(ruta_curso):
+        for unidad_dir in sorted(os.listdir(ruta_curso)):
+            if unidad_dir.startswith("Unidad-"):
+                return os.path.join(ruta_curso, unidad_dir)
     return os.path.join(ruta_curso, "Unidad-1")
 
 
@@ -1172,7 +1209,7 @@ def _acortar_nombre_archivo(nombre: str) -> str:
 
 def _guardar_page(act: dict, data: dict, ruta_curso: str) -> str:
     """Guarda contenido de página en Unidad-X/contenido/."""
-    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso)
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
     ruta_contenido = os.path.join(ruta_unidad, "contenido")
     os.makedirs(ruta_contenido, exist_ok=True)
 
@@ -1207,7 +1244,7 @@ def _guardar_page(act: dict, data: dict, ruta_curso: str) -> str:
 
 def _guardar_quiz(act: dict, data: dict, ruta_curso: str) -> str:
     """Guarda datos de quiz en Unidad-X/actividades/."""
-    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso)
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
     ruta_actividades = os.path.join(ruta_unidad, "actividades")
     os.makedirs(ruta_actividades, exist_ok=True)
 
@@ -1266,7 +1303,7 @@ def _guardar_resource(act: dict, data: dict, ruta_curso: str) -> str:
     if es_intro:
         ruta_materiales = os.path.join(ruta_curso, "MATERIA")
     else:
-        ruta_unidad = _ruta_unidad_por_nombre(nombre_act, ruta_curso)
+        ruta_unidad = _ruta_unidad_por_nombre(nombre_act, ruta_curso, act.get("seccion", ""))
         ruta_materiales = os.path.join(ruta_unidad, "materiales")
     os.makedirs(ruta_materiales, exist_ok=True)
 
@@ -1311,7 +1348,7 @@ def _guardar_folder(act: dict, data: dict, ruta_curso: str) -> str:
     if es_intro:
         ruta_materiales = os.path.join(ruta_curso, "MATERIA")
     else:
-        ruta_unidad = _ruta_unidad_por_nombre(nombre_act, ruta_curso)
+        ruta_unidad = _ruta_unidad_por_nombre(nombre_act, ruta_curso, act.get("seccion", ""))
         ruta_materiales = os.path.join(ruta_unidad, "materiales")
     os.makedirs(ruta_materiales, exist_ok=True)
 
@@ -1344,7 +1381,7 @@ def _guardar_folder(act: dict, data: dict, ruta_curso: str) -> str:
 
 def _guardar_hvp(act: dict, data: dict, ruta_curso: str) -> str:
     """Guarda proxy H5P en Unidad-X/materiales/."""
-    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso)
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
     ruta_materiales = os.path.join(ruta_unidad, "materiales")
     os.makedirs(ruta_materiales, exist_ok=True)
 
@@ -1370,7 +1407,7 @@ def _guardar_hvp(act: dict, data: dict, ruta_curso: str) -> str:
 
 def _guardar_assign(act: dict, data: dict, ruta_curso: str) -> str:
     """Guarda datos de tarea (assign) en Unidad-X/actividades/."""
-    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso)
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
     ruta_actividades = os.path.join(ruta_unidad, "actividades")
     os.makedirs(ruta_actividades, exist_ok=True)
 
@@ -1394,7 +1431,7 @@ def _guardar_assign(act: dict, data: dict, ruta_curso: str) -> str:
 
 def _guardar_url(act: dict, data: dict, ruta_curso: str) -> str:
     """Guarda link externo (url) en Unidad-X/materiales/. Extrae YouTube si aplica."""
-    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso)
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
     ruta_materiales = os.path.join(ruta_unidad, "materiales")
     os.makedirs(ruta_materiales, exist_ok=True)
 
@@ -1414,6 +1451,87 @@ def _guardar_url(act: dict, data: dict, ruta_curso: str) -> str:
     if external_url and ("youtube.com" in external_url or "youtu.be" in external_url):
         _procesar_youtube_video(external_url, ruta_materiales, act["nombre"])
 
+    return ruta_archivo
+
+
+def _guardar_choice(act: dict, data: dict, ruta_curso: str) -> str:
+    """Guarda datos de encuesta (choice) en Unidad-X/actividades/."""
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
+    ruta_actividades = os.path.join(ruta_unidad, "actividades")
+    os.makedirs(ruta_actividades, exist_ok=True)
+
+    nombre_archivo = _acortar_nombre_archivo(act["nombre"]) + ".md"
+    ruta_archivo = os.path.join(ruta_actividades, nombre_archivo)
+
+    with open(ruta_archivo, 'w', encoding='utf-8') as f:
+        f.write(f"# {data['titulo']}\n\n")
+        f.write(f"URL: {data['url']}\n\n")
+        if data.get('fecha_apertura'):
+            f.write(f"**Apertura:** {data['fecha_apertura']}\n")
+        if data.get('fecha_cierre'):
+            f.write(f"**Cierre:** {data['fecha_cierre']}\n")
+        if data.get('opciones'):
+            f.write("\n## Opciones\n\n")
+            for opt in data['opciones']:
+                f.write(f"- {opt}\n")
+        f.write(f"\n## Detalle\n\n{data.get('pregunta', '')}\n")
+
+    console.print(f"      [green]Choice guardado:[/green] {ruta_archivo}")
+    return ruta_archivo
+
+
+def _guardar_lesson(act: dict, data: dict, ruta_curso: str) -> str:
+    """Guarda contenido de lección (lesson) en Unidad-X/actividades/."""
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
+    ruta_actividades = os.path.join(ruta_unidad, "actividades")
+    os.makedirs(ruta_actividades, exist_ok=True)
+
+    nombre_archivo = _acortar_nombre_archivo(act["nombre"]) + ".md"
+    ruta_archivo = os.path.join(ruta_actividades, nombre_archivo)
+
+    contenido_md = data.get("contenido_texto", "")
+    try:
+        from markdownify import markdownify as md
+        contenido_md = md(data.get("contenido_html", ""), heading_style="ATX")
+    except ImportError:
+        pass
+
+    with open(ruta_archivo, 'w', encoding='utf-8') as f:
+        f.write(f"# {data['titulo']}\n\n")
+        f.write(f"URL: {data['url']}\n\n")
+        if data.get('fecha_apertura'):
+            f.write(f"**Apertura:** {data['fecha_apertura']}\n")
+        if data.get('fecha_cierre'):
+            f.write(f"**Cierre:** {data['fecha_cierre']}\n")
+        if data.get('nota_maxima'):
+            f.write(f"**Nota máxima:** {data['nota_maxima']}\n")
+        f.write(f"\n{contenido_md}\n")
+
+    console.print(f"      [green]Lesson guardado:[/green] {ruta_archivo}")
+    return ruta_archivo
+
+
+def _guardar_workshop(act: dict, data: dict, ruta_curso: str) -> str:
+    """Guarda datos de taller (workshop) en Unidad-X/actividades/."""
+    ruta_unidad = _ruta_unidad_por_nombre(act["nombre"], ruta_curso, act.get("seccion", ""))
+    ruta_actividades = os.path.join(ruta_unidad, "actividades")
+    os.makedirs(ruta_actividades, exist_ok=True)
+
+    nombre_archivo = _acortar_nombre_archivo(act["nombre"]) + ".md"
+    ruta_archivo = os.path.join(ruta_actividades, nombre_archivo)
+
+    with open(ruta_archivo, 'w', encoding='utf-8') as f:
+        f.write(f"# {data['titulo']}\n\n")
+        f.write(f"URL: {data['url']}\n\n")
+        if data.get('fecha_apertura'):
+            f.write(f"**Apertura:** {data['fecha_apertura']}\n")
+        if data.get('fecha_cierre'):
+            f.write(f"**Cierre:** {data['fecha_cierre']}\n")
+        if data.get('nota_maxima'):
+            f.write(f"**Nota máxima:** {data['nota_maxima']}\n")
+        f.write(f"\n## Instrucciones\n\n{data['instrucciones']}\n")
+
+    console.print(f"      [green]Workshop guardado:[/green] {ruta_archivo}")
     return ruta_archivo
 
 
@@ -1518,6 +1636,18 @@ def _procesar_actividades_unidades(
                 from extractor_modulos import extraer_modulo_url
                 data = extraer_modulo_url(url)
                 _guardar_url(item, data, ruta_curso)
+            elif tipo == "choice":
+                from extractor_modulos import extraer_modulo_choice
+                data = extraer_modulo_choice(url)
+                _guardar_choice(item, data, ruta_curso)
+            elif tipo == "lesson":
+                from extractor_modulos import extraer_modulo_lesson
+                data = extraer_modulo_lesson(url)
+                _guardar_lesson(item, data, ruta_curso)
+            elif tipo == "workshop":
+                from extractor_modulos import extraer_modulo_workshop
+                data = extraer_modulo_workshop(url)
+                _guardar_workshop(item, data, ruta_curso)
             else:
                 console.print(f"      [dim]Tipo no soportado:[/dim] {tipo}")
         except SessionExpiredError:

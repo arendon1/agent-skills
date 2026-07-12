@@ -148,14 +148,16 @@ def strip_code(text: str) -> str:
 def agnosticism_violations(body: str) -> list[tuple[str, str, str]]:
     """Return [(severity, pattern_name, matched_text), ...]. severity = FAIL or WARN."""
     out: list[tuple[str, str, str]] = []
+    # Scan prose only (no code) for both harness names and tool APIs — those
+    # identifiers legitimately appear inside bash/python blocks as values.
+    prose = strip_code(body)
     for pat, label in HARNESS_NAMES:
-        for m in re.finditer(pat, body):
+        for m in re.finditer(pat, prose):
             out.append(("FAIL", f"harness name '{label}'", m.group(0)))
     for pat in TOOL_APIS:
-        for m in re.finditer(pat, body):
+        for m in re.finditer(pat, prose):
             out.append(("FAIL", f"tool API '{pat}'", m.group(0)))
-    # slash-command syntax: warn (scan prose only, not code — API paths/HTML live in code)
-    prose = strip_code(body)
+    # slash-command syntax: warn (already in prose)
     for m in SLASH_CMD.finditer(prose):
         token = m.group(0)
         # skip obvious URLs/paths

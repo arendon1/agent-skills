@@ -42,7 +42,7 @@ def navegar(url: str):
     """Navega a URL usando requests.Session. Guarda contenido internamente."""
     global _ultimo_url, _ultimo_contenido
     _check_session()
-    resp = _session.get(url, timeout=30)
+    resp = _session.get(url, timeout=60)
     resp.raise_for_status()
     _ultimo_url = resp.url
     _ultimo_contenido = resp.text
@@ -66,7 +66,7 @@ def hacer_get(url: str, headers: dict | None = None) -> bytes:
     req_headers = {"User-Agent": "Mozilla/5.0"}
     if headers:
         req_headers.update(headers)
-    resp = _session.get(url, headers=req_headers, verify=False, timeout=30)
+    resp = _session.get(url, headers=req_headers, verify=False, timeout=60)
     resp.raise_for_status()
     return resp.content
 
@@ -131,6 +131,14 @@ def _detectar_tipo_modulo(href: str) -> str:
         return "url"
     elif "/mod/assign/" in href:
         return "assign"
+    elif "/mod/choice/" in href:
+        return "choice"
+    elif "/mod/lesson/" in href:
+        return "lesson"
+    elif "/mod/workshop/" in href:
+        return "workshop"
+    elif "/l/meetup-join/" in href or "/l/channel/" in href:
+        return "url"
     elif "/mod/label/" in href:
         return "label"
     return "unknown"

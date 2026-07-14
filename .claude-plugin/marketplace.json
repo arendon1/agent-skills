@@ -29,6 +29,7 @@
       "name": "domain",
       "skills": [
         "./domain/analyze-model",
+        "./domain/compensation-report",
         "./domain/generar-paper",
         "./domain/gestionar-cursos",
         "./domain/make-a-diagram",

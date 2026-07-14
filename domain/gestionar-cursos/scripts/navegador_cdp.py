@@ -230,6 +230,14 @@ def _detectar_tipo_modulo(href: str) -> str:
         return "url"
     elif "/mod/assign/" in href:
         return "assign"
+    elif "/mod/choice/" in href:
+        return "choice"
+    elif "/mod/lesson/" in href:
+        return "lesson"
+    elif "/mod/workshop/" in href:
+        return "workshop"
+    elif "/l/meetup-join/" in href or "/l/channel/" in href:
+        return "url"
     elif "/mod/label/" in href:
         return "label"
     return "unknown"

@@ -196,6 +196,99 @@ def extraer_modulo_resource(url: str) -> dict:
     }
 
 
+def extraer_modulo_choice(url: str) -> dict:
+    """
+    Extrae datos de una encuesta/consulta (choice).
+
+    Returns:
+        {"titulo": str, "pregunta": str, "opciones": [str], "fecha_apertura": str,
+         "fecha_cierre": str}
+    """
+    get_navegador()(url)
+    soup = BeautifulSoup(get_page_content(), 'lxml')
+
+    titulo = soup.select_one('h1, .page-header-headings h1')
+    titulo = titulo.get_text(strip=True) if titulo else "Sin título"
+
+    pregunta = ""
+    content = soup.select_one('#region-main, .activity-content')
+    if content:
+        pregunta = content.get_text(separator='\n', strip=True)
+
+    opciones = []
+    for opt in soup.select('.option label, .options label, .answeroption label'):
+        texto = opt.get_text(strip=True)
+        if texto:
+            opciones.append(texto)
+
+    fecha_apertura = ""
+    fecha_cierre = ""
+    for row in soup.select('tr'):
+        cells = row.find_all(['th', 'td'])
+        if len(cells) >= 2:
+            label = cells[0].get_text(strip=True).lower()
+            value = cells[1].get_text(strip=True)
+            if "apertura" in label or "abre" in label or "open" in label:
+                fecha_apertura = value
+            elif "cierre" in label or "cierra" in label or "close" in label:
+                fecha_cierre = value
+
+    return {
+        "tipo": "choice",
+        "url": url,
+        "titulo": titulo,
+        "pregunta": pregunta,
+        "opciones": opciones,
+        "fecha_apertura": fecha_apertura,
+        "fecha_cierre": fecha_cierre,
+    }
+
+
+def extraer_modulo_lesson(url: str) -> dict:
+    """
+    Extrae datos de una lección (lesson).
+
+    Returns:
+        {"titulo": str, "contenido_html": str, "contenido_texto": str,
+         "fecha_apertura": str, "fecha_cierre": str, "nota_maxima": str}
+    """
+    get_navegador()(url)
+    soup = BeautifulSoup(get_page_content(), 'lxml')
+
+    titulo = soup.select_one('h1, .page-header-headings h1')
+    titulo = titulo.get_text(strip=True) if titulo else "Sin título"
+
+    region = soup.select_one('#region-main, .activity-content')
+    contenido_html = str(region) if region else ""
+    contenido_texto = region.get_text(separator='\n', strip=True) if region else ""
+
+    fecha_apertura = ""
+    fecha_cierre = ""
+    nota_maxima = ""
+    for row in soup.select('tr'):
+        cells = row.find_all(['th', 'td'])
+        if len(cells) >= 2:
+            label = cells[0].get_text(strip=True).lower()
+            value = cells[1].get_text(strip=True)
+            if "apertura" in label or "abre" in label or "open" in label:
+                fecha_apertura = value
+            elif "cierre" in label or "cierra" in label or "close" in label:
+                fecha_cierre = value
+            elif "nota" in label or "grade" in label or "calific" in label:
+                nota_maxima = value
+
+    return {
+        "tipo": "lesson",
+        "url": url,
+        "titulo": titulo,
+        "contenido_html": contenido_html,
+        "contenido_texto": contenido_texto,
+        "fecha_apertura": fecha_apertura,
+        "fecha_cierre": fecha_cierre,
+        "nota_maxima": nota_maxima,
+    }
+
+
 def extraer_modulo_assign(url: str) -> dict:
     """
     Extrae datos de una tarea (assign).
@@ -244,11 +337,33 @@ def extraer_modulo_assign(url: str) -> dict:
 
 def extraer_modulo_url(url: str) -> dict:
     """
-    Extrae datos de un link externo (url).
+    Extrae datos de un link externo (url), incluyendo redirects de Teams.
 
     Returns:
         {"titulo": str, "external_url": str}
     """
+    # Detectar redirects de Teams: /l/meetup-join/ o /l/channel/
+    if "/l/meetup-join/" in url or "/l/channel/" in url:
+        # Reconstruir URL real de Teams desde el path del redirect
+        idx = url.index("/l/")
+        external_url = "https://teams.microsoft.com" + url[idx:]
+        titulo = "Teams"
+        # Intentar obtener título desde la página de redirect
+        try:
+            get_navegador()(url)
+            soup = BeautifulSoup(get_page_content(), 'lxml')
+            h1 = soup.select_one('h1, .page-header-headings h1')
+            if h1:
+                titulo = h1.get_text(strip=True)
+        except Exception:
+            pass
+        return {
+            "tipo": "url",
+            "url": url,
+            "titulo": titulo,
+            "external_url": external_url,
+        }
+
     get_navegador()(url)
     soup = BeautifulSoup(get_page_content(), 'lxml')
 
@@ -265,4 +380,49 @@ def extraer_modulo_url(url: str) -> dict:
         "url": url,
         "titulo": titulo,
         "external_url": external_url,
+    }
+
+
+def extraer_modulo_workshop(url: str) -> dict:
+    """
+    Extrae datos de un taller (workshop).
+
+    Returns:
+        {"titulo": str, "instrucciones": str, "fecha_apertura": str,
+         "fecha_cierre": str, "nota_maxima": str}
+    """
+    get_navegador()(url)
+    soup = BeautifulSoup(get_page_content(), 'lxml')
+
+    titulo = soup.select_one('h1, .page-header-headings h1')
+    titulo = titulo.get_text(strip=True) if titulo else "Sin título"
+
+    instrucciones = ""
+    region = soup.select_one('#region-main, .activity-content')
+    if region:
+        instrucciones = region.get_text(separator='\n', strip=True)
+
+    fecha_apertura = ""
+    fecha_cierre = ""
+    nota_maxima = ""
+    for row in soup.select('tr'):
+        cells = row.find_all(['th', 'td'])
+        if len(cells) >= 2:
+            label = cells[0].get_text(strip=True).lower()
+            value = cells[1].get_text(strip=True)
+            if "apertura" in label or "abre" in label or "open" in label:
+                fecha_apertura = value
+            elif "cierre" in label or "cierra" in label or "close" in label:
+                fecha_cierre = value
+            elif "nota" in label or "grade" in label or "calific" in label:
+                nota_maxima = value
+
+    return {
+        "tipo": "workshop",
+        "url": url,
+        "titulo": titulo,
+        "instrucciones": instrucciones,
+        "fecha_apertura": fecha_apertura,
+        "fecha_cierre": fecha_cierre,
+        "nota_maxima": nota_maxima,
     }

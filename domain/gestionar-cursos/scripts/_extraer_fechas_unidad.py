@@ -48,11 +48,45 @@ def _es_a_iso(texto: str) -> str:
     return base
 
 
+# Etiquetas que Moodle usa en <strong> dentro de [data-region=activity-dates]
+# o en celdas <th> de tablas .quizinfo / .assigninfo. La etiqueta cambia de
+# tiempo presente ("Cierra:") a pasado ("Cerró:") cuando la actividad ya
+# cerró — el extractor debe reconocer AMBAS formas. Lo mismo aplica a
+# "Apertura" / "Abrió". Se incluyen también plurales y variantes para foros
+# y workshops.
+_LABELS_APERTURA = (
+    "abrió", "abre", "apertura", "abierto", "abierta", "abiertas",
+    "open", "opens", "inicio", "comienzo", "disponible desde",
+    "envíos abiertos", "envío abierto", "evaluación abierta",
+)
+_LABELS_CIERRE = (
+    "cerró", "cierra", "cierre", "cerrado", "cerrada", "cerradas",
+    "close", "closes", "closed", "vence", "vencido", "vencida",
+    "vencimiento", "límite", "expira", "expirado", "deadline",
+    "cierre de envíos", "cierre de evaluaciones",
+)
+
+
+def _es_label_apertura(label: str) -> bool:
+    """True si la etiqueta se refiere a una fecha de apertura."""
+    label = label.lower()
+    return any(kw in label for kw in _LABELS_APERTURA)
+
+
+def _es_label_cierre(label: str) -> bool:
+    """True si la etiqueta se refiere a una fecha de cierre."""
+    label = label.lower()
+    return any(kw in label for kw in _LABELS_CIERRE)
+
+
 def extraer_fechas_pagina(html: str) -> dict[str, str]:
     """Extrae fecha_apertura y fecha_cierre del HTML de quiz/assign.
 
     Moodle moderno expone las fechas en un div[data-region='activity-dates']
-    con etiquetas <strong>Abrió:</strong> / <strong>Cierra:</strong>.
+    con etiquetas <strong>Abrió:</strong> / <strong>Cierra:</strong>. Cuando
+    la actividad ya cerró, la etiqueta de cierre pasa a <strong>Cerró:</strong>
+    (pretérito). Esta función reconoce AMBAS formas.
+
     Formato legacy: tabla .quizinfo / .assigninfo.
     """
     soup = BeautifulSoup(html, "lxml")
@@ -68,9 +102,15 @@ def extraer_fechas_pagina(html: str) -> dict[str, str]:
             label = strong.get_text(strip=True).lower()
             strong.extract()  # quita la etiqueta para que get_text dé el valor
             value = div.get_text(" ", strip=True)
-            if any(kw in label for kw in ("abrió", "abre", "apertura", "abiert", "open")):
+            # En workshops hay varias fases (Envíos abiertos, Cierre de envíos,
+            # Apertura de evaluaciones, Cierre de evaluaciones). El último match
+            # gana: para el cierre, el relevante es "Cierre de evaluaciones"
+            # (fin de la fase de evaluación entre pares). Para la apertura, el
+            # relevante es "Apertura de evaluaciones" (inicio de la fase
+            # evaluable para el estudiante).
+            if _es_label_apertura(label):
                 fechas["fecha_apertura"] = _es_a_iso(value) or value
-            elif any(kw in label for kw in ("cierra", "cierre", "cerrad", "close", "límite", "vencimiento", "vence")):
+            elif _es_label_cierre(label):
                 fechas["fecha_cierre"] = _es_a_iso(value) or value
         if fechas["fecha_apertura"] or fechas["fecha_cierre"]:
             return fechas
@@ -81,9 +121,9 @@ def extraer_fechas_pagina(html: str) -> dict[str, str]:
         if len(cells) >= 2:
             label = cells[0].get_text(strip=True).lower()
             value = cells[1].get_text(strip=True)
-            if any(kw in label for kw in ("apertura", "abre", "open")):
+            if _es_label_apertura(label):
                 fechas["fecha_apertura"] = _es_a_iso(value) or value
-            elif any(kw in label for kw in ("cierre", "cierra", "close", "límite")):
+            elif _es_label_cierre(label):
                 fechas["fecha_cierre"] = _es_a_iso(value) or value
 
     return fechas

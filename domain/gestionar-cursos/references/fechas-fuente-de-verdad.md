@@ -26,6 +26,31 @@ sola fecha). El extractor debe leer
 que son legacy) y convertir fechas en castellano
 ("lunes, 6 de julio de 2026, 00:00") a ISO 8601.
 
+### Variantes de etiqueta según el estado de la actividad
+
+Moodle cambia la etiqueta de la `<div>` de cierre según el momento:
+
+| Estado de la actividad | Etiqueta HTML | Ejemplo |
+|---|---|---|
+| Aún no ha abierto | `Apertura:` / `Abre:` | `<strong>Apertura:</strong> lunes, 6 de julio de 2026, 00:00` |
+| Abierta actualmente | `Cierra:` | `<strong>Cierra:</strong> domingo, 12 de julio de 2026, 23:59` |
+| **Ya cerrada (pasado)** | **`Cerró:`** | `<strong>Cerró:</strong> domingo, 12 de julio de 2026, 23:59` |
+
+**Bug histórico (2026-2-B1):** la primera versión del extractor solo
+reconocía `Cierra:` / `Cierre` y NO `Cerró:`. Al re-ejecutar `estado`
+después de que las actividades de la semana 1 ya habían cerrado
+(2026-07-12 23:59), la snapshot nueva perdía las fechas de Prueba
+Inicial y Lección 1. El extractor ahora reconoce ambas formas
+(`Cierra:` y `Cerró:`) en `_LABELS_CIERRE` y siempre debe re-extraer
+fechas para TODAS las actividades evaluables, sin importar si
+están abiertas o cerradas.
+
+Para workshops hay 4 etiquetas en secuencia y la **última gana**:
+`Envíos abiertos` → `Cierre de envíos` → `Apertura de evaluaciones` →
+`Cierre de evaluaciones`. La snapshot termina guardando la fase de
+**evaluación** (`Apertura de evaluaciones` → `Cierre de evaluaciones`),
+que es la ventana donde el estudiante debe evaluar a sus pares.
+
 ## Flujo correcto de sincronización de fechas
 
 1. El PGA se extrae en `init` como **referencias** de planeación.

@@ -279,8 +279,11 @@ uv run python cli_estado.py "C:/.../2026-2-B1/<curso>"
 # 2) Capturar calificaciones (sobre snapshot recien refrescado)
 uv run python cli_calificaciones.py "C:/.../2026-2-B1/<curso>"
 
-# 3) Sincronizar con ClickUp
+# 3) Sincronizar tareas con ClickUp (crear/actualizar fechas, tags)
 uv run python cli_clickup.py "C:/.../2026-2-B1"
+
+# 4) Sincronizar calificaciones capturadas → ClickUp (status + comentario)
+uv run python sync_calificaciones_clickup.py "C:/.../2026-2-B1/<curso>"
 ```
 
 `cli_estado.py` preserva el campo `calificacion` y el
@@ -313,6 +316,65 @@ no falla.
 `_cache/gradebook_<courseid>.html` para auditoría, y el JSON
 estructurado en `_cache/calificaciones_<courseid>.json`. Re-ejecuciones
 sobre-escriben — no hay merge acumulativo.
+
+### gestionar-cursos sync-clickup-calificaciones \<CARPETA\>
+
+**Uso:** Para cada tarea calificada en el `snapshot.json` del curso,
+marca la tarea de ClickUp como **"calificado"** (status closed) y deja
+un comentario con el detalle de la nota. Es idempotente: re-ejecuciones
+no duplican status ni comentarios.
+
+```bash
+cd gestionar-cursos/scripts
+uv run python sync_calificaciones_clickup.py "C:/.../2026-2-B1/<curso>"
+uv run python sync_calificaciones_clickup.py "C:/.../2026-2-B1/<curso>" --dry-run
+```
+
+**Prerrequisito:** ejecutar `cli_calificaciones.py` primero para poblar
+`snapshot.json:actividades[*].calificacion`. Si no hay calificaciones
+capturadas, el script no hace nada (no hay qué sincronizar).
+
+**Cuándo correrlo:**
+- Después de `cli_calificaciones.py` cuando aparecen nuevas notas
+  (parcial calificado, tarea devuelta, etc).
+- En el flujo de revisión de fin de semana para tener el tablero de
+  ClickUp al día.
+
+**Qué hace por cada tarea con `calificacion.nota`:**
+
+1. **Cruza por nombre** entre `snapshot.json` y `clickup.json` (con
+   matching exacto + flexible). Si no encuentra `task_id`, warning.
+2. **Verifica idempotencia**:
+   - `tarea_ya_calificada`: ¿status ya es "calificado"?
+   - `tiene_comentario_sync`: ¿hay un comentario con tag
+     `[calificaciones-auto]`?
+   - Si ambas → SKIP (no duplica status ni comentario).
+3. **PUT /task/{id}** con `{"status": "calificado"}` (usa el NOMBRE,
+   no el status_id — la API de ClickUp rechaza IDs con 400).
+4. **POST /task/{id}/comment** con formato:
+   ```
+   [calificaciones-auto] Calificación sincronizada desde Moodle
+
+   - **Curso:** LÍNEA DE ÉNFASIS 1 - 2607B04G1
+   - **Actividad:** Primer Parcial (25%)
+   - **Nota:** 4,80 / 0–5 (96,00 %)
+   - **Estado:** Aprobado
+   - **Aporte al curso:** 24,00 %
+   - **Capturado:** 2026-07-17T01:21:11
+   ```
+
+**Status personalizado:** el script busca el status "calificado" en el
+space Universidad (id `901311224662`). El status se creó manualmente
+en el space como tipo `closed`. Si no existe, el script falla con
+lista de statuses disponibles. Otros espacios no-Universidad necesitan
+su propio status (o el script debe parametrizar el nombre).
+
+**Lección (2026-2-B1, LPA 1 + Línea de Énfasis 1):** la API de
+ClickUp `PUT /task/{id}` rechaza el `status_id` con 400 Bad Request
+cuando se envía el `id` (`p901311224662_MhIABMss`). Hay que enviar el
+**nombre** del status (`"calificado"`). El `client.py` no documenta
+esto explícitamente; el bug se manifiesta como "el status se queda en
+pendiente aunque la respuesta sea 200" o como 400 directo.
 
 ## Política de Errores
 
@@ -479,6 +541,7 @@ script: `cli_init.py` — entry point principal que orquesta el pipeline complet
 | `cli_init.py` | Inicializar curso(s) desde URL(s) de Moodle |
 | `cli_estado.py` | Verificar estado y sincronización |
 | `cli_calificaciones.py` | Extraer calificaciones del gradebook e inyectar `## Calificación` en `.md` |
+| `sync_calificaciones_clickup.py` | Sincronizar calificaciones Moodle → ClickUp (status='calificado' + comentario) |
 | `cli_clickup.py` | Sincronizar cursos locales con ClickUp (IDs, tareas, tags) |
 
 ### Extracción de Moodle

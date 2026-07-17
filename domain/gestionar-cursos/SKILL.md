@@ -250,6 +250,70 @@ a `COMUNICACION/`.
 Ver `references/foros-evaluables.md` para detalle de selectores HTML,
 formato de cache, casos edge, y el cap de 20.
 
+### gestionar-cursos calificaciones \<CARPETA\>
+
+**Uso:** Extraer calificaciones del **gradebook** del estudiante en un
+curso Moodle. Aplica a todos los items evaluables del curso: cuestionarios,
+lecciones, talleres (envío + evaluación), tareas, foros. Actualiza
+`_cache/calificaciones_<courseid>.json`, agrega campo `calificacion` en
+cada actividad del `snapshot.json`, e inyecta sección `## Calificación`
+en el archivo `.md` de cada actividad.
+
+```bash
+cd gestionar-cursos/scripts
+uv run python cli_calificaciones.py "C:/.../2026-2-B1/2607B04G1-línea-de-énfasis-1"
+uv run python cli_calificaciones.py "C:/.../2026-2-B1/2607B04G1-línea-de-énfasis-1" --dry-run
+```
+
+**Cuándo correrlo:**
+- Después de `estado` (que refresca fechas).
+- Tras un parcial o tarea calificada por el docente.
+- Antes de la sesión sincrónica para ver el avance del curso.
+
+**Orden correcto del flujo de sincronización:**
+
+```bash
+# 1) Refrescar fechas
+uv run python cli_estado.py "C:/.../2026-2-B1/<curso>"
+
+# 2) Capturar calificaciones (sobre snapshot recien refrescado)
+uv run python cli_calificaciones.py "C:/.../2026-2-B1/<curso>"
+
+# 3) Sincronizar con ClickUp
+uv run python cli_clickup.py "C:/.../2026-2-B1"
+```
+
+`cli_estado.py` preserva el campo `calificacion` y el
+`calificaciones_capturadas` al re-escribir `snapshot.json`. Re-ejecutar
+`estado` después de `calificaciones` no borra las notas. **Orden
+inverso = bug**: si se ejecuta `calificaciones` antes que `estado`, las
+calificaciones se preservan; pero si se ejecuta `calificaciones` y
+luego `estado` sin preservar, las calificaciones se pierden. (Desde
+2026-2-B1 está arreglado en `guardar_snapshot`.)
+
+**Lo que captura por actividad:**
+
+| Campo | Fuente Moodle |
+|-------|---------------|
+| `nota` | Calificación en escala del rango |
+| `estado` | Aprobado / Reprobado / Pendiente (icono `fa-check text-success` / `fa-remove text-danger`) |
+| `rango` | Rango calificable (ej. `0–5`) |
+| `porcentaje` | % sobre el rango |
+| `aporte_curso` | % ya ponderado al total del curso |
+| `ponderacion_categoria` | Ponderación dentro de la categoría del curso |
+| `feedback` | Retroalimentación del docente |
+
+**Match de archivos `.md`:** por nombre normalizado + alias canónicos
+(`Prueba Inicial` → `PruebaInicial.md`, `Primer Parcial` → `Parcial-1.md`,
+etc.). Si una actividad del gradebook no tiene `.md` local (típico:
+H5P `Contenido interactivo`), el script lo reporta como warning pero
+no falla.
+
+**Cache:** el HTML crudo se guarda en
+`_cache/gradebook_<courseid>.html` para auditoría, y el JSON
+estructurado en `_cache/calificaciones_<courseid>.json`. Re-ejecuciones
+sobre-escriben — no hay merge acumulativo.
+
 ## Política de Errores
 
 **Resiliente — nunca falla completamente.**
@@ -414,6 +478,7 @@ script: `cli_init.py` — entry point principal que orquesta el pipeline complet
 |---------|-----------|
 | `cli_init.py` | Inicializar curso(s) desde URL(s) de Moodle |
 | `cli_estado.py` | Verificar estado y sincronización |
+| `cli_calificaciones.py` | Extraer calificaciones del gradebook e inyectar `## Calificación` en `.md` |
 | `cli_clickup.py` | Sincronizar cursos locales con ClickUp (IDs, tareas, tags) |
 
 ### Extracción de Moodle

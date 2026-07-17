@@ -49,11 +49,50 @@ def cargar_snapshot(ruta_curso: str) -> dict:
 
 
 def guardar_snapshot(ruta_curso: str, snapshot: dict):
-    """Guarda snapshot actualizado."""
+    """Guarda snapshot actualizado.
+
+    Preserva campos extra que no controla `estado` (ej: `calificacion`,
+    `calificaciones_capturadas` que escribe `cli_calificaciones.py`).
+    Sin esta preservación, re-ejecutar `estado` borraría las notas
+    recién capturadas.
+    """
     cache_dir = os.path.join(ruta_curso, "_cache")
     os.makedirs(cache_dir, exist_ok=True)
-    snapshot["timestamp"] = datetime.now().isoformat()
     path = os.path.join(cache_dir, "snapshot.json")
+
+    # Preservar campos que no son de nuestra incumbencia
+    snapshot_anterior = {}
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                snapshot_anterior = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    campos_preservados = (
+        "calificaciones_capturadas",
+        # `calificacion` vive dentro de cada actividad, lo manejamos abajo
+    )
+    for campo in campos_preservados:
+        if campo in snapshot_anterior and campo not in snapshot:
+            snapshot[campo] = snapshot_anterior[campo]
+
+    # Preservar `calificacion` por actividad si no se está actualizando
+    actividades_nuevas = snapshot.get("actividades", {})
+    actividades_viejas = snapshot_anterior.get("actividades", {})
+    for key, nueva in actividades_nuevas.items():
+        vieja = actividades_viejas.get(key, {})
+        if "calificacion" in vieja and "calificacion" not in nueva:
+            nueva["calificacion"] = vieja["calificacion"]
+        # No pisar si la nueva ya tiene `calificacion` (re-fetch)
+        elif "calificacion" in vieja and "calificacion" in nueva:
+            # Si la nueva no tiene `actualizado` (caso raro), preservar
+            if not nueva["calificacion"].get("actualizado"):
+                # Conservar campos extra que la nueva no haya poblado
+                for k, v in vieja["calificacion"].items():
+                    nueva["calificacion"].setdefault(k, v)
+
+    snapshot["timestamp"] = datetime.now().isoformat()
     with open(path, "w", encoding="utf-8") as f:
         json.dump(snapshot, f, indent=2, ensure_ascii=False)
 

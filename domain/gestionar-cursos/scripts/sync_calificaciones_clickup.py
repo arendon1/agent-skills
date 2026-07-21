@@ -40,7 +40,7 @@ from rich.console import Console
 # Resolver el path a use-clickup/scripts dinámicamente: probamos varias
 # ubicaciones porque el skill puede vivir en:
 #   - ~/.agents/skills/{gestionar-cursos,use-clickup}/scripts/  (producción)
-#   - agent-skills-v2/domain/{gestionar-cursos,use-clickup}/scripts/  (source)
+#   - agent-skills/domain/{gestionar-cursos,use-clickup}/scripts/  (source)
 _here = os.path.dirname(os.path.abspath(__file__))
 for _candidate in [
     os.path.normpath(os.path.join(_here, "..", "..", "use-clickup", "scripts")),

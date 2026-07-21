@@ -74,6 +74,12 @@ en el agente, que orquesta ambos skills.
   de tipo, evaluación, soporte + prioridades).
 - **Flujo:** `init` y `estado` preguntan al usuario si sincronizar;
   `cli_clickup.py --dry-run` permite previsualizar antes de confirmar.
+- **Aplicacion del `sync_plan.json`:** el agente sigue el playbook
+  ejecutable en [references/sync-flow.md](references/sync-flow.md).
+
+**Modo de operacion: autonomo por defecto.** El agente invoca los
+scripts y aplica el `sync_plan.json` sin pedir confirmacion, salvo
+en los casos documentados en [references/sync-flow.md](references/sync-flow.md) §B.
 
 ## Configuración LLM
 
@@ -224,31 +230,19 @@ si detecta cambios de fecha o nuevas actividades.
 
 ### gestionar-cursos foros \<CARPETA\>
 
-**Uso:** Extraer foros evaluables (>0% en título) y los hilos principales
-de compañeros (sin replies). El output va a `Unidad-X/Foros/<slug>.md`.
-Usa cache por `discuss_id` (query string de `discuss.php`) — re-ejecuciones
-no re-abren hilos ya guardados.
-
-**Cuándo correrlo:** durante `init` ya se invoca automáticamente para
-foros evaluables de cada unidad. También se puede correr manualmente
-cuando quieras actualizar los hilos tras varios días, o después de que
-`cli_estado.py` reporte hilos nuevos en foros.
+Extrae foros evaluables (>0% en titulo) y los hasta 20 hilos
+principales por foro. Output: `Unidad-X/Foros/<slug>.md`. Cache por
+`discuss_id` — re-ejecuciones no re-abren hilos ya guardados. Se
+invoca durante `init` para cada foro evaluable; tambien se puede
+correr manual:
 
 ```bash
-cd gestionar-cursos/scripts
 uv run python cli_foros.py "C:/.../2026-2-B1/MATERIA"
 uv run python cli_foros.py "C:/.../2026-2-B1/MATERIA" --dry-run
 ```
 
-**Qué extrae por foro (si es evaluable, regex `\(\d+%\)` con >0):**
-título + %, vencimiento, indicaciones, actividad a realizar, y hasta
-20 hilos principales (título, autor, fecha, último mensaje, réplicas,
-URL) con el primer post completo de cada uno. Foros introductorios
-(Avisos, Consultas, Presentación) NO se procesan aquí — siguen yendo
-a `COMUNICACION/`.
-
-Ver `references/foros-evaluables.md` para detalle de selectores HTML,
-formato de cache, casos edge, y el cap de 20.
+Detalle de selectores HTML, formato de cache, casos edge y el
+cap de 20 en [references/foros-evaluables.md](references/foros-evaluables.md).
 
 ### gestionar-cursos calificaciones \<CARPETA\>
 
@@ -393,14 +387,7 @@ pendiente aunque la respuesta sea 200" o como 400 directo.
 
 ## Formato de Fechas
 
-Todas las fechas se normalizan a **ISO 8601** (`YYYY-MM-DD`).
-
-En archivos markdown se muestra dual:
-```markdown
-| Actividad | Fecha Inicio | Fecha Fin |
-|-----------|--------------|-----------|
-| Prueba Inicial | 26/1/2026 (2026-01-26) | 1/2/2026 (2026-02-01) |
-```
+Ver [references/fechas-fuente-de-verdad.md](references/fechas-fuente-de-verdad.md#formato-canonico).
 
 ## Fuente de Verdad de Fechas
 
@@ -417,118 +404,13 @@ Flujo:
 Detalle, selectores HTML, y la lección dura del 2026-2-B1 en
 `references/fechas-fuente-de-verdad.md`.
 
-## Heurísticas de Extracción
-
-Reglas que el skill aplica al procesar cada tipo de módulo
-(Teams, H5P, pluginfile.php, nombres de actividades). Ver detalle
-en `references/extraccion-heuristicas.md`.
-
-Resumen:
-- **Teams:** solo URLs `teams.microsoft.com/l/meetup-join/`. Si no,
-  marcar como pendiente.
-- **forcedownload:** añadir `?forcedownload=1` o `&forcedownload=1`
-  a cualquier URL de `pluginfile.php`.
-- **H5P:** crear proxy HTML local con iframe + `h5p-resizer.js`.
-- **Nombres de actividades:** auto-acortar patrones como
-  `Actividad de seguimiento (Calificable 10%) Disponible...` →
-  `Seguimiento[10%].md`.
-
 ## Estructura de Carpetas Local
 
-```
-2026-2-B1/                         # Raíz del período académico
-├── clickup.json                   # Índice ClickUp del período (UNO para todas las materias)
-├── [CÓDIGO]-NOMBRE-DEL-CURSO/
-│   ├── _cache/                    # Caché LLM + snapshot.json
-│   ├── AGENTS.md                  # Metadatos + visión general + metadata LLM
-│   ├── CONTEXT.md                 # Contexto extenso: documentos, PGA, sesiones
-│   ├── SITEMAP.md                 # Enlaces permanentes de Moodle
-│   ├── PGA.md                     # Tabla de actividades (fechas ISO)
-│   ├── MATERIA/
-│   ├── Modulo.pdf
-│   ├── Microcurriculo.pdf
-│   └── ...                       # Otros documentos del profesor
-├── COMUNICACION/
-│   ├── YYYYMMDD_Avisos.md
-│   ├── YYYYMMDD_Foro_Consultas.md
-│   └── YYYYMMDD_Foro_Presentacion.md
-├── Unidad-1/
-│   ├── contenido/
-│   │   ├── Conoce_tu_profesor.md
-│   │   └── Vision_general_del_curso.md
-│   ├── materiales/
-│   │   ├── documento.pdf
-│   │   ├── presentacion.html      # H5P proxy
-│   │   └── Seguimiento_YouTube.md # Resumen de video YouTube
-│   ├── actividades/
-│   │   ├── Seguimiento[10%].md
-│   │   ├── Parcial-1[25%].md
-│   │   └── Parcial-3[25%].md
-│   └── Foros/
-│       └── Foro_1_Seguridad_en_aplicaciones_web_6.md
-├── Unidad-2/
-│   └── ...
-└── Unidad-3/
-    └── ...
-```
+Ver [references/folder-structure.md](references/folder-structure.md).
 
 ## AGENTS.md - Contenido
 
-```markdown
-# [Nombre del Curso]
-
-> Índice de curso para agentes. Ver detalles en CONTEXT.md.
-
-## Identidad
-- **CODIGO**: [Código]
-- **URL**: [URL permanente del curso]
-- **PERIODO**: 2026-2
-- **BLOQUE**: B1
-- **SEMANAS**: [PENDIENTE]
-- **INICIO**: [YYYY-MM-DD]
-- **FIN**: [YYYY-MM-DD]
-- **INICIALIZADO**: [Fecha de inicialización]
-
-## Resumen
-[Primer párrafo de la visión general del curso]
-
-## Metadatos del Curso
-[Extraídos por LLM de Módulo y Microcurrículo]
-
-### Objetivos
-- ...
-
-### Competencias
-- ...
-
-### Metodología
-...
-
-### Criterios de Evaluación
-- ...
-
-### Unidades Temáticas
-- ...
-
-### Bibliografía
-- ...
-
-## Sesiones Sincrónicas
-| Descripción | Enlace Teams | Fecha | Hora | Grabaciones |
-|-------------|-------------|-------|------|-------------|
-
-## Índice Local
-- [Unidad 1](Unidad-1/)
-  - [Materiales](Unidad-1/materiales/)
-  - [Actividades](Unidad-1/actividades/)
-  - [Contenido](Unidad-1/contenido/)
-
-## Archivos de Contexto
-- [CONTEXT](CONTEXT.md)
-- [PGA](PGA.md)
-- [SITEMAP](SITEMAP.md)
-- [COMUNICACION](COMUNICACION/)
-```
+Ver [references/agents-md-template.md](references/agents-md-template.md).
 
 ## Archivos del Skill
 

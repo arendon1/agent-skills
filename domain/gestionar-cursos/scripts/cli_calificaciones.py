@@ -43,6 +43,7 @@ from rich.table import Table
 # Asegurar que scripts/ esté en path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from _parsing import _parse_porcentaje
 from navegador_cdp import get_driver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -432,11 +433,8 @@ def _imprimir_resumen(items: list[dict]):
         )
     console.print(table)
 
-    # Aporte total al curso
-    aporte_total = sum(
-        float(it["aporte_curso"].replace("%", "").replace(",", ".").strip() or 0)
-        for it in items
-    )
+    # Aporte total al curso (tolera "-", "", "Sin calificar" sin crashear).
+    aporte_total = sum(_parse_porcentaje(it["aporte_curso"]) for it in items)
     console.print(
         Panel(
             f"[bold]Aporte total al curso: {aporte_total:.2f}%[/bold]\n"
@@ -482,38 +480,44 @@ def main():
         items = _parsear_gradebook(html)
         console.print(f"[green]✓[/green] {len(items)} items extraídos")
 
-        # Persistir JSON
-        json_path = os.path.join(cache_dir, f"calificaciones_{courseid}.json")
+        # Persistir JSON + .md + snapshot SOLO si no es dry-run.
+        # El resumen se imprime SIEMPRE (incluso en dry-run), envuelto en
+        # try/except para que un valor raro del gradebook (ej. "-" en un
+        # campo que la tabla espera float) no tumbe la persistencia.
         if not args.dry_run:
+            json_path = os.path.join(cache_dir, f"calificaciones_{courseid}.json")
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(items, f, indent=2, ensure_ascii=False)
 
-        _imprimir_resumen(items)
+            # Actualizar .md de actividades
+            actualizados = 0
+            for item in items:
+                md_path = _encontrar_md_para_item(ruta_curso, item)
+                if not md_path:
+                    console.print(
+                        f"  [yellow]⚠ No se encontró .md para:[/yellow] {item['nombre']}"
+                    )
+                    continue
+                _actualizar_md_actividad(md_path, item, courseid)
+                actualizados += 1
+            console.print(f"\n[green]✓[/green] {actualizados} archivos .md actualizados")
+
+            # Actualizar snapshot
+            snap_path = os.path.join(cache_dir, "snapshot.json")
+            if os.path.isfile(snap_path):
+                _actualizar_snapshot(snap_path, items)
+                console.print(f"[green]✓[/green] snapshot.json actualizado")
+            else:
+                console.print(f"[yellow]⚠ No se encontró snapshot.json[/yellow]")
+
+        try:
+            _imprimir_resumen(items)
+        except Exception as e:
+            console.print(f"[yellow]⚠ Resumen no se pudo imprimir: {e}[/yellow]")
 
         if args.dry_run:
             console.print("\n[yellow]DRY RUN: no se actualizaron archivos .md ni snapshot.json[/yellow]")
             return
-
-        # Actualizar .md de actividades
-        actualizados = 0
-        for item in items:
-            md_path = _encontrar_md_para_item(ruta_curso, item)
-            if not md_path:
-                console.print(
-                    f"  [yellow]⚠ No se encontró .md para:[/yellow] {item['nombre']}"
-                )
-                continue
-            _actualizar_md_actividad(md_path, item, courseid)
-            actualizados += 1
-        console.print(f"\n[green]✓[/green] {actualizados} archivos .md actualizados")
-
-        # Actualizar snapshot
-        snap_path = os.path.join(cache_dir, "snapshot.json")
-        if os.path.isfile(snap_path):
-            _actualizar_snapshot(snap_path, items)
-            console.print(f"[green]✓[/green] snapshot.json actualizado")
-        else:
-            console.print(f"[yellow]⚠ No se encontró snapshot.json[/yellow]")
 
     finally:
         # No cerramos el driver para no cerrar Chrome del usuario

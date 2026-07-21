@@ -5,6 +5,21 @@ entrega NO es el PGA (tabla DO-FR-66 del Microcurrículo), sino las
 fechas de apertura y cierre configuradas por el profesor en cada
 actividad de Moodle.**
 
+## Formato canonico
+
+Todas las fechas se normalizan a **ISO 8601** (`YYYY-MM-DD`).
+
+En archivos markdown se muestra dual:
+
+```markdown
+| Actividad | Fecha Inicio | Fecha Fin |
+|-----------|--------------|-----------|
+| Prueba Inicial | 26/1/2026 (2026-01-26) | 1/2/2026 (2026-02-01) |
+```
+
+La columna con formato local aparece siempre junto a la ISO para
+mantener legibilidad humana sin perder la maquina-leibilidad.
+
 El PGA es un documento pedagógico de planeación. Una vez el curso
 está vivo, el profesor ajusta fechas directamente en Moodle (extiende
 plazos, cambia aperturas, reorganiza unidades). Si se confía

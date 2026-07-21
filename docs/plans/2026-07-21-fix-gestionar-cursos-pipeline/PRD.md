@@ -41,6 +41,57 @@ C7. **Course local debe existir antes de planificar ClickUp.** Si no existe loca
 
 ## §I INTERFACES (sketch)
 
+### `_meta.orchestration_hint` y `_meta.idempotency_keys` (NUEVO)
+
+Anadidos al schema para maxima autonomia del agente (regla del usuario 2026-07-21:
+"minima interaccion humana salvo accion destructiva"):
+
+```json
+"_meta": {
+  "periodo": "2026-2-B1",
+  "generated_at": "2026-07-21T15:30:00-05:00",
+  "source": "moodle",
+  "schema_version": 1,
+  "orchestration_hint": {
+    "order": ["to_create", "to_update", "to_archive"],
+    "tools_required": [
+      "use-clickup:create_task",
+      "use-clickup:update_task",
+      "use-clickup:post_comment"
+    ],
+    "pause_for_human": [
+      "unresolved con razon no determinista (ver §B de sync-flow.md)"
+    ]
+  },
+  "idempotency_keys": {
+    "to_create": "list_id + name",
+    "to_update": "task_id",
+    "to_archive": "task_id"
+  }
+}
+```
+
+- `orchestration_hint.order` — el agente aplica en ese orden. `to_create` primero
+  (para que las actualizaciones posteriores puedan referenciar IDs nuevos si aplica).
+- `tools_required` — capabilities del orquestador que el plan asume disponibles.
+  Si alguna falta, el agente aborta con error claro (no aplica parcialmente).
+- `pause_for_human` — el unico caso donde el agente PAUSA antes de aplicar.
+- `idempotency_keys` — el agente usa estos campos para detectar doble-aplicacion.
+  Antes de aplicar cada `to_update` o `to_archive`, verifica que el comentario
+  mas reciente de la tarea NO empiece con `[calificaciones-auto]`. Antes de cada
+  `to_create`, verifica que no exista ya una tarea con `list_id + name` identico.
+
+### Comportamiento ante `unresolved` (regla del agente)
+
+- **Auto-resoluble** (agente resuelve y aplica solo): `list_id` derivable del
+  `curso_key` (list existe en `clickup.json`); `task_id` ausente pero `name`
+  matchea exactamente contra tareas existentes en la list; renombre de Moodle
+  que matchea por alias canonico (`Prueba Inicial` → `PruebaInicial.md`).
+- **No auto-resoluble** (agente PAUSA y reporta al humano): `curso_no_inicializado`,
+  `folder_not_found`, `task_id_ambiguo` (multiples matches近似), `list_id_null`
+  sin curso_key matcheable. El agente lista los items pausados en orden
+  alfabetico para que el humano resuelva en batch.
+
 ### Salida nueva: `sync_plan.json` (producido por `cli_clickup.py`)
 
 ```json

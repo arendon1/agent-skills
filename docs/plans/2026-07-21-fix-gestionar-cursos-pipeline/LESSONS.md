@@ -117,3 +117,46 @@
   `to_archive` con campo `reason` (string libre: "removed_from_moodle",
   "renamed_in_moodle", "superseded") para que el humano pueda auditar
   por que una tarea quedo en estado cancelled.
+
+## L11 — Maxima autonomia del agente, pausa solo para input destructivo
+
+- **Regla del usuario (2026-07-21):** "este skill ha de permitir a los agentes
+  maxima autonomia cuando el usuario les ha dado alguna instruccion. El
+  objetivo siempre es cumplir con minima ineraccion humana, a menos de que
+  una situacion critica lo amerite, como algun tipo de accion destructiva."
+
+- **Causa de la regla:** el humano es el cuello de botella. Cada vez que
+  el agente pausa para pedir confirmacion, se pierde el valor principal
+  de automatizar. Los agentes tienen capacidad de leer contexto, hacer
+  pre-checks, y detectar ambiguedad no determinista — usenla antes de
+  preguntar.
+
+- **Implicacion de diseno #1:** el `sync_plan.json` lleva `_meta.orchestration_hint`
+  con `order`, `tools_required` y `pause_for_human`. El agente no tiene
+  que adivinar la secuencia ni las capabilities — las lee del plan.
+
+- **Implicacion de diseno #2:** `references/sync-flow.md` es un **playbook
+  ejecutable** (pasos numerados, no documentacion descriptiva). El agente
+  lo lee una vez, ejecuta, reporta. NO improvisa.
+
+- **Implicacion de diseno #3:** `references/sync-flow.md` §C declara
+  acciones destructivas PROHIBIDAS. El agente aborta ESA operacion si
+  cae en §C, no consulta al humano. La prohibicion ya esta en el playbook.
+
+- **Implicacion de diseno #4:** SKILL.md declara explicitamente
+  `Modo de operacion: autonomo por defecto` para que el primer read del
+  agente no genere la pregunta "¿le pregunto al humano?".
+
+- **Portable:** todo skill que produce artefactos para un agente deberia
+  declarar su modo de operacion (autonomo / colaborativo / manual) en
+  el frontmatter o en una seccion visible del SKILL.md. La ambiguedad
+  sobre "¿puedo ejecutar sin pedir?" es la principal causa de friccion
+  innecesaria.
+
+- **Excepciones que SI justifican pausa humana:**
+  - Operacion destructiva no listada en §C (DELETE no planificado,
+    modificacion de status personalizado, etc.).
+  - Conflicto de carrera donde el estado real diverge del `diff.from`
+    y la decision de como resolver no es determinista.
+  - `unresolved` con razon no determinista (listadas en §B de sync-flow.md).
+  - Falta de capability requerida (`tools_required` del plan).

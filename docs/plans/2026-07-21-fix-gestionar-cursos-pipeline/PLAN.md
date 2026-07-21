@@ -223,20 +223,83 @@ Mover a `references/` (ver T11, T12) lo que no sea directiva operativa:
 SKILL.md queda en ~440 lineas, suficiente para anadir bloque "Contrato
 agente/skill" (~30 lineas) sin pasarse de 500.
 
-### T10 — `references/sync-flow.md` (NUEVO)
+### T10 — `references/sync-flow.md` (NUEVO, playbook ejecutable)
 
-Documento clave del fix. Contiene:
+Documento CLAVE del fix. **No es documentacion descriptiva — es el playbook
+que el agente sigue para aplicar el plan autonomamente.** Contiene:
 
-1. **Contrato agente/skill**: diagrama del flujo Moodle→Local→ClickUp con
-   flechas explicitas.
-2. **Schema de `sync_plan.json`**: copy-paste del PRD §I con anotaciones
-   sobre cada campo.
-3. **Idempotencia**: tabla de "que pasa si re-corro N veces" para cada modo.
-4. **Casos degenerados**: Moodle caido, ClickUp caido, curso no inicializado,
-   actividad renombrada, actividad eliminada, plan con todos los items
-   `unresolved`.
-5. **Quirk conocido**: `status_id` vs `status name` (la leccion 2026-2-B1
-   del script viejo, preservada aqui).
+#### §A — Aplicacion autonoma (caso normal, sin input humano)
+
+Pasos numerados que el agente ejecuta:
+
+```
+1. Leer sync_plan.json
+2. Verificar _meta.schema_version (abort si != 1)
+3. Verificar capabilities de orquestador contra _meta.orchestration_hint.tools_required
+4. Para cada item en _meta.orchestration_hint.order:
+   a. to_create:
+      - Pre-check: GET /list/{list_id}/task?name=<name> para confirmar que no existe
+      - Si existe con mismo nombre: skip (idempotente)
+      - Si no existe: POST /list/{list_id}/task con name+tags+priority+due_date_ms
+   b. to_update:
+      - Pre-check: GET /task/{task_id}/comment para leer el ultimo comentario
+      - Si ultimo comentario empieza con "[calificaciones-auto]": skip (idempotente)
+      - Verificar diff.status.from contra GET /task/{task_id}.status (carrera)
+      - Si hay divergencia: log warning y abortar ESA entrada (no todo el plan)
+      - Si OK: PUT /task/{task_id} con campos no-null del diff
+      - Si diff.comment != null: POST /task/{task_id}/comment con comment.text
+   c. to_archive:
+      - Pre-check: GET /task/{task_id}.status
+      - Si status ya es "cancelled": skip (idempotente)
+      - PUT /task/{task_id} con status: "cancelled"
+5. Log resumen: aplicadas / skipped / abortadas / paused
+```
+
+#### §B — Pausa para input humano (unico caso)
+
+Solo cuando `unresolved` contiene items con razon **no determinista**:
+
+- `curso_no_inicializado` — el humano debe correr `cli_init.py` primero.
+- `folder_not_found` — el humano debe crear el folder en ClickUp manualmente.
+- `task_id_ambiguo` — multiples tareas近似; el humano elige una o ignora.
+- `list_id_null` — el curso existe en Moodle pero no en ClickUp.json;
+  el humano decide si correr `cli_init.py` para inicializarlo.
+
+El agente lista los items pausados en orden alfabetico y reporta el batch
+completo. NO pausa uno por uno.
+
+#### §C — Acciones destructivas PROHIBIDAS
+
+Lista explicita que el agente NUNCA debe ejecutar:
+
+- `DELETE /task/{id}` — el plan solo planifica `to_archive`, nunca `to_delete`.
+- Reorganizacion del workspace ClickUp (mover tasks entre lists, cambiar
+  jerarquia de folders, renombrar espacios).
+- Edicion de statuses personalizados del space Universidad.
+- Cualquier operacion que afecte tareas que NO estan en el `sync_plan.json`
+  (ej. tareas manuales del humano que no vinieron de Moodle).
+
+Si el agente detecta que una operacion requerida cae en §C, aborta ESA
+operacion con error explicito y continua con las demas.
+
+#### §D — Quirk conocido: `status_id` vs `status` name
+
+Leccion preservada del commit 6d7fb79 / 2026-2-B1. PUT /task/{id} rechaza
+`status_id` (ID numerico) con 400 Bad Request. SIEMPRE enviar `status`
+como nombre del status (ej. `"calificado"`, `"pendiente"`, `"cancelled"`).
+
+#### §E — Tabla de idempotencia (para audit)
+
+| Operacion        | Key                       | Pre-check                                      |
+|------------------|---------------------------|------------------------------------------------|
+| `to_create`      | `list_id + name`          | GET /list/{list_id}/task?name=X → empty?       |
+| `to_update`      | `task_id`                 | GET /task/{id}/comment → sin tag auto          |
+| `to_archive`     | `task_id`                 | GET /task/{id}.status != "cancelled"?          |
+| `unresolved`     | n/a                       | siempre requiere intervencion                  |
+
+Si la pre-check falla (ya aplicado), skip silencioso. Si la pre-check
+pasa pero la operacion PUT/POST falla, abort ESA entrada (no todo el plan)
+y registra en `_meta.applied_results` (campo nuevo en el plan post-aplicacion).
 
 ### T13 — `CONTEXT.md` raiz (NUEVO)
 

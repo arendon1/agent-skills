@@ -1,6 +1,6 @@
 # agent-skills
 
-A collection of **33 skills** for coding agents — process loops, domain
+A collection of **35 skills** for coding agents — process loops, domain
 capabilities, and utility tools — organized into three layers and shipped as a
 single installable package. Skills express **behavior**; an optional thin
 adapter maps behavior to your harness's tools.
@@ -30,8 +30,8 @@ when you want their named deliverable.
 
 ### What you get
 
-- ✅ All 33 skills discoverable by your harness.
-- ✅ All 33 skills audited against the constitution (`AGENTS.md`) before ship.
+- ✅ All 35 skills discoverable by your harness.
+- ✅ All 35 skills audited against the constitution (`AGENTS.md`) before ship.
 - ✅ Compatible with every harness the `skills` CLI supports (Claude Code,
   Cursor, Windsurf, Cline, OpenCode, …).
 - ❌ No auto-injection at session start — `skills add` ships `SKILL.md` files
@@ -61,7 +61,7 @@ contribute.
 │   └── marketplace.json           ← generated, Format A: groups by layer
 ├── process/                       ← 20 skills — loops + disciplines
 ├── domain/                        ←  8 skills — domain-specific capabilities
-└── utility/                       ←  5 skills — cross-cutting tools
+└── utility/                       ←  6 skills — cross-cutting tools
 ```
 
 ### The three layers
@@ -136,15 +136,35 @@ named output you can ask for.
 ## Adapters (optional)
 
 The repo is **harness-agnostic at the core** — skills name behaviors, never
-tools. The optional adapter layer (`adapters/<harness>/`) is the only place
-where a skill's behavior gets bound to a specific harness's tools (e.g.
-auto-injecting `bootstrap` at session start, or exposing a subagent dispatch
-helper).
+tools. The optional adapter layer is the only place where a skill's behavior
+gets bound to a specific harness's tools (e.g. auto-injecting `bootstrap` at
+session start, or mapping agnostic behaviors to concrete tool names).
 
-This repo ships adapters for select harnesses as a convenience, but you do
-**not** need them to use the skills. `npx skills add` is the recommended path
-for everyone. If you want the full self-triggering experience on a specific
-harness, check the `adapters/` directory for one that matches yours.
+| Harness | Adapter path | Mechanism |
+|---------|-------------|-----------|
+| **pi** | `.pi/extensions/agent-skills.ts` | TS extension hooking `resources_discover`, `session_start`, `session_compact`, `context` |
+| **Hermes** | `adapters/hermes/` | Python plugin (`plugin.yaml` + `__init__.py`) hooking `on_session_start` + `pre_llm_call` |
+
+You do **not** need an adapter to use the skills — `npx skills add` is the
+recommended path for everyone. Adapters add the full self-triggering experience:
+auto-injecting `bootstrap` at session start and after compaction, plus the
+behavior→tool mapping. If you want that on a specific harness, install the
+matching adapter.
+
+### Hermes
+
+```bash
+# From the repo root — symlink into Hermes's plugins directory
+ln -sf "$(pwd)/adapters/hermes" ~/.hermes/plugins/agent-skills
+hermes plugins enable agent-skills
+# Takes effect on the next session (/reset or restart).
+```
+
+The Hermes adapter uses the `pre_llm_call` hook to inject the bootstrap skill
+body + a Hermes-specific tool mapping into the first turn of every new session.
+Because `pre_llm_call` injection is ephemeral (not persisted to conversation
+history), it naturally re-injects after context compaction — no separate
+`session_compact` hook needed.
 
 ---
 

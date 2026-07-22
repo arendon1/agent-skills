@@ -44,6 +44,7 @@
       "skills": [
         "./utility/bootstrap",
         "./utility/caveman",
+        "./utility/context7-live-docs",
         "./utility/skill-add",
         "./utility/skill-find",
         "./utility/skill-forge"

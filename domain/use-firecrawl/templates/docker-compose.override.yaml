@@ -1,0 +1,20 @@
+# docker-compose.override.yaml — Mac-friendly resources
+# Place next to the upstream docker-compose.yaml (auto-merged by Compose).
+# Default upstream requests 8GB api + 4GB playwright — too much for a MacBook.
+
+services:
+  api:
+    cpus: "2.0"
+    mem_limit: 4G
+    memswap_limit: 4G
+
+  playwright-service:
+    cpus: "1.0"
+    mem_limit: 2G
+    memswap_limit: 2G
+
+  rabbitmq:
+    mem_limit: 1G
+    cpus: "0.5"
+
+  # nuq-postgres, redis, foundationdb: left unconstrained (collectively ~280MB)

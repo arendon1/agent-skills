@@ -35,7 +35,8 @@
         "./domain/make-a-diagram",
         "./domain/make-a-map",
         "./domain/research-literature",
-        "./domain/use-clickup"
+        "./domain/use-clickup",
+        "./domain/use-firecrawl"
       ]
     },
     {

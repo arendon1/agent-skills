@@ -1,50 +1,52 @@
-# PRD — fix(gestionar-cursos): modo plan-local + delta Moodle→ClickUp
+# PRD — fix(gestionar-cursos): local-plan mode + Moodle→ClickUp delta
 
 ## §G GOAL
 
-`gestionar-cursos` produce artefactos locales que el agente orquesta con `use-clickup`.
-Sin imports cruzados. `cli_clickup.py` deja de tocar la API y emite `sync_plan.json`
-declarativo. `cli_calificaciones.py` soporta cursos 100% Pendiente sin crashear.
+`gestionar-cursos` produces local artifacts that the agent orchestrates with
+`use-clickup`. No cross-imports. `cli_clickup.py` stops touching the API and
+emits a declarative `sync_plan.json`. `cli_calificaciones.py` supports
+100% "Pendiente" courses without crashing.
 
-## §C CONSTRAINTS (del usuario, hard)
+## §C CONSTRAINTS (from the user, hard)
 
-C1. **Ningún skill de dominio importa otro.** `gestionar-cursos` NO importa `use-clickup`.
-    El agente (yo/Hermes) orquesta las llamadas entre skills, no el código.
-
-C2. **Todo script Python usa `uv` para gestionar dependencias** si las requiere.
-    `uv run python <script>` es la forma canónica de invocar.
-
-C3. **Detección + status + comentario.** Para cada actividad con `calificacion != None`
-    en el snapshot, planificar: status → "calificado" (por nombre, NO por id) + comentario
-    con la nota en formato canónico. Idempotente: re-correr no duplica.
-
-C4. **Direccion de flujo: Moodle → Local → ClickUp, unidireccional.** ClickUp es terminal.
-    Reclasificaciones / renombres van como `to_update` del mismo `task_id`. Eliminaciones
-    de Moodle van como `to_archive` (NO `to_delete`).
-
-C5. **Moodle = fuente de verdad operativa.** Las caches locales pueden estar stale;
-    el agente decide cuándo re-sincronizar; el script no asume cache fresca.
-
-C6. **Pruebas visuales con browser cuantas veces haga falta.** Validar contra Moodle
-    real (gradebook) y contra panel real de ClickUp. No fiarse de tests unitarios solos.
-
-C7. **Course local debe existir antes de planificar ClickUp.** Si no existe local,
-    `cli_clickup.py` aborta con mensaje claro — no auto-inicializa nada.
+C1. **No domain skill imports another.** `gestionar-cursos` MUST NOT import
+    `use-clickup`. The agent (me / Hermes) orchestrates calls between
+    skills, not the code.
+C2. **Every Python script uses `uv` for dependency management** when it has
+    any. `uv run python <script>` is the canonical invocation form.
+C3. **Detection + status + comment.** For every activity with
+    `calificacion != None` in the snapshot, plan: status → "calificado"
+    (by name, NOT by id) + a comment with the grade in canonical format.
+    Idempotent: re-running does not duplicate.
+C4. **Flow direction: Moodle → Local → ClickUp, unidirectional.** ClickUp is
+    terminal. Reclassifications / renames go as `to_update` of the same
+    `task_id`. Deletions from Moodle go as `to_archive` (NOT `to_delete`).
+C5. **Moodle = operational source of truth.** Local caches can be stale;
+    the agent decides when to re-sync; the script does not assume a
+    fresh cache.
+C6. **Visual browser tests as many times as needed.** Validate against the
+    real Moodle (gradebook) and the real ClickUp panel. Do not trust unit
+    tests alone.
+C7. **Local course must exist before planning ClickUp.** If it does not
+    exist locally, `cli_clickup.py` aborts with a clear message — never
+    auto-initializes anything.
 
 ## §O OUT OF SCOPE
 
-- Refactor amplio de los scripts (CLI con sub-comandos, dataclasses, logging estructurado).
-- Reescritura de `navegador_cdp.py`, `cli_init.py` u orquestadores existentes.
-- Cambios al skill `use-clickup` (funciona, queda como API).
-- Auto-inicialización de cursos en ClickUp desde `cli_clickup.py` (decisión del agente).
+- Broad refactor of the scripts (CLI with sub-commands, dataclasses,
+  structured logging).
+- Rewrite of `navegador_cdp.py`, `cli_init.py`, or existing orchestrators.
+- Changes to the `use-clickup` skill (it works, it stays as the API).
+- Auto-initialization of ClickUp courses from `cli_clickup.py` (that is
+  the agent's decision).
 - Linter / pre-commit hooks.
 
 ## §I INTERFACES (sketch)
 
-### `_meta.orchestration_hint` y `_meta.idempotency_keys` (NUEVO)
+### `_meta.orchestration_hint` and `_meta.idempotency_keys` (NEW)
 
-Anadidos al schema para maxima autonomia del agente (regla del usuario 2026-07-21:
-"minima interaccion humana salvo accion destructiva"):
+Added to the schema for maximum agent autonomy (user rule 2026-07-21:
+"minimum human interaction unless destructive action"):
 
 ```json
 "_meta": {
@@ -60,7 +62,7 @@ Anadidos al schema para maxima autonomia del agente (regla del usuario 2026-07-2
       "use-clickup:post_comment"
     ],
     "pause_for_human": [
-      "unresolved con razon no determinista (ver §B de sync-flow.md)"
+      "unresolved with non-deterministic reason (see §B of sync-flow.md)"
     ]
   },
   "idempotency_keys": {
@@ -71,28 +73,33 @@ Anadidos al schema para maxima autonomia del agente (regla del usuario 2026-07-2
 }
 ```
 
-- `orchestration_hint.order` — el agente aplica en ese orden. `to_create` primero
-  (para que las actualizaciones posteriores puedan referenciar IDs nuevos si aplica).
-- `tools_required` — capabilities del orquestador que el plan asume disponibles.
-  Si alguna falta, el agente aborta con error claro (no aplica parcialmente).
-- `pause_for_human` — el unico caso donde el agente PAUSA antes de aplicar.
-- `idempotency_keys` — el agente usa estos campos para detectar doble-aplicacion.
-  Antes de aplicar cada `to_update` o `to_archive`, verifica que el comentario
-  mas reciente de la tarea NO empiece con `[calificaciones-auto]`. Antes de cada
-  `to_create`, verifica que no exista ya una tarea con `list_id + name` identico.
+- `orchestration_hint.order` — the agent applies in that order.
+  `to_create` first (so that later updates can reference new IDs if
+  applicable).
+- `tools_required` — orchestrator capabilities the plan assumes available.
+  If any is missing, the agent aborts with a clear error (no partial
+  apply).
+- `pause_for_human` — the only case where the agent PAUSES before applying.
+- `idempotency_keys` — the agent uses these fields to detect double-apply.
+  Before applying any `to_update` or `to_archive`, verify that the most
+  recent comment on the task does NOT start with `[calificaciones-auto]`.
+  Before each `to_create`, verify that no task with the same
+  `list_id + name` already exists.
 
-### Comportamiento ante `unresolved` (regla del agente)
+### Behavior on `unresolved` (agent rule)
 
-- **Auto-resoluble** (agente resuelve y aplica solo): `list_id` derivable del
-  `curso_key` (list existe en `clickup.json`); `task_id` ausente pero `name`
-  matchea exactamente contra tareas existentes en la list; renombre de Moodle
-  que matchea por alias canonico (`Prueba Inicial` → `PruebaInicial.md`).
-- **No auto-resoluble** (agente PAUSA y reporta al humano): `curso_no_inicializado`,
-  `folder_not_found`, `task_id_ambiguo` (multiples matches近似), `list_id_null`
-  sin curso_key matcheable. El agente lista los items pausados en orden
-  alfabetico para que el humano resuelva en batch.
+- **Auto-resolvable** (agent resolves and applies alone): `list_id`
+  derivable from `curso_key` (list exists in `clickup.json`); `task_id`
+  absent but `name` matches exactly against existing tasks in the list;
+  Moodle rename that matches by canonical alias
+  (`Prueba Inicial` → `PruebaInicial.md`).
+- **Not auto-resolvable** (agent PAUSES and reports to the human):
+  `curso_no_inicializado`, `folder_not_found`, `task_id_ambiguo`
+  (multiple near matches), `list_id_null` with no matchable `curso_key`.
+  The agent lists paused items in alphabetical order so the human can
+  resolve them in a batch.
 
-### Salida nueva: `sync_plan.json` (producido por `cli_clickup.py`)
+### New output: `sync_plan.json` (produced by `cli_clickup.py`)
 
 ```json
 {
@@ -144,88 +151,106 @@ Anadidos al schema para maxima autonomia del agente (regla del usuario 2026-07-2
 }
 ```
 
-**Contrato del schema:**
+**Schema contract:**
 
-- `to_create` → POST `/list/{id}/task` con `name`, `tags`, `priority`, `due_date`.
-- `to_update` → PUT `/task/{id}` con campos en `diff` que NO son `null` + POST `/task/{id}/comment` si `comment != null`.
-- `to_archive` → PUT `/task/{id}` con `status: "cancelled"` (o el equivalente del space). NO DELETE — preserva historial.
-- `unresolved` → el agente reporta al humano; nada se aplica a ClickUp para estos items.
-- `diff.status.from` → si el estado real en ClickUp no coincide al momento de aplicar, el agente aborta esa entrada (carrera detectada).
+- `to_create` → POST `/list/{id}/task` with `name`, `tags`, `priority`,
+  `due_date`.
+- `to_update` → PUT `/task/{id}` with non-`null` fields in `diff` + POST
+  `/task/{id}/comment` if `comment != null`.
+- `to_archive` → PUT `/task/{id}` with `status: "cancelled"` (or the
+  space's equivalent). NOT DELETE — preserves history.
+- `unresolved` → the agent reports to the human; nothing is applied to
+  ClickUp for these items.
+- `diff.status.from` → if the actual ClickUp status does not match at
+  apply time, the agent aborts that entry (race detected).
 
 ### CLI
 
 ```bash
-uv run python scripts/cli_calificaciones.py <curso>             # exit 0, JSON + .md actualizados
-uv run python scripts/cli_calificaciones.py <curso> --dry-run   # mismo, sin escribir
-uv run python scripts/cli_clickup.py <periodo>                  # exit 0, sync_plan.json escrito
-uv run python scripts/cli_clickup.py <periodo> --dry-run        # mismo, sin escribir
+uv run python scripts/cli_calificaciones.py <curso>             # exit 0, JSON + .md updated
+uv run python scripts/cli_calificaciones.py <curso> --dry-run   # same, no writes
+uv run python scripts/cli_clickup.py <periodo>                  # exit 0, sync_plan.json written
+uv run python scripts/cli_clickup.py <periodo> --dry-run        # same, no writes
 ```
 
-Ningun script invoca `use-clickup`. Punto.
+No script invokes `use-clickup`. Period.
 
 ### Env
 
-- `CLICKUP_API_KEY` → la usa el agente (vía `use-clickup`), NO los scripts de `gestionar-cursos`.
-- `OPENROUTER_API_KEY` → para LLM, sin cambios.
+- `CLICKUP_API_KEY` → used by the agent (via `use-clickup`), NOT by
+  `gestionar-cursos` scripts.
+- `OPENROUTER_API_KEY` → for the LLM, unchanged.
 
 ## §D DONE
 
-D1. `cli_calificaciones.py` corre exit 0 sobre curso con todos los items "Pendiente".
-D2. `snapshot.json` tiene campo `calificacion` por cada actividad (puede ser `null`).
-D3. Los archivos `.md` de actividades tienen sección `## Calificación`.
-D4. `cli_clickup.py` corre exit 0 y produce `sync_plan.json` válido.
-D5. `sync_plan.json` tiene `to_create` / `to_update` / `to_archive` / `unresolved`
-    clasificados correctamente, sin tocar la API de ClickUp.
-D6. `pytest` exit 0 sobre toda la suite del skill.
-D7. `skill-forge audit gestionar-cursos` exit 0 (SKILL.md <= 500 líneas).
-D8. Validación visual contra Moodle (browser) y contra panel de ClickUp (browser)
-    confirma que los artefactos coinciden con la realidad.
+D1. `cli_calificaciones.py` exits 0 on a course with all items
+    "Pendiente".
+D2. `snapshot.json` has a `calificacion` field for every activity
+    (may be `null`).
+D3. Activity `.md` files have a `## Calificación` section.
+D4. `cli_clickup.py` exits 0 and produces a valid `sync_plan.json`.
+D5. `sync_plan.json` has `to_create` / `to_update` / `to_archive` /
+    `unresolved` classified correctly, without touching the ClickUp API.
+D6. `pytest` exits 0 on the full skill suite.
+D7. `skill-forge audit gestionar-cursos` exits 0 (SKILL.md <= 500 lines).
+D8. Visual validation against Moodle (browser) and against the ClickUp
+    panel (browser) confirms artifacts match reality.
 
-## §V INVARIANTS (propuesto, ARD/SPEC)
+## §V INVARIANTS (proposed, ARD/SPEC)
 
-V1. `gestionar-cursos` MUST NOT `import` código de `use-clickup` ni de ningún otro skill.
-V2. `gestionar-cursos` MUST producir artefactos (`sync_plan.json`, `calificaciones.json`,
-    `snapshot.json`) que el agente consume con `use-clickup` u otras herramientas.
-V3. `_parse_porcentaje` MUST tolerar `" - %"`, `"100%"`, `"12,5 %"`, `"12.5 %"`,
-    `"Sin calificar"`, `None`, `""`, `"-"`, `"—"` retornando float o 0.0 sin excepcion.
-V4. `cli_calificaciones.py:main` MUST persistir (`_actualizar_md_actividad`,
-    `_actualizar_snapshot`) ANTES de imprimir resumen; resumen se imprime en
-    TODOS los modos (incluso `--dry-run`).
-V5. PUT /task a ClickUp MUST usar `status` por nombre, NUNCA `status_id` (lección 2026-2-B1).
-V6. Re-ejecucion del pipeline MUST ser idempotente: re-correr NO duplica status
-    ni comentarios en ClickUp.
-V7. `sync_plan.json` MUST declarar `_meta.schema_version` y ser estable hacia atras
-    dentro de la major version.
-V8. Tests del skill MUST correr con `uv run pytest` (no `python -m pytest` directo,
-    no `pip install` ad-hoc).
+V1. `gestionar-cursos` MUST NOT `import` code from `use-clickup` or any
+    other skill.
+V2. `gestionar-cursos` MUST produce artifacts (`sync_plan.json`,
+    `calificaciones.json`, `snapshot.json`) that the agent consumes with
+    `use-clickup` or other tools.
+V3. `_parse_porcentaje` MUST tolerate `" - %"`, `"100%"`, `"12,5 %"`,
+    `"12.5 %"`, `"Sin calificar"`, `None`, `""`, `"-"`, `"—"` returning
+    a float or `0.0` without raising.
+V4. `cli_calificaciones.py:main` MUST persist
+    (`_actualizar_md_actividad`, `_actualizar_snapshot`) BEFORE printing
+    the summary; the summary is printed in ALL modes (even `--dry-run`).
+V5. PUT /task to ClickUp MUST use `status` by name, NEVER `status_id`
+    (lesson from 2026-2-B1).
+V6. Re-running the pipeline MUST be idempotent: re-running MUST NOT
+    duplicate status or comments in ClickUp.
+V7. `sync_plan.json` MUST declare `_meta.schema_version` and be
+    backward-stable within a major version.
+V8. Skill tests MUST run with `uv run pytest` (not `python -m pytest`
+    directly, not ad-hoc `pip install`).
 
 ## §Q OPEN QUESTIONS
 
-- ? ¿La validación visual contra ClickUp requiere `CLICKUP_API_KEY` real en el
-  entorno de tests, o se hace manual con `--dry-run` y un viewer? → Recomendado:
-  manual con el browser, no automatizar E2E de ClickUp (costo + flakiness).
-- ? ¿`sync_plan.json` se sobre-escribe o se acumula? → Recomendado: sobre-escribe
-  con timestamp en `_meta.generated_at`; el agente decide cuándo aplicar.
-- ? ¿Qué pasa con items en ClickUp que NO existen en Moodle (huérfanos)? →
-  Recomendado: no se planifican (el delta es Moodle-centric). Se documenta en
-  SKILL.md como caso esperado tras errores manuales del usuario.
+- ? Does visual validation against ClickUp require a real
+  `CLICKUP_API_KEY` in the test env, or is it done manually with
+  `--dry-run` and a viewer? → Recommendation: manual with the browser,
+  do not automate ClickUp E2E (cost + flakiness).
+- ? Does `sync_plan.json` get overwritten or accumulated? → Recommend:
+  overwrite with a timestamp in `_meta.generated_at`; the agent decides
+  when to apply.
+- ? What happens with items in ClickUp that do NOT exist in Moodle
+  (orphans)? → Recommend: do not plan them (the delta is
+  Moodle-centric). Document in SKILL.md as an expected case after
+  manual user errors.
 
-## §B BUGS (los que arregla este fix)
+## §B BUGS (what this fix resolves)
 
 | id  | date       | cause                                                                 | fix                  |
 |-----|------------|-----------------------------------------------------------------------|----------------------|
-| B1  | 2026-07-21 | `float(it["aporte_curso"].replace(...).strip() or 0)` crashea con `"-"` | `_parse_porcentaje` con centinelas explicitos |
-| B2  | 2026-07-21 | `_imprimir_resumen` antes de `_actualizar_md_actividad`/`_actualizar_snapshot` | reordenar main() + try/except |
-| B3  | 2026-07-21 | `cli_clickup.py` llama `get_client()` sin import (NameError)         | deprecado: el script ahora produce `sync_plan.json`; no usa `use-clickup` |
-| B4  | 2026-07-21 | `cli_clickup.py:127,132,388,421` usa 4 funciones libres de `use-clickup` no importadas | idem B3: el script ya no las necesita |
-| B5  | 2026-07-21 | SKILL.md excede 500 líneas (586)                                      | refactor: mover secciones a `references/` |
-| B6  | 2026-07-21 | `pyproject.toml` ya tiene bloque `[dependency-groups]`; duplicarlo causa `TOMLDecodeError` | añadir `pytest` al array existente |
-| B7  | 2026-07-21 | tests propuestos no mockean `console` de Rich, fallan en CI sin TTY    | mockear `console` con `StringIO` en conftest |
+| B1  | 2026-07-21 | `float(it["aporte_curso"].replace(...).strip() or 0)` crashes on `"-"` | `_parse_porcentaje` with explicit sentinels |
+| B2  | 2026-07-21 | `_imprimir_resumen` before `_actualizar_md_actividad` / `_actualizar_snapshot` | reorder main() + try/except |
+| B3  | 2026-07-21 | `cli_clickup.py` calls `get_client()` without import (NameError)      | deprecated: the script now produces `sync_plan.json`; does not use `use-clickup` |
+| B4  | 2026-07-21 | `cli_clickup.py:127,132,388,421` uses 4 free functions of `use-clickup` not imported | same as B3: the script no longer needs them |
+| B5  | 2026-07-21 | SKILL.md exceeds 500 lines (586)                                      | refactor: move sections to `references/` |
+| B6  | 2026-07-21 | `pyproject.toml` already has a `[dependency-groups]` block; duplicating it causes `TOMLDecodeError` | add `pytest` to the existing array |
+| B7  | 2026-07-21 | proposed tests don't mock Rich's `console`, fail in CI without a TTY  | mock `console` with `StringIO` in conftest |
 
 ## §R REFS
 
-- `AGENTS.md` raiz — constitucion del repo (§3 layers, §9 agnosticismo, §11 right-size, §15 size).
-- `use-clickup/scripts/client.py` — API consumida por el agente (no por el skill).
-- `references/sync-flow.md` (NUEVO) — contrato agente/skill + flujo end-to-end.
-- `references/folder-structure.md` (NUEVO) — extraido de SKILL.md.
-- `references/agents-md-template.md` (NUEVO) — extraido de SKILL.md.
+- `AGENTS.md` at repo root — repo constitution
+  (§3 layers, §9 agnosticism, §11 right-size, §15 size).
+- `use-clickup/scripts/client.py` — API consumed by the agent (not by
+  the skill).
+- `references/sync-flow.md` (NEW) — agent/skill contract + end-to-end
+  flow.
+- `references/folder-structure.md` (NEW) — extracted from SKILL.md.
+- `references/agents-md-template.md` (NEW) — extracted from SKILL.md.

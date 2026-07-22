@@ -1,87 +1,89 @@
 # SPEC: Geo-Information & SVG Mapping Skill
 
-## 1. Objetivo General
+## 1. Overall objective
 
-Diseñar e implementar una habilidad (skill) para el agente que le permita
-interactuar con APIs geográficas para obtener coordenadas, límites
-administrativos y vectores de calles, procesar dicha información y exportar
-mapas vectoriales precisos en formato SVG.
+Design and implement a skill for the agent that lets it interact with
+geographic APIs to obtain coordinates, administrative boundaries, and
+street vectors, process that information, and export accurate vector
+maps in SVG format.
 
-## 2. Arquitectura de Integración (Estrategia Fallback)
+## 2. Integration architecture (fallback strategy)
 
-La skill implementa un flujo de consulta secuencial de dos capas para
-garantizar la disponibilidad y calidad de los datos:
+The skill implements a two-layer sequential query flow to guarantee data
+availability and quality:
 
-- **Proveedor Principal (Capa 1): OpenStreetMap (OSM)**
-  - **Geocodificación:** Nominatim API.
-  - **Geometrías/Vectores:** Overpass API (consultas Overpass QL).
-  - **Criterio de éxito:** Si el resultado es exitoso, contiene datos
-    geométricos válidos y tiene un score de confianza aceptable, se procesa.
-- **Proveedor de Respaldo (Capa 2): Mapbox**
-  - **Activación:** Se invoca únicamente si OSM falla (timeout, error de
-    red), excede sus límites de ratio de peticiones, o devuelve un set de
-    datos vacío/insuficiente para el área solicitada.
-  - **Servicio:** Mapbox Geocoding API.
+- **Primary provider (Layer 1): OpenStreetMap (OSM)**
+  - **Geocoding:** Nominatim API.
+  - **Geometries/vectors:** Overpass API (Overpass QL queries).
+  - **Success criterion:** if the result is successful, contains valid
+    geometric data, and has an acceptable confidence score, it is
+    processed.
+- **Backup provider (Layer 2): Mapbox**
+  - **Activation:** invoked only if OSM fails (timeout, network
+    error), exceeds its request rate limits, or returns an empty /
+    insufficient dataset for the requested area.
+  - **Service:** Mapbox Geocoding API.
 
-## 3. Flujo de Trabajo Técnico
+## 3. Technical workflow
 
-1. **Entrada:** Recibe el texto o query con la ubicación deseada.
-2. **Consulta Principal (OSM):** Se intentan extraer los datos geográficos
-   de OpenStreetMap.
-   - _Si es exitoso:_ Envía el GeoJSON directamente al pipeline de
-     procesamiento.
-   - _Si falla o retorna vacío:_ Se activa de inmediato el fallback hacia
-     la API de Mapbox.
-3. **Proyección Cartográfica:** Transforma las coordenadas esféricas del
-   GeoJSON obtenido en coordenadas cartesianas (X, Y) usando Web Mercator.
-4. **Renderizado:** Traduce los datos proyectados a etiquetas vectoriales
-   organizadas y genera el archivo SVG final.
+1. **Input:** receives the text or query with the desired location.
+2. **Primary query (OSM):** the skill tries to extract geographic data
+   from OpenStreetMap.
+   - _If successful:_ sends the GeoJSON directly to the processing
+     pipeline.
+   - _If it fails or returns empty:_ the fallback to the Mapbox API is
+     activated immediately.
+3. **Cartographic projection:** transforms the spherical coordinates
+   of the obtained GeoJSON into Cartesian coordinates (X, Y) using
+   Web Mercator.
+4. **Rendering:** translates the projected data into organized vector
+   labels and generates the final SVG file.
 
-### Paso 1: Geocodificación y Extracción de Datos
+### Step 1: Geocoding and data extraction
 
-- **Input:** Un string con la ubicación (ej. "Floridablanca, Santander")
-  o coordenadas explícitas.
-- **Output esperado:** Un objeto estructurado en formato **GeoJSON** que
-  contenga nodos (puntos de interés), _ways_ (calles, carreteras) y
-  relaciones (límites de polígonos).
+- **Input:** a string with the location (e.g. "Floridablanca,
+  Santander") or explicit coordinates.
+- **Expected output:** a structured object in **GeoJSON** format
+  containing nodes (points of interest), _ways_ (streets, roads), and
+  relations (polygon boundaries).
 
-### Paso 2: Normalización y Proyección Cartográfica
+### Step 2: Normalization and cartographic projection
 
-El agente debe tomar las coordenadas geográficas esféricas `[Longitud,
-Latitud]` del GeoJSON y proyectarlas en un plano bidimensional cartesiano
-`(X, Y)` utilizando la **Proyección Web Mercator (EPSG:3857)** adaptada
-al tamaño del lienzo SVG requerido.
+The agent must take the spherical geographic coordinates
+`[Longitude, Latitude]` from the GeoJSON and project them onto a
+two-dimensional Cartesian plane `(X, Y)` using the **Web Mercator
+projection (EPSG:3857)** adapted to the required SVG canvas size.
 
-- Debe calcular automáticamente el _Bounding Box_ (caja de delimitación)
-  para centrar y escalar el contenido de manera óptima dentro del lienzo.
+- It must automatically compute the _Bounding Box_ to center and
+  scale the content optimally within the canvas.
 
-### Paso 3: Renderizado a SVG Vectorial (Requerimiento CORE de Estructura)
+### Step 3: Vector SVG rendering (CORE structure requirement)
 
-La skill debe mapear las entidades geográficas a etiquetas SVG válidas. Es
-un **requerimiento estrictamente mandatorio** que todos los elementos se
-organicen en grupos (`<g>`) perfectamente nombrados e identificados. Esto
-garantiza la comprensión humana directa y permite que el SVG sea importado
-y editado como un recurso de diseño limpio en herramientas como
-**Affinity Designer** o **Microsoft PowerPoint**.
+The skill must map geographic entities to valid SVG tags. It is a
+**strictly mandatory requirement** that all elements be organized
+into perfectly named and identified groups (`<g>`). This guarantees
+direct human comprehension and allows the SVG to be imported and
+edited as a clean design resource in tools like **Affinity Designer**
+or **Microsoft PowerPoint**.
 
-- **Organización por Capas Semánticas:** Cada categoría de datos debe estar
-  agrupada dentro de una etiqueta `<g>` con un atributo `id` semántico,
-  claro y legible (ej. `<g id="limites-administrativos">`,
+- **Organization by semantic layers:** each data category must be
+  grouped inside a `<g>` tag with a semantic, clear, readable `id`
+  attribute (e.g. `<g id="limites-administrativos">`,
   `<g id="calles-principales">`, `<g id="parques-y-zonas-verdes">`,
   `<g id="cuerpos-de-agua">`).
-- **Elementos de Línea:** `LineString` y `MultiLineString` (calles, ríos)
-  -> Elementos `<path d="..." />` con atributos de estilo configurables
-  (`stroke`, `stroke-width`).
-- **Elementos de Polígono:** `Polygon` y `MultiPolygon` (edificios,
-  parques, zonas urbanas) -> Elementos `<path d="..." />` con atributos
-  `fill` y `opacity`.
-- **Elementos de Punto:** `Point` (marcadores o lugares clave) -> Elementos
-  `<circle cx="..." cy="..." />`.
+- **Line elements:** `LineString` and `MultiLineString` (streets,
+  rivers) -> `<path d="..." />` elements with configurable style
+  attributes (`stroke`, `stroke-width`).
+- **Polygon elements:** `Polygon` and `MultiPolygon` (buildings,
+  parks, urban zones) -> `<path d="..." />` elements with `fill` and
+  `opacity` attributes.
+- **Point elements:** `Point` (markers or key places) -> `<circle
+  cx="..." cy="..." />` elements.
 
-## 4. Requisitos del Output del Script/Función
+## 4. Script/function output requirements
 
-Cualquier ejecución de esta skill debe retornar un objeto JSON con la
-siguiente estructura:
+Every execution of this skill must return a JSON object with the
+following structure:
 
 ```json
 {
@@ -96,27 +98,26 @@ siguiente estructura:
 }
 ```
 
-## 5. Criterios de Aceptación para el Agente
+## 5. Acceptance criteria for the agent
 
-- **Validación de Fallback:** Si se simula un error de conexión con
-  Nominatim/Overpass, la skill debe cambiar automáticamente a Mapbox sin
-  lanzar excepciones críticas de detención.
-- **Precisión Geométrica:** Las proporciones espaciales del mapa en el
-  SVG resultante deben mantenerse fieles a la realidad geográfica,
-  evitando distorsiones visuales severas (estiramiento
-  vertical/horizontal).
-- **Código SVG Limpio y Editable:** El string de SVG generado debe estar
-  bien indentado, incluir una etiqueta `viewBox` dinámica, no contener
-  elementos huérfanos y, sobre todo, exhibir una jerarquía de capas
-  (`id` en etiquetas `<g>`) completamente intuitiva para que un humano
-  pueda desagrupar y cambiar colores de calles o zonas de forma
-  independiente en su software de diseño.
+- **Fallback validation:** if a connection error with
+  Nominatim/Overpass is simulated, the skill must automatically
+  switch to Mapbox without throwing critical stop exceptions.
+- **Geometric precision:** the spatial proportions of the map in the
+  resulting SVG must stay faithful to geographic reality, avoiding
+  severe visual distortions (vertical/horizontal stretching).
+- **Clean editable SVG code:** the generated SVG string must be
+  well-indented, include a dynamic `viewBox` tag, not contain
+  orphan elements, and — above all — exhibit a layer hierarchy
+  (`id` in `<g>` tags) that is completely intuitive so a human can
+  ungroup and change colors of streets or zones independently in
+  their design software.
 
-## 6. Restricciones del Harness
+## 6. Harness constraints
 
-- Skill agnóstica (§9): sin referencias a harnesses o herramientas
-  específicas en el cuerpo del SKILL.md.
-- Idioma del skill: `es-CO` (la spec original está en es-CO).
-- Capa: `domain`. Invocación: `auto`. `provides`: capacidades
-  declaradas.
-- Tamaño: `SKILL.md <= 500` líneas.
+- Skill agnostic (§9): no references to specific harnesses or tools
+  in the SKILL.md body.
+- Skill language: `es-CO` (the original spec is in es-CO).
+- Layer: `domain`. Invocation: `auto`. `provides`: declared
+  capabilities.
+- Size: `SKILL.md <= 500` lines.

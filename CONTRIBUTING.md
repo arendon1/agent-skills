@@ -26,7 +26,7 @@ You do **not** need to read every skill to learn conventions. `skill-forge` +
 ## Step 1 — Decide the layer
 
 The `layer:` field (and the directory you put the skill in) must be one of
-`process` / `domain` / `utility`. The criteria below are **inferred from the 31
+`process` / `domain` / `utility`. The criteria below are **inferred from the 33
 existing skills and the call rules in AGENTS.md §3** — the constitution itself
 does not define an assignment algorithm, so use your judgment, and if in doubt
 look at which bucket analogous skills sit in.
@@ -176,20 +176,26 @@ fails and fixes:
 ## Step 6 — Verify end-to-end
 
 After `audit` passes and the manifest is fresh, confirm the harness can find
-your skill:
+your skill. The recommended path is the Vercel `skills` CLI — it works on
+every supported harness:
 
 ```bash
 # Cross-harness discovery + grouping by layer.
 npx skills add . --list -y | grep <skill-name>
+```
 
-# Full pi experience (auto-triggering + the new skill).
+If you are using a harness with a dedicated adapter (e.g. pi) and want the
+full self-triggering experience:
+
+```bash
 pi install . -l -a
 # In a fresh pi prompt:
 #   "How many skills are available to you? Reply with just a number."
-# Expect 32 (one more than before).
+# Expect 34 (one more than before).
 ```
 
-If the counts match and `audit --check` is green, commit.
+Either path is fine — pick the one your harness supports. The skill is
+correct as long as `audit` passes and your harness lists it.
 
 ## Step 7 — Commit
 
@@ -213,3 +219,18 @@ docs(<skill>): <SKILL.md / references update only>
 | How do I invoke the scaffolder / auditor / manifest generator? | `utility/skill-forge/SKILL.md` (COMMANDS section) |
 | What does the body look like? | This doc (Step 4 anatomy) + AGENTS.md §9 (agnosticism) + §8 (caveman boundaries) |
 | Where does the skill live in the repo? How is it deployed? | `README.md` (install paths) + AGENTS.md §2 (bucket layout) |
+
+---
+
+## Install path for users (not contributors)
+
+If you're here to **use** the skills, not write one, skip everything above and
+run:
+
+```bash
+npx skills add <this-repo>
+```
+
+That's the install path documented in `README.md`. This doc is for adding
+skills to the repo. See `AGENTS.md` for the rules, `skill-forge` for the
+enforcer, and `README.md` for the user-facing install.

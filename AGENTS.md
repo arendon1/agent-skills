@@ -58,7 +58,7 @@ is the only place harness-specific coupling lives.
 
 | Layer | Name | Skills |
 |---|---|---|
-| 4 | Adapters | `adapters/pi/`, `adapters/opencode/` — harness coupling only |
+| 4 | Adapters | per-harness glue (one adapter per harness; e.g. `adapters/pi/`, `adapters/opencode/`) — harness coupling only |
 | 3 | Utility | `skill-forge`, `caveman`, `bootstrap`, `skill-find`, `skill-add` |
 | 2 | Domain | `use-clickup`, `research-literature`, `make-a-diagram`, loops (`gestionar-cursos`, `generar-paper`, `analyze-model`) |
 | 1 | Process | loops (`grill design spec plan build research review check prototype handoff teach triage`) + disciplines (`tdd debug verify lessons deepen domain-modeling git dispatch`) |

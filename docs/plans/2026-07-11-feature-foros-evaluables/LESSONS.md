@@ -1,66 +1,72 @@
-# LESSONS: Foros evaluables
+# LESSONS: Evaluatable forums
 
-## Lecciones durante el build
+## Lessons during the build
 
-### L1: SKILL.md ya violaba el límite de 500 líneas
+### L1: SKILL.md was already violating the 500-line limit
 
-- **Síntoma:** al agregar la nueva sección de `foros`, SKILL.md pasó
-  de 560 → 618 líneas (límite MUST: 500).
-- **Causa:** la versión previa del SKILL.md ya estaba en 560 líneas,
-  violando la constitución (§15: SKILL.md MUST stay under 500 lines).
-- **Mitigación:** moví el detalle de implementación de la nueva feature
-  a `references/foros-evaluables.md` y dejé en SKILL.md solo lo
-  esencial (uso, qué extrae, dónde está el detalle). 618 → 593.
-- **Pendiente:** abrir un refactor que mueva MÁS contenido del SKILL.md
-  actual a `references/` (la sección de "Fuente de Verdad de Fechas"
-  tiene 50+ líneas que podrían vivir en su propio reference). Esto
-  debería ser un plan aparte, no acoplado a esta feature.
+- **Symptom:** when adding the new `foros` section, SKILL.md went
+  from 560 → 618 lines (MUST limit: 500).
+- **Cause:** the previous version of SKILL.md was already at 560
+  lines, violating the constitution (§15: SKILL.md MUST stay under
+  500 lines).
+- **Mitigation:** moved the implementation detail of the new
+  feature to `references/foros-evaluables.md` and left in SKILL.md
+  only the essentials (usage, what it extracts, where the detail
+  lives). 618 → 593.
+- **Pending:** open a refactor that moves MORE content of the
+  current SKILL.md to `references/` (the "Date Source of Truth"
+  section is 50+ lines that could live in its own reference). This
+  should be a separate plan, not coupled to this feature.
 
-### L2: Los foros intro y los foros de actividad son bestias distintas
+### L2: Intro forums and activity forums are different beasts
 
-- **Aprendizaje:** `extractor_foro.py` (intro: Avisos, Consultas,
-  Presentación) filtra solo discusiones del profesor — eso es correcto
-  para intro donde el profe es el autor de los avisos. NO es correcto
-  para foros de actividad donde los compañeros son los autores.
-- **Decisión:** NO refactorizar `extractor_foro.py` — crear
-  `extractor_foro_evaluable.py` paralelo, dejando el viejo intacto.
-  El `cli_init.py` decide cuál usar según `es_evaluable(titulo)`.
-- **Beneficio:** cero riesgo de romper el flujo existente de
-  intro/Avisos que ya está en producción.
+- **Learning:** `extractor_foro.py` (intro: Announcements,
+  Consultations, Presentation) filters only the professor's
+  discussions — that is correct for intro where the professor is
+  the author of the announcements. It is NOT correct for activity
+  forums where classmates are the authors.
+- **Decision:** do NOT refactor `extractor_foro.py` — create a
+  parallel `extractor_foro_evaluable.py`, leaving the old one
+  intact. `cli_init.py` decides which to use based on
+  `es_evaluable(titulo)`.
+- **Benefit:** zero risk of breaking the existing intro/Announcements
+  flow that is already in production.
 
-### L3: Cache por `discuss_id` es el identificador canónico
+### L3: Cache by `discuss_id` is the canonical identifier
 
-- **Aprendizaje:** la URL completa del hilo es
-  `/mod/forum/discuss.php?d=<N>`. El `<N>` es estable (Moodle no lo
-  recicla). Usar el ID como key de cache garantiza idempotencia:
-  re-ejecuciones no re-abren hilos ya procesados.
-- **Verificación:** el smoke test con `tempfile` confirmó que el cache
-  hit evita la navegación.
+- **Learning:** the full thread URL is
+  `/mod/forum/discuss.php?d=<N>`. The `<N>` is stable (Moodle does
+  not recycle it). Using the ID as cache key guarantees
+  idempotency: re-executions do not re-open already-processed
+  threads.
+- **Verification:** the smoke test with `tempfile` confirmed that
+  the cache hit avoids the navigation.
 
-### L4: Selectores de Moodle pueden cambiar entre versiones
+### L4: Moodle selectors can change between versions
 
-- **Riesgo:** el parser de `vencimiento`, `indicaciones`, y `actividad`
-  depende de la estructura HTML actual de Moodle (basado en la
-  captura del usuario). Si Uniremington actualiza Moodle, estos
-  selectores pueden romperse.
-- **Mitigación aplicada:** cada extractor tiene fallbacks (ej: la
-  extracción de `vencimiento` busca en `div[data-region='activity-dates']`
-  y devuelve "" si no encuentra; `indicaciones` y `actividad` buscan
-  en el texto y devuelven "[Sin indicaciones]" / "[Sin actividad]").
-- **Mitigación futura:** si los selectores fallan en un curso real,
-  añadir logs de debug con el HTML descargado para iterar. Por
-  ahora, los fallbacks garantizan que el flujo no crashea.
+- **Risk:** the parser for `vencimiento`, `indicaciones`, and
+  `actividad` depends on the current Moodle HTML structure (based
+  on the user's capture). If Uniremington updates Moodle, these
+  selectors may break.
+- **Applied mitigation:** each extractor has fallbacks (e.g. the
+  `vencimiento` extraction searches in
+  `div[data-region='activity-dates']` and returns `""` if not
+  found; `indicaciones` and `actividad` search in the text and
+  return `"[Sin indicaciones]"` / `"[Sin actividad]"`).
+- **Future mitigation:** if the selectors fail in a real course,
+  add debug logs with the downloaded HTML to iterate. For now,
+  the fallbacks guarantee the flow does not crash.
 
-### L5: El cap de 20 hilos es por foro, no por curso
+### L5: The 20-thread cap is per forum, not per course
 
-- **Decisión:** el usuario dijo "máximo 20 hilos por foro" (cap por
-  foro). Si hay 5 foros con 20 hilos cada uno = 100 navegaciones
-  en el peor caso. Aceptable para uso real.
-- **Configurable:** `MAX_HILOS = 20` en `extractor_foro_evaluable.py`
-  para ajuste futuro.
+- **Decision:** the user said "max 20 threads per forum" (cap per
+  forum). If there are 5 forums with 20 threads each = 100
+  navigations in the worst case. Acceptable for real use.
+- **Configurable:** `MAX_HILOS = 20` in
+  `extractor_foro_evaluable.py` for future tuning.
 
-### L6: El `__pycache__` en el repo de docs es ruido
+### L6: The `__pycache__` in the docs repo is noise
 
-- Observación menor: hay `.pyc` files en el repo del skill (carpeta
-  `__pycache__`). Debería estar en `.gitignore`. No es bloqueante
-  pero es limpieza pendiente.
+- Minor observation: there are `.pyc` files in the skill's repo
+  (the `__pycache__` folder). They should be in `.gitignore`. Not
+  blocking but pending cleanup.

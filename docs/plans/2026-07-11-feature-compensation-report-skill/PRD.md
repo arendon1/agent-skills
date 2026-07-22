@@ -1,81 +1,80 @@
-# PRD: skill de reporte de compensación
+# PRD: compensation report skill
 
 **Plan:** `2026-07-11-feature-compensation-report-skill`
-**Tipo:** feature
-**Estado:** ✅ implementado
+**Type:** feature
+**Status:** ✅ implemented
 
-## Contexto
+## Context
 
-El usuario es un ingeniero BI/Analytics con 6 años de experiencia en Colombia,
-remoto, especializado en Tableau. Necesita negociar salario con frecuencia
-(evaluaciones anuales, ofertas externas) y no tenía un flujo reproducible
-para producir análisis de mercado accionables. La conversación manual
-(pedirle datos, hacer búsquedas, generar tablas) tomaba 3-4 turnos y los
-reportes se perdían en el chat.
+The user is a BI/Analytics engineer with 6 years of experience in
+Colombia, remote, specialized in Tableau. They need to negotiate
+salary frequently (annual reviews, external offers) and did not have
+a reproducible flow to produce actionable market analyses. The manual
+conversation (asking for data, doing searches, generating tables) took
+3-4 turns and the reports were lost in the chat.
 
-## Problema
+## Problem
 
-1. Recolectar los datos necesarios para un análisis de compensación
-   requería 2-3 turnos de preguntas.
-2. La investigación de bandas salariales en LATAM (COP + USD, multi-rol,
-   multi-stack) no estaba estandarizada — dependía de la memoria del
-   agente.
-3. El reporte final variaba en forma: a veces en columnas, a veces en
-   prosa, a veces solo USD sin conversión a COP.
-4. No había separación entre "reporte generado" y "reporte reutilizable"
-   — cada negociación empezaba de cero.
+1. Collecting the data needed for a compensation analysis required
+   2-3 turns of questions.
+2. The research of salary bands in LATAM (COP + USD, multi-role,
+   multi-stack) was not standardized — it depended on the agent's
+   memory.
+3. The final report varied in form: sometimes in columns, sometimes
+   in prose, sometimes only USD without COP conversion.
+4. There was no separation between "generated report" and "reusable
+   report" — every negotiation started from zero.
 
-## Usuarios
+## Users
 
-- **Primario:** el propio usuario, negociando salario con su empleador
-  actual o evaluando ofertas externas.
-- **Secundario:** otros profesionales LATAM en roles técnicos similares
-  que adopten el skill vía el repo `agent-skills-v2`.
+- **Primary:** the user themselves, negotiating salary with their
+  current employer or evaluating external offers.
+- **Secondary:** other LATAM professionals in similar technical
+  roles who adopt the skill via the `agent-skills-v2` repo.
 
 ## Goals
 
-1. Reducir el ciclo "necesito un análisis de compensación" a 2 turnos:
-   uno para entrevista, otro para el reporte listo.
-2. Estandarizar el reporte: siempre 7 secciones, siempre las 4 formas
-   de cada cifra (USD/año, USD/mes, COP/año, COP/mes), siempre 3+
-   fuentes por percentil.
-3. Que el reporte sea reutilizable como artefacto: archivo markdown
-   versionable, no chat efímero.
-4. Que el skill sea agnóstico del harness (corre en cualquier
-   adaptador de Layer 4 que pueda leer SKILL.md y correr Bash).
+1. Reduce the "I need a compensation analysis" cycle to 2 turns:
+   one for the interview, one for the ready report.
+2. Standardize the report: always 7 sections, always 4 forms of
+   each figure (USD/year, USD/month, COP/year, COP/month), always 3+
+   sources per percentile.
+3. Make the report reusable as an artifact: a versionable markdown
+   file, not ephemeral chat.
+4. Make the skill harness-agnostic (runs on any Layer 4 adapter that
+   can read SKILL.md and run Bash).
 
 ## Non-goals
 
-- No intenta predecir ofertas individuales — solo refleja el mercado
-  público disponible.
-- No scrapea sitios no públicos (Glassdoor autenticado, niveles
-  privados, etc.).
-- No produce recomendaciones legales ni fiscales.
-- No automatiza el envío de la oferta al empleador — el reporte
-  termina en el usuario, no en el reclutador.
+- Does not try to predict individual offers — only reflects the
+  available public market.
+- Does not scrape non-public sites (authenticated Glassdoor, private
+  levels, etc.).
+- Does not produce legal or tax recommendations.
+- Does not automate sending the offer to the employer — the report
+  ends with the user, not the recruiter.
 
-## Criterios de éxito
+## Success criteria
 
-- El usuario puede invocar el skill, responder la entrevista, y recibir
-  un reporte markdown en menos de 5 minutos.
-- El reporte siempre tiene las 4 columnas monetarias por tabla
-  salarial.
-- El reporte cita al menos 10 fuentes externas.
-- El skill pasa `skill-forge audit` sin advertencias críticas.
-- El skill es agnóstico: no menciona `pi`, `Claude Code`, `OpenCode`,
-  ni sintaxis de slash-commands en el cuerpo.
+- The user can invoke the skill, answer the interview, and receive
+  a markdown report in less than 5 minutes.
+- The report always has the 4 monetary columns per salary table.
+- The report cites at least 10 external sources.
+- The skill passes `skill-forge audit` without critical warnings.
+- The skill is agnostic: it does not mention `pi`, `Claude Code`,
+  `OpenCode`, or slash-command syntax in the body.
 
-## Riesgos
+## Risks
 
-- **Datos desactualizados:** las bandas salariales cambian trimestre a
-  trimestre. Mitigación: el skill exige fecha en cada fuente y
-  advierte cuando son mayores a 12 meses.
-- **TRM volátil:** la tasa COP/USD varía. Mitigación: el reporte
-  registra la TRM usada con fecha y advierte sobre riesgo cambiario si
-  el contrato es en COP.
-- **Alta varianza de fuentes:** Glassdoor tiene outliers enormes.
-  Mitigación: triangulación obligatoria de 3 fuentes, advertencia
-  explícita si la varianza intra-percentil supera 25%.
-- **Falsa precisión:** un percentil P50 no garantiza nada.
-  Mitigación: el reporte es de mercado, no de oferta individual; las
-  tácticas de negociación lo dejan claro.
+- **Stale data:** salary bands change quarter to quarter.
+  Mitigation: the skill requires a date on each source and warns
+  when they are older than 12 months.
+- **Volatile exchange rate:** the COP/USD rate varies. Mitigation:
+  the report records the exchange rate used with a date and warns
+  about FX risk if the contract is in COP.
+- **High source variance:** Glassdoor has huge outliers. Mitigation:
+  mandatory triangulation of 3 sources, explicit warning if
+  intra-percentile variance exceeds 25%.
+- **False precision:** a P50 percentile does not guarantee anything.
+  Mitigation: the report is about the market, not an individual
+  offer; the negotiation tactics make that clear.

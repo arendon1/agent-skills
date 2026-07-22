@@ -1,119 +1,121 @@
-# ARD: skill de reporte de compensación
+# ARD: compensation report skill
 
 **Plan:** `2026-07-11-feature-compensation-report-skill`
-**Estado:** ✅ implementado
+**Status:** ✅ implemented
 
-## Decisión arquitectónica
+## Architectural decision
 
-Skill único, autocontenido, sin dependencias runtime de otros skills
-del repo. Vive en `domain/compensation-report/` porque:
+Single, self-contained skill, with no runtime dependencies on other
+skills in the repo. It lives in `domain/compensation-report/` because:
 
-- Es un loop con deliverable concreto (un archivo markdown) → capa
-  `domain` por convención del repo (ver AGENTS.md §3, §4).
-- No orquesta otros loops del SDD pipeline (`grill`, `plan`, `build`)
-  → no es `process`.
-- No es leaf de soporte (no lo invocan otros skills) → no es `utility`.
+- It is a loop with a concrete deliverable (a markdown file) → `domain`
+  layer by repo convention (see AGENTS.md §3, §4).
+- It does not orchestrate other loops of the SDD pipeline
+  (`grill`, `plan`, `build`) → not `process`.
+- It is not a support leaf (it is not invoked by other skills) → not
+  `utility`.
 
-## Capas e interfaces
+## Layers and interfaces
 
 ```
 +-------------------------+
-| Usuario (humano)        |
-| "necesito un reporte"   |
+| User (human)            |
+| "I need a report"       |
 +----------+--------------+
            |
            v
 +-------------------------+
-| compensation-report     |  ← skill de loop, invocation: user
+| compensation-report     |  ← loop skill, invocation: user
 | (domain)                |
 +----------+--------------+
            |
            v
 +-------------------------+
-| Investigación externa   |  ← búsqueda web, extracción de páginas
+| External research       |  ← web search, page extraction
 | (web search/extract)    |
 +-------------------------+
            |
            v
 +-------------------------+
-| Triangulación + cálculo |  ← en memoria del agente
+| Triangulation + compute |  ← in agent memory
 +-------------------------+
            |
            v
 +-------------------------+
-| Reporte markdown        |  ← archivo escrito al home
+| Markdown report         |  ← file written to home
 +-------------------------+
 ```
 
-## Capas (Layer 2 domain, AGENTS.md §3)
+## Layers (Layer 2 domain, AGENTS.md §3)
 
-| Capa | Skill que se invoca | Razón |
+| Layer | Skill invoked | Reason |
 |---|---|---|
-| L3 utility | ninguno en este flujo | No requiere caveman ni bootstrap |
-| L2 domain | ninguno en este flujo | No consume use-clickup, make-a-diagram, etc. |
-| L1 process | nunca | Por regla §3, domain MUST NOT invocar process |
+| L3 utility | none in this flow | Does not require caveman or bootstrap |
+| L2 domain | none in this flow | Does not consume use-clickup, make-a-diagram, etc. |
+| L1 process | never | Per §3, domain MUST NOT invoke process |
 
-## Interfaces de entrada
+## Input interfaces
 
-| Nombre | Tipo | Requerido | Notas |
+| Name | Type | Required | Notes |
 |---|---|---|---|
-| `cargo` | string[] | sí | uno o varios cargos objetivo |
-| `experiencia_anos` | number | sí | años de experiencia total |
-| `ubicacion` | string | sí | ciudad/país + modalidad |
-| `empresa_objetivo` | string | sí | nombre o "mercado general" |
-| `stack` | string[] | no | herramientas o skills destacadas |
-| `salario_actual` | number | no | para calcular delta |
+| `cargo` | string[] | yes | one or more target roles |
+| `experiencia_anos` | number | yes | total years of experience |
+| `ubicacion` | string | yes | city/country + modality |
+| `empresa_objetivo` | string | yes | name or "general market" |
+| `stack` | string[] | no | standout tools or skills |
+| `salario_actual` | number | no | to compute the delta |
 | `tipo_contratacion` | enum | no | default: empleado_directo |
 | `moneda` | enum | no | default: ambas |
-| `ciudades` | string[] | no | default: país completo |
-| `nivel` | enum | no | default: inferido por años |
-| `sector` | string | no | default: mercado general |
-| `beneficios_actuales` | string[] | no | default: beneficios típicos |
+| `ciudades` | string[] | no | default: full country |
+| `nivel` | enum | no | default: inferred from years |
+| `sector` | string | no | default: general market |
+| `beneficios_actuales` | string[] | no | default: typical benefits |
 
-## Interface de salida
+## Output interface
 
-Un único archivo markdown con:
+A single markdown file with:
 
-- 7 secciones obligatorias en orden fijo
-- Tablas salariales siempre con 4 columnas: USD/año, USD/mes, COP/año,
-  COP/mes
-- ≥ 3 fuentes por percentil publicado
-- ≥ 10 fuentes totales citadas entre §2, §3 y §7
-- Header con TRM y fecha
-- Advertencias accionables, no genéricas
+- 7 mandatory sections in fixed order
+- Salary tables always with 4 columns: USD/year, USD/month, COP/year,
+  COP/month
+- ≥ 3 sources per published percentile
+- ≥ 10 total sources cited across §2, §3 and §7
+- Header with exchange rate and date
+- Actionable warnings, not generic
 
-## Datos persistentes
+## Persistent data
 
-Ninguno. El skill no escribe bases de datos, no mantiene caché, no
-genera logs. El reporte es el único artefacto.
+None. The skill does not write databases, does not maintain caches,
+does not generate logs. The report is the only artifact.
 
-## Riesgos arquitectónicos
+## Architectural risks
 
-- **Acoplamiento a las herramientas de búsqueda del adaptador.** El
-  skill describe comportamiento ("investigar fuentes") sin nombrar la
-  herramienta. El adaptador Layer 4 decide si usa `web_search`,
-  `WebFetch`, `Brave Search` u otra. Razón: AGENTS.md §9 (agnosticismo).
-- **Variabilidad de TRM entre fuentes.** Distintas APIs devuelven TRM
-  ligeramente distintas. Mitigación: el skill exige una sola TRM por
-  reporte, registrada al inicio, capturada del mismo hilo de
-  investigación.
-- **Falta de fuentes para roles emergentes** (ej. "Analytics Manager"
-  en Latam es un cargo nuevo). Mitigación: si no hay ≥ 3 fuentes, se
-  reduce a mercado general y se advierte.
+- **Coupling to the adapter's search tools.** The skill describes
+  behavior ("research sources") without naming the tool. The Layer 4
+  adapter decides whether to use `web_search`, `WebFetch`, `Brave
+  Search`, or another. Reason: AGENTS.md §9 (agnosticism).
+- **Exchange-rate variability between sources.** Different APIs
+  return slightly different rates. Mitigation: the skill requires a
+  single rate per report, recorded at the top, captured from the
+  same research thread.
+- **Lack of sources for emerging roles** (e.g. "Analytics Manager"
+  in Latam is a new title). Mitigation: if there are not ≥ 3
+  sources, fall back to the general market and warn.
 
-## Cambios necesarios en otros archivos
+## Required changes in other files
 
-- `domain/compensation-report/SKILL.md` (nuevo, 307 líneas, < 500 ✓)
-- `docs/plans/2026-07-11-feature-compensation-report-skill/` (nuevo,
-  este plan)
-- `manifest.py` regenera automáticamente al correr `skill-forge`.
+- `domain/compensation-report/SKILL.md` (new, 307 lines, < 500 ✓)
+- `docs/plans/2026-07-11-feature-compensation-report-skill/` (new,
+  this plan)
+- `manifest.py` regenerates automatically when running `skill-forge`.
 
-## Decisiones rechazadas
+## Rejected decisions
 
-- **Skill como utility (no domain).** Rechazado: tiene deliverable
-  concreto, no es soporte de otros skills.
-- **Subdividir en 2 skills (interview + research).** Rechazado: la
-  entrevista es trivial (12 campos) y dividir añade ceremonia sin valor
-  (§11 right-size).
-- **Output en HTML además de markdown.** Rechazado: AGENTS.md §6 dice
-  "artifacts are markdown, HTML only when the user asks ad-hoc".
+- **Skill as utility (not domain).** Rejected: it has a concrete
+  deliverable; it is not a support skill.
+- **Split into 2 skills (interview + research).** Rejected: the
+  interview is trivial (12 fields) and splitting adds ceremony
+  without value (§11 right-size).
+- **Output in HTML in addition to markdown.** Rejected: AGENTS.md §6
+  says "artifacts are markdown, HTML only when the user asks
+  ad-hoc".

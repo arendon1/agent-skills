@@ -1,89 +1,162 @@
 # agent-skills
 
-A cohesive, self-triggering skill system for coding agents — 31 skills across
-`process/` · `domain/` · `utility/` layers, with a constitution enforcer
-(`skill-forge`) and a Layer 4 adapter for pi. Merges mechanisms from Cavekit,
-Superpowers, and Matt Pocock into one harness-agnostic architecture.
+A collection of **33 skills** for coding agents — process loops, domain
+capabilities, and utility tools — organized into three layers and shipped as a
+single installable package. Skills express **behavior**; an optional thin
+adapter maps behavior to your harness's tools.
 
-- **Constitution:** `AGENTS.md` — frontmatter schema, layers, triggering,
-  per-plan artifacts, ubiquitous language, caveman compression, agnosticism.
-- **Design source of truth:** `architecture-plan.html`, `HANDOFF.md`.
-- **Constitution enforcer:** `utility/skill-forge` — `audit.py` is the
-  direct, exit-code enforcer of the constitution.
+> **Constitution:** every skill is validated against [`AGENTS.md`](./AGENTS.md)
+> by `utility/skill-forge` (the enforcer). The constitution is the source of
+> truth for frontmatter, layer rules, and triggering contracts.
 
-## Install — two paths, two capability tiers
+---
 
-This repo is designed to be installed by Vercel's skills manager (`npx skills`)
-or directly into pi (`pi install`). Both are verified; pick by what you need.
+## Install
 
-### Tier 1 — Full self-triggering (pi)
+Use Vercel's [`skills`](https://www.npmjs.com/package/skills) CLI. It copies
+(or symlinks) every `SKILL.md` into your harness's conventional skill
+directory, so a one-liner works on every supported agent:
 
 ```bash
-pi install <this-repo>           # project-local
-pi install -g <this-repo>        # or global (~/.pi/)
+npx skills add <this-repo>
+# or, to a specific global location
+npx skills add <this-repo> -g
 ```
 
-One command. `pi install` reads our `package.json` (`pi.extensions` +
-`pi.skills`) and gives you:
+That's it. Once installed, every skill becomes available to your agent — most
+auto-trigger on context (the `"Use when …"` line in each frontmatter); the few
+that are user-invoked loops (e.g. `grill`, `plan`, `build`) get typed by name
+when you want their named deliverable.
 
-- ✅ All 31 skills discoverable (pi scans the layer buckets via
-  `resources_discover`).
-- ✅ **Bootstrap auto-triggering** — the `bootstrap` skill body is injected
-  at session start and after every compaction (the §4 self-triggering
-  behavior — check for skills + `CONTEXT.md` + the active plan before
-  responding).
+### What you get
 
-This is the recommended path for pi users. The adapter is the **only**
-harness-coupled code in the repo, by design (§9 agnosticism).
+- ✅ All 33 skills discoverable by your harness.
+- ✅ All 33 skills audited against the constitution (`AGENTS.md`) before ship.
+- ✅ Compatible with every harness the `skills` CLI supports (Claude Code,
+  Cursor, Windsurf, Cline, OpenCode, …).
+- ❌ No auto-injection at session start — `skills add` ships `SKILL.md` files
+  only, never runtime hooks. If you want the `bootstrap` skill auto-injected
+  at session start, see the [Adapters](#adapters-optional) section.
 
-### Tier 2 — Cross-harness discovery (every harness)
+### Pin a version
 
 ```bash
-npx skills add <this-repo>      # uses 'npx skills' (the Vercel skills manager)
+npx skills add <this-repo>@v1.2.0
 ```
 
-This is the path for OpenCode, Claude Code, Cursor, Windsurf, Cline, and every
-other harness the skills manager supports. `SKILL.md` files get copied (or
-symlinked, depending on flags) into each harness's conventional skill dir.
+---
 
-- ✅ All 31 skills discoverable + manually invokable on every harness.
-- ❌ **No bootstrap injection** — `skills add` ships `SKILL.md` files only,
-  never runtime hooks/exensions, so auto-triggering is not available. Skills
-  work when you ask for them ("Use when…" triggers fire normally).
+## Repository structure
 
-### Which one do I want?
+The repo is the **source**. The `skills` CLI flattens it into
+`<your-harness>/skills/<skill-name>/` on install, but the source layout is
+deliberately grouped into three layer-buckets so humans can browse and
+contribute.
 
-| You want… | Use |
-|---|---|
-| Full self-triggering on pi (recommended) | `pi install` |
-| Self-triggering on another harness | that harness' adapter (Tier 1 equivalent); build it in `adapters/<harness>/` |
-| Skills on every harness, manual invocation is fine | `npx skills add` |
+```
+.
+├── AGENTS.md                      ← constitution (frontmatter schema, layer rules, triggering)
+├── package.json                   ← manifest (also used by some harnesses)
+├── .claude-plugin/
+│   └── marketplace.json           ← generated, Format A: groups by layer
+├── process/                       ← 20 skills — loops + disciplines
+├── domain/                        ←  8 skills — domain-specific capabilities
+└── utility/                       ←  5 skills — cross-cutting tools
+```
 
-The buckets (`process/`/`domain/`/`utility/`) are a **source-repo** concern —
-human browsing + the `skills` CLI's grouping display. Deployed locations are
-flat (`<harness>/skills/<skill>/`) by design.
+### The three layers
 
-## What this is
+Skills are organized into strict layers with a one-way call rule. The rule is
+enforced by `skill-forge audit`, not by social agreement.
 
-A skill system, not a framework for apps. The deliverables are:
+| Layer | Bucket    | Count | Role | Examples |
+|------:|-----------|------:|------|----------|
+| 1     | `process` | 20    | Loops that produce a deliverable (`grill`, `plan`, `build`, `review` …) and reusable disciplines (`tdd`, `debug`, `verify`, `lessons`, `git`, `dispatch` …) | `grill`, `plan`, `tdd`, `debug`, `verify` |
+| 2     | `domain`  | 8     | Domain-specific capabilities that operate inside a process loop | `use-clickup`, `research-literature`, `gestionar-cursos`, `generar-paper` |
+| 3     | `utility` | 5     | Cross-cutting leaf tools; one of them (`bootstrap`) is session-enabling | `skill-forge`, `bootstrap`, `caveman`, `skill-find`, `skill-add` |
 
-- 31 `SKILL.md` files (each = one skill, each self-contained).
-- A constitution (`AGENTS.md`) that every skill is validated against.
-- An enforcer (`utility/skill-forge`) that audits and scaffolds.
-- Per-harness adapters (Layer 4) — pi today; OpenCode/Claude/etc. as needed.
+**Call rule (one-way):** process → domain → utility. A `domain` skill MUST
+NOT call a `process` skill. A `utility` skill MUST NOT call anything. The
+reason: if a domain loop could trigger a process loop, control inverts and
+the agent stops being a peer — it becomes a dispatcher with amnesia.
 
-Skills express **behavior**; adapters map behavior to harness tools. Skills
-never name a harness, model, or tool.
+### Anatomy of a skill
 
-## Working in this repo
+Each skill is one directory with at minimum a `SKILL.md`. Most also have
+`scripts/`, `references/`, and optional `examples/`, `evals/`, `assets/`.
 
-All script invocations are from the repo root:
+```
+process/grill/
+├── SKILL.md        ← required; the contract
+├── references/     ← cited sources, glossaries, deep dives
+├── examples/       ← worked inputs/outputs (optional)
+└── evals/          ← tests + acceptance criteria (optional)
+```
+
+The `SKILL.md` is **the contract**. It has two parts:
+
+1. **YAML frontmatter** — declares name, description (must contain `Use when`),
+   `invocation` (`auto` / `user` / `bootstrap`), `layer`, and for `user`-invoked
+   skills a `loop` + `deliverable`.
+
+   ```yaml
+   ---
+   name: grill
+   description: |
+     Sharpen a fuzzy idea into requirements before spec. Calibrates scope,
+     surfaces unknowns, and co-designs the mission.
+     Use when a task is vague, a PRD is missing, or scope is unclear.
+   invocation: user
+   layer: process
+   loop: grill
+   deliverable: PRD.md
+   ---
+   ```
+
+2. **Markdown body** — the procedure: when to fire, numbered steps, pitfalls,
+   and verification. Skills stay under 500 lines so a single context window
+   can hold one skill plus the active task.
+
+### Triggering model
+
+Every skill declares one of three `invocation` values:
+
+| Value       | Count | Contract |
+|-------------|------:|----------|
+| `auto`      | ~30   | Self-triggers on context, symptoms, or behavior. Default for disciplines + domain capabilities. |
+| `user`      | ~3    | Human invokes a named loop producing a specific deliverable. MUST declare `loop` + `deliverable`. |
+| `bootstrap` | 1     | Injected at session start and after compaction. Only `utility/bootstrap` holds this role. |
+
+This is what eliminates ambiguous entry points like `grill-me` vs
+`brainstorming`: a `user` skill MUST ship a `deliverable`, so the loop has a
+named output you can ask for.
+
+---
+
+## Adapters (optional)
+
+The repo is **harness-agnostic at the core** — skills name behaviors, never
+tools. The optional adapter layer (`adapters/<harness>/`) is the only place
+where a skill's behavior gets bound to a specific harness's tools (e.g.
+auto-injecting `bootstrap` at session start, or exposing a subagent dispatch
+helper).
+
+This repo ships adapters for select harnesses as a convenience, but you do
+**not** need them to use the skills. `npx skills add` is the recommended path
+for everyone. If you want the full self-triggering experience on a specific
+harness, check the `adapters/` directory for one that matches yours.
+
+---
+
+## Working in this repo (contributors)
+
+All script invocations are from the repo root.
 
 ```bash
-# audit a skill (exit 0 = PASS, 1 = FAIL)
+# audit a skill against AGENTS.md (exit 0 = PASS, 1 = FAIL)
 python utility/skill-forge/scripts/audit.py <skill-name>
 
-# regenerate the marketplace manifest (Format A: groups skills by layer)
+# regenerate the marketplace manifest (Format A: groups by layer)
 python utility/skill-forge/scripts/manifest.py
 python utility/skill-forge/scripts/manifest.py --check   # fail if stale
 
@@ -92,22 +165,15 @@ python utility/skill-forge/scripts/init.py <name> \
     --invocation user --layer process \
     --loop <name> --deliverable "<thing>"
 
-# check the constitution
+# read the constitution
 cat AGENTS.md
 ```
 
-## Layout
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full contributor guide and
+[`AGENTS.md`](./AGENTS.md) for the rules every skill must follow.
 
-```
-.
-├── AGENTS.md                      ← constitution
-├── architecture-plan.html         ← design source of truth (read-only)
-├── package.json                   ← pi package manifest (extensions + skills)
-├── .claude-plugin/
-│   └── marketplace.json           ← generated; Format A; groups by layer
-├── .pi/extensions/
-│   └── agent-skills.ts            ← Layer 4 adapter (pi)
-├── process/                       ← 20 skills
-├── domain/                        ←  6 skills
-└── utility/                       ←  5 skills (includes skill-forge, bootstrap, caveman)
-```
+---
+
+## License
+
+MIT.

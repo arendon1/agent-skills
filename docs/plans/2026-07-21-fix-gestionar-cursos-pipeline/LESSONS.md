@@ -1,162 +1,173 @@
 # LESSONS — fix(gestionar-cursos)
 
-## L1 — El bug de `float("-" or 0)` es una trampa clasica de Python
+## L1 — The `float("-" or 0)` bug is a classic Python trap
 
-- **Sintoma:** `ValueError: could not convert string to float: '-'`
-- **Causa:** `valor or 0` solo captura `valor == ""` o `valor is None`.
-  Cualquier string no vacio (incluido `"-"`, `"N/A"`, `"—"`) es truthy.
-- **Aprendizaje:** `or 0` NO es defensivo para "cualquier string no
-  parseable". Hay que enumerar centinelas explicitos.
-- **Portable:** preferir `_parse_porcentaje()` con lista explicita de
-  centinelas, sobre una expresion inline.
+- **Symptom:** `ValueError: could not convert string to float: '-'`
+- **Cause:** `valor or 0` only catches `valor == ""` or `valor is None`.
+  Any non-empty string (including `"-"`, `"N/A"`, `"—"`) is truthy.
+- **Learning:** `or 0` is NOT defensive for "any non-parseable string".
+  You need an explicit list of sentinels.
+- **Portable:** prefer `_parse_porcentaje()` with an explicit sentinel
+  list over an inline expression.
 
-## L2 — Las dependencias "imaginarias" son un olor a codigo
+## L2 — "Imaginary" dependencies are a code smell
 
-- **Sintoma:** `NameError: name 'get_client' is not defined` al primer uso.
-- **Causa:** el script llamaba funciones de `use-clickup` sin importarlas.
-  El comentario "delegated to the agent" ocultaba la deuda.
-- **Aprendizaje:** un script estructurado como ejecutable end-to-end DEBE
-  ser ejecutable end-to-end. Si no, el comentario miente.
-- **Portable:** o se implementa el wiring completo, o se elimina la opcion
-  `--apply` y se documenta el script como "solo previsualizacion".
+- **Symptom:** `NameError: name 'get_client' is not defined` on first
+  use.
+- **Cause:** the script called functions from `use-clickup` without
+  importing them. The "delegated to the agent" comment hid the debt.
+- **Learning:** a script structured as an end-to-end executable MUST be
+  end-to-end executable. Otherwise, the comment lies.
+- **Portable:** either implement the full wiring, or remove the
+  `--apply` option and document the script as "preview only".
 
-## L3 — El orden de operaciones en main() importa cuando hay un paso cosmetico
+## L3 — The order of operations in main() matters when there is a cosmetic step
 
-- **Sintoma:** `_imprimir_resumen` crasheaba antes de `_actualizar_md_actividad`
-  y `_actualizar_snapshot`, perdiendo el trabajo de extraccion.
-- **Causa:** orden collect → persist → format(report) → persist2; la segunda
-  persistencia se saltaba si format revienta.
-- **Aprendizaje:** persistir primero, formatear despues. El formato es para
-  el humano; los datos en disco son para el sistema.
-- **Portable:** orden canonico collect → persist → format → report.
+- **Symptom:** `_imprimir_resumen` crashed before
+  `_actualizar_md_actividad` and `_actualizar_snapshot`, losing the
+  extraction work.
+- **Cause:** order collect → persist → format(report) → persist2; the
+  second persistence was skipped if format blew up.
+- **Learning:** persist first, format after. Formatting is for the
+  human; the data on disk is for the system.
+- **Portable:** canonical order collect → persist → format → report.
 
-## L4 — Buscar antes de asumir
+## L4 — Search before assuming
 
-- **Contexto:** la leccion "status_id vs status name" ya existia documentada
-  en `sync_calificaciones_clickup.py:24-28`. Al implementar el fix B4, la
-  respuesta estaba literalmente en el archivo de la skill vecina.
-- **Aprendizaje:** antes de implementar un fix, buscar en el repo si ya hay
-  nota sobre el bug. `grep -r "leccion\|lesson\|LPA\|gotcha" --include="*.md"`.
+- **Context:** the "status_id vs status name" lesson was already
+  documented in `sync_calificaciones_clickup.py:24-28`. When
+  implementing fix B4, the answer was literally in the neighboring
+  skill's file.
+- **Learning:** before implementing a fix, search the repo for
+  existing notes about the bug.
+  `grep -r "leccion\|lesson\|LPA\|gotcha" --include="*.md"`.
 
-## L5 — El gradebook HTML crudo (295 KB) se queda en disco aunque el script falle
+## L5 — The raw HTML gradebook (295 KB) stays on disk even if the script fails
 
-- **Contexto:** `_descargar_gradebook` escribe el HTML ANTES de parsear. Si
-  el parser falla, el HTML queda huerfano en `_cache/`.
-- **Decision:** NO incluido en este fix (cambio de scope). Documentar como
-  known-issue. Plan aparte si vale la pena.
+- **Context:** `_descargar_gradebook` writes the HTML BEFORE parsing.
+  If the parser fails, the HTML is orphaned in `_cache/`.
+- **Decision:** NOT included in this fix (out of scope). Documented as
+  a known issue. Separate plan if worth it.
 
-## L6 — El test minimo viable protege contra regresiones futuras
+## L6 — The minimum viable test protects against future regressions
 
-- **Aprendizaje:** el costo de anadir el test minimo (3 funciones, ~20
-  lineas) es despreciable comparado con el costo de diagnosticar el bug
-  en produccion. Anadir tests con cada fix, no como tarea aparte.
+- **Learning:** the cost of adding the minimum test (3 functions,
+  ~20 lines) is negligible compared to the cost of diagnosing the
+  bug in production. Add tests with each fix, not as a separate task.
 
-## L7 — El agente es el verdadero orquestador — pero solo si tiene las primitivas
+## L7 — The agent is the real orchestrator — but only if it has the primitives
 
-- **Aprendizaje:** "delegar al agente" funciona si el agente tiene las
-  primitivas disponibles. Hoy el skill `use-clickup` SI las tiene. El
-  problema era que `cli_clickup.py` no las exponia.
+- **Learning:** "delegate to the agent" works only if the agent has
+  the primitives available. Today the `use-clickup` skill DOES have
+  them. The problem was that `cli_clickup.py` did not expose them.
 
-## L8 — Las caches locales pueden estar stale
+## L8 — Local caches can be stale
 
-- **Sintoma:** un skill que depende de archivos locales (`snapshot.json`,
-  `calificaciones.json`, `clickup.json`) puede estar leyendo informacion
-  de hace horas o dias. El delta que produce contra ClickUp puede estar
-  basado en realidad obsoleta.
-- **Causa:** no hay timestamp de "ultima sincronizacion fresca" en los
-  artefactos locales. El script no sabe cuando fue la ultima vez que se
-  leyo Moodle realmente.
-- **Aprendizaje:** los scripts de gestion de estado deben REPORTAR la
-  antiguedad de su input (`_meta.source_fetched_at`, `_meta.stale`),
-  no solo procesarlo. El agente decide cuando re-sincronizar; el script
-  solo informa.
-- **Portable:** todo artefacto con `_meta.generated_at` debe acompanarse
-  de `_meta.source_freshness` o un threshold de "stale" configurable.
-  Tests E2E deben incluir el caso "cache de 48h + 1 cambio en Moodle".
+- **Symptom:** a skill that depends on local files (`snapshot.json`,
+  `calificaciones.json`, `clickup.json`) may be reading information
+  that is hours or days old. The delta it produces against ClickUp
+  can be based on stale reality.
+- **Cause:** there is no "last fresh sync" timestamp in the local
+  artifacts. The script does not know when Moodle was last actually
+  read.
+- **Learning:** state-management scripts must REPORT the age of their
+  input (`_meta.source_fetched_at`, `_meta.stale`), not just process
+  it. The agent decides when to re-sync; the script only reports.
+- **Portable:** every artifact with `_meta.generated_at` should be
+  paired with `_meta.source_freshness` or a configurable "stale"
+  threshold. E2E tests must include the "48h cache + 1 change in
+  Moodle" case.
 
-## L9 — La regla de no-import entre skills de dominio
+## L9 — The no-import rule between domain skills
 
-- **Contexto:** `gestionar-cursos` necesita `use-clickup` para sincronizar
-  tareas. La primera lectura fue "importar get_client" — pero esa lectura
-  viola el principio de composicion: cada skill debe ser desplegable
-  independientemente, sin requerir que otro skill este instalado en el
-  mismo path.
-- **Causa:** la tentacion de "reusar" el cliente HTTP ya construido en
-  lugar de producir un artefacto que el agente aplique con la herramienta
-  adecuada.
-- **Aprendizaje:** el hecho de que un skill USE a otro no significa que
-  deba importarlo. `use-clickup` es una API que el agente invoca, no una
-  libreria que el skill linkea. El contrato entre skills es el artefacto
-  JSON que el primero produce y el segundo (vía agente) consume.
-- **Portable:** cuando un skill A necesita capacidades de un skill B, el
-  patron es: A produce un artefacto declarativo (JSON, YAML) que describe
-  lo que quiere hacer; el agente lee el artefacto y usa B para aplicarlo.
-  A nunca importa B. B nunca sabe que A existe.
-- **Anti-patron opuesto:** "skill A es util sin skill B" — cierto, pero
-  "skill A requiere skill B en su path de import" rompe deployabilidad
-  independiente. Test: `cd /path/to/A && uv run python A/script.py`
-  sin B presente debe fallar LIMPIO (mensaje claro), no con
-  `ModuleNotFoundError` en runtime.
+- **Context:** `gestionar-cursos` needs `use-clickup` to sync tasks.
+  The first reading was "import get_client" — but that reading
+  violates the composition principle: every skill must be
+  independently deployable, without requiring another skill to be
+  installed in the same path.
+- **Cause:** the temptation to "reuse" the already-built HTTP client
+  instead of producing an artifact the agent applies with the right
+  tool.
+- **Learning:** the fact that skill A USES skill B does not mean it
+  must import it. `use-clickup` is an API the agent invokes, not a
+  library the skill links. The contract between skills is the JSON
+  artifact the first produces and the second (via the agent)
+  consumes.
+- **Portable:** when skill A needs capabilities from skill B, the
+  pattern is: A produces a declarative artifact (JSON, YAML)
+  describing what it wants to do; the agent reads the artifact and
+  uses B to apply it. A never imports B. B never knows A exists.
+- **Opposite anti-pattern:** "skill A is useful without skill B" —
+  true, but "skill A requires skill B in its import path" breaks
+  independent deployability. Test:
+  `cd /path/to/A && uv run python A/script.py` without B present
+  must fail CLEANLY (clear message), not with `ModuleNotFoundError`
+  at runtime.
 
-## L10 — ClickUp es terminal, no se reorganiza desde codigo
+## L10 — ClickUp is terminal; it is not reorganized from code
 
-- **Contexto:** el plan original propuso "delete + create" para actividades
-  que cambian de nombre o tipo entre Moodle y ClickUp. El usuario corrigio:
-  ClickUp es donde el humano organiza su trabajo, no un estado que el
-  script puede reorganizar arbitrariamente.
-- **Causa:** tentacion de "limpiar" el workspace de ClickUp cuando Moodle
-  refleja un cambio. Asume que ClickUp es otra base de datos mas.
-- **Aprendizaje:** ClickUp es terminal en el flujo. Cambios en Moodle
-  producen `to_update` (PUT con diff) o `to_archive` (status cancelled,
-  NUNCA DELETE). Renombres, reclasificaciones, merges, splits son
-  decisiones del humano en su workspace.
-- **Portable:** en general, todo sistema donde el humano es el owner
-  final del estado debe recibir `to_update` / `to_archive`, no
-  `to_delete + to_create`. El historial del humano es sagrado.
-- **Implicacion de diseno:** el `sync_plan.json` schema incluye
-  `to_archive` con campo `reason` (string libre: "removed_from_moodle",
-  "renamed_in_moodle", "superseded") para que el humano pueda auditar
-  por que una tarea quedo en estado cancelled.
+- **Context:** the original plan proposed "delete + create" for
+  activities that change name or type between Moodle and ClickUp.
+  The user corrected: ClickUp is where the human organizes their
+  work, not a state the script can arbitrarily reorganize.
+- **Cause:** the temptation to "clean up" the ClickUp workspace when
+  Moodle reflects a change. It assumes ClickUp is just another
+  database.
+- **Learning:** ClickUp is terminal in the flow. Changes in Moodle
+  produce `to_update` (PUT with diff) or `to_archive` (status
+  cancelled, NEVER DELETE). Renames, reclassifications, merges,
+  splits are human decisions in their workspace.
+- **Portable:** in general, every system where the human is the final
+  owner of state should receive `to_update` / `to_archive`, not
+  `to_delete + to_create`. The human's history is sacred.
+- **Design implication:** the `sync_plan.json` schema includes
+  `to_archive` with a `reason` field (free string:
+  "removed_from_moodle", "renamed_in_moodle", "superseded") so the
+  human can audit why a task ended up in the cancelled state.
 
-## L11 — Maxima autonomia del agente, pausa solo para input destructivo
+## L11 — Maximum agent autonomy, pause only for destructive input
 
-- **Regla del usuario (2026-07-21):** "este skill ha de permitir a los agentes
-  maxima autonomia cuando el usuario les ha dado alguna instruccion. El
-  objetivo siempre es cumplir con minima ineraccion humana, a menos de que
-  una situacion critica lo amerite, como algun tipo de accion destructiva."
+- **User rule (2026-07-21):** "this skill must allow agents maximum
+  autonomy when the user has given them some instruction. The goal
+  is always to fulfill with minimum human interaction, unless a
+  critical situation warrants it, such as some kind of destructive
+  action."
 
-- **Causa de la regla:** el humano es el cuello de botella. Cada vez que
-  el agente pausa para pedir confirmacion, se pierde el valor principal
-  de automatizar. Los agentes tienen capacidad de leer contexto, hacer
-  pre-checks, y detectar ambiguedad no determinista — usenla antes de
-  preguntar.
+- **Reason for the rule:** the human is the bottleneck. Every time
+  the agent pauses to ask for confirmation, the main value of
+  automation is lost. Agents can read context, do pre-checks, and
+  detect non-deterministic ambiguity — use them before asking.
 
-- **Implicacion de diseno #1:** el `sync_plan.json` lleva `_meta.orchestration_hint`
-  con `order`, `tools_required` y `pause_for_human`. El agente no tiene
-  que adivinar la secuencia ni las capabilities — las lee del plan.
+- **Design implication #1:** `sync_plan.json` carries
+  `_meta.orchestration_hint` with `order`, `tools_required`, and
+  `pause_for_human`. The agent does not have to guess the sequence or
+  the capabilities — it reads them from the plan.
 
-- **Implicacion de diseno #2:** `references/sync-flow.md` es un **playbook
-  ejecutable** (pasos numerados, no documentacion descriptiva). El agente
-  lo lee una vez, ejecuta, reporta. NO improvisa.
+- **Design implication #2:** `references/sync-flow.md` is an
+  **executable playbook** (numbered steps, not descriptive
+  documentation). The agent reads it once, executes, reports. It
+  does NOT improvise.
 
-- **Implicacion de diseno #3:** `references/sync-flow.md` §C declara
-  acciones destructivas PROHIBIDAS. El agente aborta ESA operacion si
-  cae en §C, no consulta al humano. La prohibicion ya esta en el playbook.
+- **Design implication #3:** `references/sync-flow.md` §C declares
+  PROHIBITED destructive actions. The agent aborts THAT operation if
+  it falls under §C; it does not ask the human. The prohibition is
+  already in the playbook.
 
-- **Implicacion de diseno #4:** SKILL.md declara explicitamente
-  `Modo de operacion: autonomo por defecto` para que el primer read del
-  agente no genere la pregunta "¿le pregunto al humano?".
+- **Design implication #4:** SKILL.md explicitly declares
+  `Operation mode: autonomous by default` so the agent's first read
+  does not generate the question "should I ask the human?".
 
-- **Portable:** todo skill que produce artefactos para un agente deberia
-  declarar su modo de operacion (autonomo / colaborativo / manual) en
-  el frontmatter o en una seccion visible del SKILL.md. La ambiguedad
-  sobre "¿puedo ejecutar sin pedir?" es la principal causa de friccion
-  innecesaria.
+- **Portable:** every skill that produces artifacts for an agent
+  should declare its operation mode (autonomous / collaborative /
+  manual) in the frontmatter or in a visible section of SKILL.md.
+  Ambiguity about "may I execute without asking?" is the main cause
+  of unnecessary friction.
 
-- **Excepciones que SI justifican pausa humana:**
-  - Operacion destructiva no listada en §C (DELETE no planificado,
-    modificacion de status personalizado, etc.).
-  - Conflicto de carrera donde el estado real diverge del `diff.from`
-    y la decision de como resolver no es determinista.
-  - `unresolved` con razon no determinista (listadas en §B de sync-flow.md).
-  - Falta de capability requerida (`tools_required` del plan).
+- **Exceptions that DO justify a human pause:**
+  - Destructive operation not listed in §C (unplanned DELETE,
+    modification of custom status, etc.).
+  - Race conflict where the real state diverges from `diff.from` and
+    how to resolve it is non-deterministic.
+  - `unresolved` with a non-deterministic reason (listed in §B of
+    sync-flow.md).
+  - Missing required capability (`tools_required` of the plan).

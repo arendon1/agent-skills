@@ -1,0 +1,7 @@
+name: agent-skills
+version: 1.0.0
+description: "agent-skills adapter for Hermes. Injects the bootstrap skill at session start and after compaction, plus maps agnostic skill behaviors to Hermes tools. Mirrors the pi adapter (.pi/extensions/agent-skills.ts) for the Hermes plugin surface."
+author: arendon1
+provides_hooks:
+  - pre_llm_call
+  - on_session_start

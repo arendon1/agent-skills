@@ -184,8 +184,10 @@ every supported harness:
 npx skills add . --list -y | grep <skill-name>
 ```
 
-If you are using a harness with a dedicated adapter (e.g. pi) and want the
-full self-triggering experience:
+If you are using a harness with a dedicated adapter (pi via
+`.pi/extensions/`, Hermes via `adapters/hermes/`) and want the
+full self-triggering experience, install the adapter per the
+instructions in the README's **Adapters** section.
 
 ```bash
 pi install . -l -a

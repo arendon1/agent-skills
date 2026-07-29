@@ -1,22 +1,19 @@
 ---
 name: use-agy
 description: |
-  Use the Antigravity CLI (`agy`) as a worker / third-opinion reviewer from
-  any agent harness. `agy` is Google's agentic coding-agent backend (same
-  family as `codex` / `claude-code`); it authenticates via OS-keyring +
-  browser Google sign-in, so its **Gemini models ride on the user's Google
-  AI Pro subscription at effectively zero token cost**. Reach for `agy` when
-  you need a Gemini-family answer (cheap), a Claude-family second opinion
-  against another agent's plan or diff, or a sandboxed multi-turn coding
-  session outside the host harness's model menu. `agy` is a worker, not an
-  orchestrator — route work through the normal task graph and let the
-  assigned worker pick `agy` as its execution backend.
+  Use the Antigravity CLI (`agy`) as a worker or third-opinion reviewer from any
+  agent harness. `agy` is Google's agentic coding-agent backend (same family as
+  `codex` / `claude-code`); auth is OS-keyring + browser Google sign-in, so its
+  **Gemini models ride on Google AI Pro at zero marginal token cost**. Reach
+  for `agy` for a cheap Gemini answer, a Claude-family second opinion on
+  another agent's plan or diff, or a sandboxed multi-turn coding session
+  outside the host's model menu. `agy` is a worker, not an orchestrator —
+  route work through the normal task graph.
   Use when running a one-shot `agy -p` review or change, launching an
-  interactive `agy -i` session, doing a parallel batch across git worktrees
-  with one `agy -p` per worktree, picking a Gemini model on a Google AI Pro
-  budget, asking for a Claude Sonnet/Opus second opinion on a plan or diff,
-  inspecting `~/.gemini/antigravity-cli/` (settings, keybindings, logs,
-  conversations), or debugging auth/sandbox/permission state.
+  interactive `agy -i` session, fanning a parallel batch across git worktrees
+  with one `agy -p` each, picking a Gemini model on a Google AI Pro budget,
+  asking for a Claude Sonnet/Opus second opinion on a plan or diff, inspecting
+  `~/.gemini/antigravity-cli/`, or debugging auth/sandbox/permission state.
 invocation: auto
 layer: domain
 provides: [agy-worker]

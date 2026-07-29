@@ -72,6 +72,7 @@ cmux move-tab-to-new-workspace ...
 cmux tab-action <action> [--surface S] [--title T]   # rename, new-terminal-right,
                                                       # new-browser-right, close-*, pin, ...
 cmux focus-pane [--pane P]
+cmux trigger-flash [--surface S] [--workspace W]   # visual attention cue on a surface
 ```
 
 ## Send / read / keys (terminal surfaces)

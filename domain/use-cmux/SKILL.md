@@ -271,6 +271,7 @@ cmux read-screen --surface surface:2               # visible viewport
 cmux read-screen --surface surface:2 --scrollback --lines 200  # last 200 lines
 cmux focus-pane --pane pane:2                      # focus a pane
 cmux focus-window --window window:1                # bring a window to front
+cmux trigger-flash --surface surface:7            # visual attention cue on a surface
 ```
 
 Key names follow terminal conventions: `enter`, `tab`, `escape`, `ctrl+c`,

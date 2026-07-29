@@ -145,6 +145,11 @@ cmux browser "$SURF" get text body
    restores native sizing. Close/detach the browser inspector first — its
    split layout conflicts with viewport emulation.
 
+7. **Remote dev servers over SSH workspaces.** Browser panes route through the
+   remote network, so `http://localhost:PORT` just works against a dev server
+   running on the remote host — no port forwarding needed. This is the
+   intended way to preview a remote dev server from inside an SSH workspace.
+
 ## Workflow C — parallel work in its own surface
 
 ### Full sequence

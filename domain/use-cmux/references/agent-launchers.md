@@ -26,6 +26,16 @@ These are the harness-coupled entry points. An agent that wants to spawn a
 peer agent with full session-restore + Feed wiring should prefer the matching
 launcher over a bare `cmux new-workspace --command "..."`.
 
+**Unifying mechanism:** all of the above use a tmux-compatibility shim
+(`cmux __tmux-compat`) that intercepts the tmux commands an orchestrator
+issues (`new-session`, `new-window`, `split-window`, `send-keys`,
+`capture-pane`, `select-pane`, `kill-pane`, `list-panes`) and translates them
+into cmux socket-API calls. So an orchestrator that expects tmux produces
+real, visible cmux panes instead of hidden background processes. This is why
+"subagents become native panes" — the shim materializes them. An agent
+driving cmux directly (via the CLI in this skill) does not need the shim; it
+is what makes the first-class launchers' subagents appear as panes.
+
 ## Agent-session surface type
 
 `cmux new-surface --type agent-session` creates a first-class agent surface

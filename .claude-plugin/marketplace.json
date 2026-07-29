@@ -36,6 +36,7 @@
         "./domain/make-a-map",
         "./domain/research-literature",
         "./domain/use-clickup",
+        "./domain/use-cmux",
         "./domain/use-firecrawl"
       ]
     },

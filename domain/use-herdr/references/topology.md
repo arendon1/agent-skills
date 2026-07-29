@@ -37,13 +37,13 @@ keep running. Reattach with `herdr` or `herdr session attach <name>`.
 | Entity | ID format | Notes |
 |--------|-----------|-------|
 | Session | named or default | `--session <name>` or `HERDR_SESSION` env |
-| Workspace | `w1` | Parse from JSON; never derive from sidebar order |
-| Tab | `w1:t1` | |
-| Pane | `w1:p1` | `--current` targets the calling pane |
+| Workspace | UUID (`w-abc123`) | Parse from JSON; never derive from sidebar order |
+| Tab | UUID (`t-abc123`) | |
+| Pane | UUID (`p-abc123`) | `--current` targets the calling pane |
 | Agent | by name or pane ID | Names match `[a-z][a-z0-9_-]{0,31}`, unique among live agents |
 
 All commands accept `--json` for machine-readable output. Parse IDs from the
-JSON response — never hardcode `w1:p1`.
+JSON response — never hardcode pane IDs.
 
 ## Discovery
 

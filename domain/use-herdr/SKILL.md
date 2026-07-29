@@ -61,7 +61,8 @@ session        persistent server namespace (default or named via --session)
 - **Session → workspace → tab → pane → agent.** A pane is a real terminal; an
   agent is a recognized coding-agent process inside a pane with semantic state
   (`blocked` | `working` | `done` | `idle` | `unknown`).
-- **IDs.** Workspaces: `w1`. Tabs: `w1:t1`. Panes: `w1:p1`. Agents: referenced
+- **IDs.** Workspaces, tabs, and panes use string IDs (UUIDs assigned by
+  the server, e.g. `w-abc123`, `t-abc123`, `p-abc123`). Agents are referenced
   by unique live name or by pane ID. Parse IDs from JSON responses — never
   derive from sidebar order or examples.
 - **Caller context.** Every herdr pane exports `HERDR_ENV=1`, `HERDR_PANE_ID`,
@@ -74,8 +75,8 @@ Discover where you are and what exists:
 herdr status                       # server + client runtime status
 herdr session list [--json]        # sessions
 herdr workspace list               # workspaces
-herdr tab list [--workspace w1]    # tabs in a workspace
-herdr pane list [--workspace w1]   # panes in a workspace
+herdr tab list [--workspace <id>]    # tabs in a workspace
+herdr pane list [--workspace <id>]   # panes in a workspace
 herdr pane current --current       # the calling pane's ID
 herdr agent list                   # recognized agents and their states
 ```
@@ -124,7 +125,7 @@ PANE=$(herdr --json workspace get "$WS" \
        | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["root_pane"]["pane_id"])')
 
 # 2. Start the server in that pane. `pane run` sends text + Enter atomically.
-herdr pane run "$PANE" "npm run dev"
+herdr pane run "$PANE" npm run dev
 
 # 3. Wait for the ready line (server-owned, event-driven — no polling loop).
 herdr pane wait-output "$PANE" --match "Local:" --source recent-unwrapped --timeout 30000
@@ -164,9 +165,9 @@ herdr pane:
 
 ```bash
 # From any pane, open the URL in the host's default browser.
-herdr pane run "$PANE" "open http://localhost:5173"        # macOS
-herdr pane run "$PANE" "xdg-open http://localhost:5173"    # Linux
-herdr pane run "$PANE" "start http://localhost:5173"       # Windows (cmd)
+herdr pane run "$PANE" open http://localhost:5173        # macOS
+herdr pane run "$PANE" xdg-open http://localhost:5173    # Linux
+herdr pane run "$PANE" start http://localhost:5173       # Windows (cmd)
 ```
 
 For automated verification (DOM inspection, screenshots), use a headless
@@ -176,7 +177,7 @@ browser tool or a curl-based smoke test from a dedicated pane:
 # Split a pane for the smoke test, run it, wait for the server, read the result.
 TEST_PANE=$(herdr --json pane split --current --direction down --no-focus \
             | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
-herdr pane run "$TEST_PANE" "curl -sS http://localhost:5173 | head -20"
+herdr pane run "$TEST_PANE" curl -sS http://localhost:5173 | head -20
 herdr pane read "$TEST_PANE" --source recent-unwrapped --lines 30
 ```
 
@@ -196,7 +197,7 @@ P2=$(herdr --json pane split --current --direction right --no-focus \
       | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 
 # Run a command in the new pane.
-herdr pane run "$P2" "npm test 2>&1 | tee /tmp/test.log"
+herdr pane run "$P2" npm test 2>&1 | tee /tmp/test.log
 
 # Wait for the test result line.
 herdr pane wait-output "$P2" --regex "(passed|failed|[0-9]+ tests)" \
@@ -396,7 +397,7 @@ reference: `herdr --default-config` or the docs site.
 - `pane read` before you `pane run`/`send-keys` — confirm the target is at a
   prompt.
 - Capture and reuse the IDs that `workspace create`/`pane split`/`tab create`
-  return. Do not hardcode `w1:p1`.
+  return. Do not hardcode pane IDs.
 - Use `--no-focus` for background work so the human's focus stays put.
 - Treat herdr output as evidence: a server is "up" only when `pane read` or
   `pane wait-output` confirms it; a test "passed" only when `pane read` shows

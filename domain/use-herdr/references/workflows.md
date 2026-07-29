@@ -19,7 +19,7 @@ WS=$(echo "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["resu
 PANE=$(echo "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["root_pane"]["pane_id"])')
 
 # 2. Start the server. `pane run` sends text + Enter atomically.
-herdr pane run "$PANE" "npm run dev"
+herdr pane run "$PANE" npm run dev
 
 # 3. Wait for the ready line — event-driven, no polling loop.
 herdr pane wait-output "$PANE" --match "Local:" --source recent-unwrapped --timeout 30000
@@ -85,11 +85,11 @@ herdr has no built-in browser surface. Open the URL in the host browser:
 
 ```bash
 # macOS
-herdr pane run "$PANE" "open http://localhost:5173"
+herdr pane run "$PANE" open http://localhost:5173
 # Linux
-herdr pane run "$PANE" "xdg-open http://localhost:5173"
+herdr pane run "$PANE" xdg-open http://localhost:5173
 # Windows (cmd)
-herdr pane run "$PANE" "start http://localhost:5173"
+herdr pane run "$PANE" start http://localhost:5173
 ```
 
 For automated verification, run a smoke test in a dedicated pane:
@@ -97,7 +97,7 @@ For automated verification, run a smoke test in a dedicated pane:
 ```bash
 TEST_PANE=$(herdr --json pane split --current --direction down --no-focus \
             | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
-herdr pane run "$TEST_PANE" "curl -sS http://localhost:5173 | head -20"
+herdr pane run "$TEST_PANE" curl -sS http://localhost:5173 | head -20
 herdr pane wait-output "$TEST_PANE" --regex "(<!DOCTYPE|<html|error)" \
       --source recent-unwrapped --timeout 10000
 herdr pane read "$TEST_PANE" --source recent-unwrapped --lines 30
@@ -114,7 +114,7 @@ P2=$(herdr --json pane split --current --direction right --no-focus \
       | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 
 # 2. Run the parallel command.
-herdr pane run "$P2" "npm test 2>&1 | tee /tmp/test.log"
+herdr pane run "$P2" npm test 2>&1 | tee /tmp/test.log
 
 # 3. Wait for the result line (event-driven, no polling).
 herdr pane wait-output "$P2" --regex "(passed|failed|[0-9]+ tests)" \

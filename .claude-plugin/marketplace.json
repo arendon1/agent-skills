@@ -39,7 +39,8 @@
         "./domain/use-clickup",
         "./domain/use-cmux",
         "./domain/use-firecrawl",
-        "./domain/use-herdr"
+        "./domain/use-herdr",
+        "./domain/use-hunk"
       ]
     },
     {

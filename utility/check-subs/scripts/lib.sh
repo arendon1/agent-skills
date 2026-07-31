@@ -121,6 +121,8 @@ state_set() {
 }
 
 # Merge a provider's update into the state. Args: provider_key, json_obj.
+# Computes next_probe_at: if the block has window resetEtaMs values, push the
+# next probe to the earliest reset time (floor 5 min). Otherwise 5 min cadence.
 state_merge_provider() {
   local provider="$1"
   local block="$2"
@@ -130,7 +132,11 @@ state_merge_provider() {
   local current; current="$(state_get '.')"
   # Note: jq 1.8 has a parser quirk where //= and = can't coexist in the same
   # expression. We use explicit if/else for the schema_version field.
-  # next_probe_at: if the block has its own, use it; else now + 300s (default cadence).
+  # next_probe_at:
+  #   - If the block has its own next_probe_at, use it (e.g. cmd_record).
+  #   - Else if the block has windows with resetEtaMs, push to the earliest
+  #     reset (floor 5 min).
+  #   - Else (pay-per-use or no windows), 5-min cadence.
   echo "$current" | jq --arg p "$provider" --arg now "$now" --argjson b "$block" '
     .schema_version = (if has("schema_version") then .schema_version else 2 end)
     | .updated_at = $now
@@ -139,7 +145,15 @@ state_merge_provider() {
         $b + {
           next_probe_at: (
             if $b.next_probe_at then $b.next_probe_at
-            else ($now | fromdateiso8601 + 300 | todate)
+            elif ($b.windows // null) then (
+              ([$b.windows | to_entries[] | (.value.resetEtaMs // 999999999)] | min) as $eta_ms |
+              (if $eta_ms < 300000 then 300000 else $eta_ms end) as $cap_ms |
+              ($now | fromdateiso8601) as $now_sec |
+              (($cap_ms / 1000) | floor) as $eta_sec |
+              ($now_sec + $eta_sec) | todate
+            )
+            else
+              ($now | fromdateiso8601 + 300 | todate)
             end
           )
         }
@@ -204,6 +218,8 @@ classify() {
 # ---- config reading --------------------------------------------------------
 
 # Read a key from the config file (jq). Returns empty string if missing.
+# Pass the path as a jq expression that uses bracket notation for keys with
+# dashes, e.g. config_get '."opencode-go".workspaceId'.
 config_get() {
   local path="$1"
   [ -f "$CONFIG_FILE" ] || return 0
@@ -234,10 +250,11 @@ fallback_auth() {
 }
 
 # Resolve a config value: config file → env → fallback auth.
+# Uses bracket notation for provider keys with dashes (e.g. "opencode-go").
 resolve() {
   local provider="$1" field="$2" envname="$3"
   local v
-  v="$(config_get ".${provider}.${field}")"
+  v="$(config_get ".[\"$provider\"].$field")"
   [ -n "$v" ] && { printf '%s' "$v"; return; }
   v="${!envname:-}"
   [ -n "$v" ] && { printf '%s' "$v"; return; }

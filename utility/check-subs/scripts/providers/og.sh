@@ -37,10 +37,12 @@ probe() {
   fi
 
   local resp http_code
+  # Cookie name is "auth" — prepend it if not already present.
+  local cookie_header="auth=${cookie#auth=}"
   resp="$(curl -sS --max-time 10 -L -w '\n%{http_code}' \
     -H "User-Agent: $USER_AGENT" \
     -H "Accept: text/html" \
-    -H "Cookie: ${cookie#auth=}" \
+    -H "Cookie: $cookie_header" \
     "https://opencode.ai/workspace/$ws/go" 2>/dev/null)" || {
       log_warn "og: network error"
       printf '%s' '{"status":"network-error","api":"GET /workspace/{id}/go (HTML scrape)"}'

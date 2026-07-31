@@ -35,6 +35,7 @@
         "./domain/make-a-diagram",
         "./domain/make-a-map",
         "./domain/research-literature",
+        "./domain/use-agy",
         "./domain/use-clickup",
         "./domain/use-cmux",
         "./domain/use-firecrawl",
@@ -46,6 +47,7 @@
       "skills": [
         "./utility/bootstrap",
         "./utility/caveman",
+        "./utility/check-subs",
         "./utility/get-docs",
         "./utility/skill-add",
         "./utility/skill-find",

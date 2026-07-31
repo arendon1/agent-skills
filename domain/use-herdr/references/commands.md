@@ -17,8 +17,17 @@ Compact command tables. For handle syntax and lifecycle depth see
 | `--help`, `-h` | Show help |
 
 Never run bare `herdr` from a script — it launches the interactive TUI.
-Always use a subcommand. All commands accept `--json` for machine-readable
-output.
+Always use a subcommand. **Machine-readable output:** creational and most
+list/inspect commands (`workspace create`, `pane split`, `tab create`,
+`workspace get`, `pane get`, `tab get`, `workspace close`, `workspace list`,
+`tab list`, `pane list`, `agent list`, `worktree list`, `worktree create`,
+`worktree open`, `worktree remove`, `agent explain`) already emit JSON to
+stdout by default. **`--json` is reserved for the small set of commands
+that default to text/YAML output:** `herdr status`, `herdr session list`,
+`herdr session stop`, `herdr session delete`, `herdr plugin list`,
+`herdr server agent-manifests`, `herdr server update-agent-manifests`,
+`herdr agent explain --format json`. Do **not** pass `--json` to
+creational or list commands — the binary rejects it.
 
 ## Launch & status
 
@@ -237,6 +246,7 @@ herdr completion zsh|bash|fish|powershell|elvish
 herdr api schema                 # socket protocol schema summary
 herdr api schema --json          # full JSON Schema
 herdr api schema --output <path>
+herdr api snapshot               # live session snapshot as JSON (added in v0.7.5)
 ```
 
 Socket paths: `~/.config/herdr/herdr.sock` (default),
@@ -246,12 +256,20 @@ Socket paths: `~/.config/herdr/herdr.sock` (default),
 
 ```bash
 herdr --default-config           # print default config
+herdr config check               # validate config.toml + report unknown keys (added in v0.7.5)
 herdr config reset-keys          # back up config.toml + remove custom keybindings
 herdr server reload-config       # reload config.toml in the running server
 ```
 
 Config file: `~/.config/herdr/config.toml` (Linux/macOS),
 `%APPDATA%\herdr\config.toml` (Windows).
+
+Notable `[ui]` keys (added in v0.7.5): `sidebar_start_collapsed = false`
+(launch with sidebar collapsed), `prompt_new_workspace_name = false` (ask
+for a name before TUI workspace creation). `[experimental].pane_history =
+false` is the uncommented active default (preserves recent screen history
+across full server restarts when toggled on); `kitty_graphics` remains a
+commented opt-in.
 
 Sections: `[terminal]`, `[worktrees]`, `[remote]`, `[keys]`, `[theme]`,
 `[ui]`, `[session]`, `[experimental]`. Full config reference data at

@@ -66,8 +66,9 @@ session        persistent server namespace (default or named via --session)
   by unique live name or by pane ID. Parse IDs from JSON responses — never
   derive from sidebar order or examples.
 - **Caller context.** Every herdr pane exports `HERDR_ENV=1`, `HERDR_PANE_ID`,
-  `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. Most commands
-  accept `--current` to target the calling pane.
+  `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. macOS panes also
+  receive `HERDR_AGENT=<agent>` as a foreground-process hint (added in v0.7.5).
+  Most commands accept `--current` to target the calling pane.
 
 Discover where you are and what exists:
 
@@ -119,9 +120,9 @@ server-owned, event-driven waits — no sleep loops, no missed transitions.
 ```bash
 # 1. Create an isolated workspace for the server (also creates first tab + root pane).
 #    Parse the root pane ID from JSON output.
-WS=$(herdr --json workspace create --cwd ~/projects/myapp --label "dev-server" --no-focus \
+WS=$(herdr workspace create --cwd ~/projects/myapp --label "dev-server" --no-focus \
       | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["workspace"]["workspace_id"])')
-PANE=$(herdr --json workspace get "$WS" \
+PANE=$(herdr workspace get "$WS" \
        | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["root_pane"]["pane_id"])')
 
 # 2. Start the server in that pane. `pane run` sends text + Enter atomically.
@@ -149,8 +150,9 @@ separate workspace keeps it out of your editing pane's scrollback. Use a split
 
 **Capture IDs from creation responses.** `workspace create` returns
 `.result.workspace.workspace_id`, `.result.tab.tab_id`, `.result.root_pane.pane_id`.
-`pane split` returns `.result.pane.pane_id`. Parse them from `--json` output;
-do not assume IDs stay stable.
+`pane split` returns `.result.pane.pane_id`. Parse them from the JSON response
+(creational commands emit JSON to stdout by default; do not add `--json` —
+it errors out on these verbs); do not assume IDs stay stable.
 
 **`pane wait-output` instead of polling.** `--match <text>` or `--regex <pat>`
 with `--source recent-unwrapped` (best for logs — no soft wrapping) and
@@ -175,7 +177,7 @@ browser tool or a curl-based smoke test from a dedicated pane:
 
 ```bash
 # Split a pane for the smoke test, run it, wait for the server, read the result.
-TEST_PANE=$(herdr --json pane split --current --direction down --no-focus \
+TEST_PANE=$(herdr pane split --current --direction down --no-focus \
             | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 herdr pane run "$TEST_PANE" curl -sS http://localhost:5173 | head -20
 herdr pane read "$TEST_PANE" --source recent-unwrapped --lines 30
@@ -193,7 +195,7 @@ and run.
 ```bash
 # Split the current pane. Geometry rule: wide pane -> split right; tall -> down.
 # Returns the new pane ID.
-P2=$(herdr --json pane split --current --direction right --no-focus \
+P2=$(herdr pane split --current --direction right --no-focus \
       | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 
 # Run a command in the new pane.
@@ -222,7 +224,7 @@ state. Launching a peer agent is a first-class operation.
 ```bash
 # 1. Split a pane for the peer agent (must be an available shell — no foreground
 #    command/editor/agent running in it).
-PANE=$(herdr --json pane split --current --direction right --no-focus \
+PANE=$(herdr pane split --current --direction right --no-focus \
        | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 
 # 2. Start the agent in that pane. --kind selects the agent CLI; the command
@@ -382,6 +384,34 @@ reference: `herdr --default-config` or the docs site.
   close`) — don't orphan processes.
 - `agent wait` returned the expected terminal state (done/idle), not a timeout.
 
+## Known issues & gotchas (v0.7.5)
+
+- **`--json` is selectively supported.** The binary rejects `--json` on
+  creational commands (`workspace create`, `pane split`, `tab create`,
+  `workspace get`, `pane get`, `tab get`, `workspace close`) and most list
+  commands — but those commands already emit JSON to stdout by default, so
+  the `python3 -c 'import json...'` parse pattern still works. Reserve
+  `--json` for the few commands that default to text/YAML output
+  (`herdr status`, `herdr session list`, `herdr plugin list`,
+  `herdr server agent-manifests`, `herdr agent explain`). When in doubt,
+  pipe without `--json` first — if it's JSON, you're done; if it's text,
+  add `--json`.
+- **Headless restart + agent prompt = `agent_not_found`** (#2065). After a
+  `herdr server` restart with no attached client, `agent list` may report
+  agents as `idle` but `agent prompt <name>` returns `agent_not_found`.
+  Workaround: attach a client (`herdr session attach default`) before
+  prompting, or restart the agent pane.
+- **herdr inside tmux** (#2054, #2057). Mouse selection, copy, and keybindings
+  can fail silently when herdr is launched from inside a tmux session. If
+  `$TMUX` is set and the workflow needs copy/select, prefer running herdr
+  outside tmux (its TUI is the multiplexer; nesting it under tmux is
+  redundant and lossy).
+- **Non-US keyboard layouts + `pane send-keys`** (#1992, fixed on master,
+  not in 0.7.5). Shifted punctuation (`!@#$%` on US; on Spanish keyboards
+  `/` = Shift+7, etc.) may not register when sent via `pane send-keys` on
+  pre-master binaries. If the key sequence matters, prefer `pane run` with
+  a shell command instead of `send-keys` for non-ASCII or shifted chars.
+
 ## Boundaries
 
 **MUST**
@@ -392,8 +422,9 @@ reference: `herdr --default-config` or the docs site.
 - Run `herdr pane current --current` (or parse `HERDR_PANE_ID`) first to learn
   your own pane, then target *other* panes explicitly. Use `--current` to
   target the calling pane when you mean it.
-- Parse IDs from `--json` responses. Never derive IDs from sidebar order or
-  examples.
+- Parse IDs from JSON responses (creational + list commands emit JSON by
+  default; do not pass `--json` to those — it errors out). Never derive IDs
+  from sidebar order or examples.
 - `pane read` before you `pane run`/`send-keys` — confirm the target is at a
   prompt.
 - Capture and reuse the IDs that `workspace create`/`pane split`/`tab create`
@@ -415,6 +446,14 @@ reference: `herdr --default-config` or the docs site.
   for the kind list and integration hooks). The skill is agnostic; the adapter
   picks the binary.
 - Do not run bare `herdr` from a script — it attaches the TUI and blocks.
+- Do not pass `--json` to creational commands (`workspace create`,
+  `pane split`, `tab create`, `workspace get`, `pane get`, `tab get`,
+  `workspace close`) or most list commands (`workspace list`, `tab list`,
+  `pane list`, `agent list`, `worktree list`). The binary rejects the flag
+  on these verbs; they emit JSON to stdout by default. `--json` is reserved
+  for the small set of commands that default to text/YAML
+  (`herdr status`, `herdr session list`, `herdr plugin list`,
+  `herdr server agent-manifests`, `herdr agent explain`).
 
 ## References
 

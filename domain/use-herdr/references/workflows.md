@@ -14,7 +14,7 @@ test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
 
 # 1. Create an isolated workspace (also creates first tab + root pane).
 #    Parse the workspace ID and root pane ID from JSON.
-RESP=$(herdr --json workspace create --cwd ~/projects/myapp --label "dev-server" --no-focus)
+RESP=$(herdr workspace create --cwd ~/projects/myapp --label "dev-server" --no-focus)
 WS=$(echo "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["workspace"]["workspace_id"])')
 PANE=$(echo "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["root_pane"]["pane_id"])')
 
@@ -95,7 +95,7 @@ herdr pane run "$PANE" start http://localhost:5173
 For automated verification, run a smoke test in a dedicated pane:
 
 ```bash
-TEST_PANE=$(herdr --json pane split --current --direction down --no-focus \
+TEST_PANE=$(herdr pane split --current --direction down --no-focus \
             | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 herdr pane run "$TEST_PANE" curl -sS http://localhost:5173 | head -20
 herdr pane wait-output "$TEST_PANE" --regex "(<!DOCTYPE|<html|error)" \
@@ -110,7 +110,7 @@ script in a pane or defer to a browser-automation capability.
 
 ```bash
 # 1. Split the current pane. Geometry: wide -> right, tall -> down.
-P2=$(herdr --json pane split --current --direction right --no-focus \
+P2=$(herdr pane split --current --direction right --no-focus \
       | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 
 # 2. Run the parallel command.
@@ -150,7 +150,7 @@ herdr pane move "$P2" --new-tab --label "tests" --no-focus
 ```bash
 # 1. Split a pane for the peer agent. Must be an available shell (no foreground
 #    command/editor/agent running).
-PANE=$(herdr --json pane split --current --direction right --no-focus \
+PANE=$(herdr pane split --current --direction right --no-focus \
        | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 
 # 2. Start the agent. --kind selects the CLI; returns after agent is ready.

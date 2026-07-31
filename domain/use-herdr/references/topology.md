@@ -42,8 +42,13 @@ keep running. Reattach with `herdr` or `herdr session attach <name>`.
 | Pane | UUID (`p-abc123`) | `--current` targets the calling pane |
 | Agent | by name or pane ID | Names match `[a-z][a-z0-9_-]{0,31}`, unique among live agents |
 
-All commands accept `--json` for machine-readable output. Parse IDs from the
-JSON response — never hardcode pane IDs.
+Most commands emit JSON to stdout by default for machine-readable output;
+`--json` is only needed for commands that default to text/YAML output
+(`status`, `session list`, `plugin list`, `server agent-manifests`,
+`agent explain`). Do **not** pass `--json` to creational commands
+(`workspace create`, `pane split`, `tab create`, `workspace get`,
+`pane close`) — the binary rejects it. Parse IDs from the JSON response
+(creational commands emit JSON by default) — never hardcode pane IDs.
 
 ## Discovery
 
@@ -76,6 +81,7 @@ herdr agent get <target>            # one agent's state + details
 | `HERDR_TAB_ID` | Public tab ID |
 | `HERDR_WORKSPACE_ID` | Public workspace ID |
 | `HERDR_SOCKET_PATH` | Socket path override |
+| `HERDR_AGENT` | Foreground-process hint for the agent (macOS, added in v0.7.5) |
 | `HERDR_SESSION` | Select a named session for CLI commands |
 | `HERDR_CONFIG_PATH` | Override config file path |
 | `HERDR_BIN_PATH` | Running herdr binary path |

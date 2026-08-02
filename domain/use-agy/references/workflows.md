@@ -3,6 +3,10 @@
 Long-form, copy-pasteable patterns. For command tables see
 `commands.md`; for the mental model and pitfalls see the main `SKILL.md`.
 
+> **Policy:** every `agy -p` worker invocation includes
+> `--dangerously-skip-permissions` (headless mode auto-denies tool calls
+> without it, and may still exit `SUCCESS` with an empty response).
+
 ## Workflow A — one-shot Gemini review of a diff (the canonical use)
 
 Use when: you want a free Gemini-family second opinion on a diff under
@@ -20,6 +24,7 @@ BLOCKING (must-fix), NON-BLOCKING (suggestions), FOLLOW-UPS (out of scope
 but worth tracking). Be terse. Cite file:line for every issue." \
     --model "gemini-3.1-pro-high" \
     --add-dir "$REPO" \
+    --dangerously-skip-permissions \
     --print-timeout 5m
 ```
 
@@ -44,6 +49,7 @@ runtime/dependencies, (2) failure modes not addressed, (3) missing
 acceptance criteria. Be terse. Cite plan section numbers." \
     --model "claude-sonnet-4-6" \
     --add-dir "$REPO" \
+    --dangerously-skip-permissions \
     --print-timeout 5m
 ```
 
@@ -188,7 +194,7 @@ agy -i
 # In the agy TUI: /exit
 
 # 3. Smoke test
-agy -p "Reply with: pong" --model gemini-3.5-flash-low --print-timeout 1m
+agy -p "Reply with: pong" --model gemini-3.5-flash-low --dangerously-skip-permissions --print-timeout 1m
 ```
 
 **If the browser doesn't open (SSH/headless):** `agy -i` will print an
@@ -251,7 +257,7 @@ permissions source when `settings.json` is absent).
 
 ## Workflow I — image generation with quota awareness
 
-`agy` can generate images via `agy -p "<prompt>" --model gemini-3.5-flash-low`,
+`agy` can generate images via `agy -p "<prompt>" --model gemini-3.5-flash-low --dangerously-skip-permissions`,
 but image gen runs on `gemini-3.1-flash-image` under the hood regardless of
 the `--model` you pick, and that model has a **per-model quota** on the
 Google AI Pro consumer tier (~10-12 calls per ~5h window). See
@@ -274,7 +280,9 @@ for slug in bandeja-paisa sushi-rolls hamburguesa-clasica; do
   for variant in 1 2; do
     agy -p "Professional food photography of ${slug}, studio lighting, \
       1024x1024, on a white plate" \
-      --model gemini-3.5-flash-low --print-timeout 120s \
+      --model gemini-3.5-flash-low \
+      --dangerously-skip-permissions \
+      --print-timeout 120s \
       > /tmp/ag-productos/logs/${slug}_${variant}.log 2>&1
     # agy writes the image to ~/.gemini/antigravity-cli/brain/<uuid>/ —
     # parse the path from the log and copy to your output dir.

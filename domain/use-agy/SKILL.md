@@ -19,7 +19,7 @@ layer: domain
 provides: [agy-worker]
 language: en-US
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # use-agy
@@ -90,6 +90,17 @@ keyring is empty — see [Authentication](#authentication) below.
 
 ## Delegation patterns
 
+**Worker policy (mandatory):** every `agy -p` invocation used as a worker
+or scripted pipeline MUST include `--dangerously-skip-permissions`.
+Headless `-p` mode cannot prompt for permission; without the flag, tool
+calls (notably `read_file` on images, but also any file/tool access)
+are **auto-denied** and agy can still exit `status: SUCCESS` with an
+empty `response` — a silent failure that wastes a run. The flag
+auto-approves every tool call the agent makes; pair it with
+`--print-timeout` so runs stay bounded. This is a default, not a
+suggestion — omit it only when you deliberately want a sandboxed
+session, and then verify output explicitly.
+
 `agy` is a coding-agent backend; the same delegation shapes as `codex` /
 `claude-code` apply. Pick the pattern that matches the work, not the
 harness.
@@ -100,6 +111,7 @@ harness.
 agy -p "Review this diff for bugs and security issues" \
     --model "gemini-3.1-pro-high" \
     --add-dir <repo> \
+    --dangerously-skip-permissions \
     --print-timeout 5m
 ```
 
@@ -187,6 +199,7 @@ agy -p "Review the diff in /tmp/diff.txt. Output: (1) blocking issues,
 (2) non-blocking issues, (3) suggested follow-ups. Be terse." \
    --model "claude-sonnet-4-6" \
    --add-dir ~/projects/myapp \
+   --dangerously-skip-permissions \
    --print-timeout 5m
 ```
 
@@ -196,6 +209,7 @@ Or against Gemini itself for a different-perspective check:
 agy -p "Same diff. Output only blocking issues." \
    --model "gemini-3.1-pro-high" \
    --add-dir ~/projects/myapp \
+   --dangerously-skip-permissions \
    --print-timeout 5m
 ```
 
@@ -293,12 +307,16 @@ visible to the agent by default — same access model as `claude-code`.
 
 ## Sandbox and permissions
 
-Three layers; pick the strictest that the task allows.
+Three layers; pick the strictest that the task allows. **For worker
+`-p` runs the policy is fixed: `--dangerously-skip-permissions` is
+mandatory** (see [Delegation patterns](#delegation-patterns)) — headless
+mode cannot prompt, so any other setting silently auto-denies tool
+calls.
 
 **Launch-time flags:**
 - `--sandbox` — run in a sandboxed shell with terminal restrictions.
 - `--dangerously-skip-permissions` — auto-approve every tool call (CI /
-  background runs).
+  background runs). **Required on every worker `-p` run.**
 
 **Persistent settings (`~/.gemini/antigravity-cli/settings.json`):**
 - `enableTerminalSandbox` (boolean, default `false`)
@@ -460,7 +478,7 @@ authenticated:
    successfully`. If the auth-error pattern repeats on every line with
    no recovery, the keyring is empty.
 7. Smoke test with a cheap Gemini one-shot:
-   `agy -p "Reply with: pong" --model gemini-3.5-flash-low --print-timeout 1m`.
+   `agy -p "Reply with: pong" --model gemini-3.5-flash-low --dangerously-skip-permissions --print-timeout 1m`.
    If it returns `pong`, auth + model resolution + `-p` round-trip are
    all good.
 8. If step 7 fails with auth errors, run `agy -i` once to trigger browser

@@ -19,7 +19,7 @@ layer: domain
 provides: [agy-worker]
 language: en-US
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # use-agy
@@ -81,6 +81,7 @@ keyring is empty — see [Authentication](#authentication) below.
 | Task | Cheapest path | Why |
 |------|---------------|-----|
 | Gemini-quality code review / refactor / write | **`agy -p` with a Gemini model** | Free under Google AI Pro |
+| Vision / image-input reads (OCR, infographics, screenshots, scanned PDFs) | **`agy -p` with a Gemini model** | Gemini is multimodal by default — free under AI Pro. See **Workflow J** for the 3 gotchas (relative path in prompt, `--dangerously-skip-permissions`, strip boilerplate). For corpus-scale ingestion prefer host subagents on `minimax/MiniMax-M3`. |
 | Claude Sonnet/Opus second opinion on a plan or diff | **`agy -p` with `claude-sonnet-4-6` / `claude-opus-4-6-thinking`** | Avoids loading Claude via another vendor |
 | Multi-turn coding session the user wants to drive interactively | **`agy -i` under PTY + tmux / herdr / cmux** | Native TUI with slash commands |
 | Parallel batch of independent tasks | **One git worktree per task, `agy -p` in each** | Same shape as the `codex` skill's worktree fan-out |
@@ -440,6 +441,7 @@ autocomplete, `esc esc` clears, `!` runs a shell command, `?` opens help.
   minutes ago, skipping update`); it will restart the binary under you if
   a new version lands mid-run. Run `agy update` deliberately.
 - **Image gen burns a per-model quota, not RPM.** Image gen runs on `gemini-3.1-flash-image` regardless of `--model`; ~10-12 calls/~5h on AI Pro, then `QUOTA_EXHAUSTED (429)` (non-transient, agy won't retry, `--model` switch won't help). Parse `quotaResetTimeStamp` from the log; `sleep 30` between calls. Fallback to OpenRouter (`google/gemini-3.1-flash-image`, same model, pay-per-use) **requires user approval** — never switch silently to a paid path. See `references/topology.md` → **Quota exhaustion** and `references/workflows.md` → **Workflow I**.
+- **Image *input* (vision) needs three things: a relative path in the prompt, `--dangerously-skip-permissions`, and a Gemini model.** `--add-dir <image>` does NOT attach the image as vision input (agent replies it sees no image); `@path` syntax times out. Without `--dangerously-skip-permissions`, headless `-p` auto-denies `read_file` on the image and can still report `status: SUCCESS` with an empty `response` — a silent failure. The JSON `response` also carries background-task boilerplate to strip. Verified `agy 1.1.9`; see `references/workflows.md` → **Workflow J**.
 
 ## Verification
 

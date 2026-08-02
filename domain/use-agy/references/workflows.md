@@ -317,3 +317,60 @@ partial or missing file.
 **Cap your expectations:** ~10 images per 5h window on AI Pro. For
 larger batches, either split across multiple windows (with scheduled
 retry) or use a pay-per-use path.
+
+## Workflow J — image input (vision / multimodal reading)
+
+Use when: you need a Gemini model to *read* an image — OCR, infographic
+analysis, screenshot QA, scanned-PDF page — rather than generate one.
+**Gemini models are multimodal by default**: no special flag enables
+vision; the image just needs to reach the model.
+
+Verified 2026-08-02 on `agy 1.1.9` (gemini-3.6-flash-high and
+gemini-3.1-pro-high both read PNGs correctly). Trigger: chunk ingestion
+for knowledge graphs where the delegating model lacks vision (e.g.
+deepseek-v4-flash-0731) — route image-bearing chunks to agy/Gemini or
+MiniMax M3 instead.
+
+```bash
+cd <project-root>   # launch dir = context root
+agy -p "Describe what this infographic shows: \
+2607B04G1-línea-de-énfasis-1/Unidad-1/materiales/Arquitectura_de_información_en_Colombia.png \
+— look at the image file. Reply in Spanish, max 20 words." \
+    --model gemini-3.6-flash-high \
+    --dangerously-skip-permissions \
+    --print-timeout 3m \
+    --output-format json
+```
+
+**The three rules that make image input work (all hard-won):**
+
+1. **Reference the image by relative path in the prompt — do NOT rely on
+   `--add-dir` alone.** `--add-dir <image.png>` adds the file to the
+   workspace but the agent will answer "no adjuntaste ninguna imagen" —
+   the image is not attached as a vision input. The prompt must name the
+   file (relative to the launch dir) so the agent opens it as an image.
+   `@path` syntax does NOT work either (causes `timeout waiting for
+   response` on 1.1.9).
+2. **`--dangerously-skip-permissions` is required in headless `-p` mode.**
+   Without it, agy auto-denies the `read_file` tool call on the image
+   (`no output produced — a tool required the "read_file" permission
+   that headless mode cannot prompt for`), and `status` may still report
+   `SUCCESS` with an empty `response` — a silent failure. The sandbox
+   blocks image reads by default; skip permissions for the `-p` run.
+3. **Sanitize the JSON `response`.** agy appends background-task noise to
+   the answer ("The background task for finding the file has
+   completed..."). Parse `.response`, strip that trailing boilerplate, or
+   cap with `--output-format text` + a strict prompt if piping raw.
+
+**Cost profile:** a single PNG read ≈ 35–57K input tokens (cache reads
+~110K on repeat), ~1.6–2.6K output — effectively **free** on Google AI
+Pro. For corpus-scale ingestion prefer the host's own subagent routing
+with `minimax/MiniMax-M3` (1M ctx, native multimodal) when the corpus
+has many images; keep agy/Gemini for one-off or low-volume vision reads.
+
+**Fallback matrix for image-input tasks:**
+| Image count | Path |
+|-------------|------|
+| 1–3 images | `agy -p` Gemini (free, this workflow) |
+| Many images / corpus ingestion | host subagents on `minimax/MiniMax-M3` |
+| Scanned PDF page | agy Gemini vision (OCR via model) or M3 |

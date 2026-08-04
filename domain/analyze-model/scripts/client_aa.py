@@ -4,7 +4,12 @@ Artificial Analysis API client for the analyze-model skill.
 Requires: ARTIFICIAL_ANALYSIS_API_KEY in .env or environment variable.
 Rate limit: 1,000 requests per day (free tier).
 
-Endpoint: GET https://artificialanalysis.ai/api/v2/data/llms/models
+Endpoint: GET https://artificialanalysis.ai/api/v2/language/models/free
+
+MIGRATION (2026-08-04): legacy /api/v2/data/llms/models retires 2026-11-04.
+Replaced by /api/v2/language/models (Pro) or /api/v2/language/models/free.
+We use the FREE tier, so free is the endpoint. See
+references/artificialanalysis-api.md for the field diff.
 """
 
 import os
@@ -15,6 +20,7 @@ import urllib.error
 from pathlib import Path
 
 AA_API_BASE = "https://artificialanalysis.ai/api/v2"
+AA_MODELS_PATH = "/language/models/free"  # FREE replacement; Pro would be /language/models
 _MAX_RETRIES = 3
 
 
@@ -83,6 +89,14 @@ def fetch_llm_models() -> list[dict]:
         ValueError: If API key is not configured.
         urllib.error.HTTPError: On unrecoverable HTTP errors.
     """
-    url = f"{AA_API_BASE}/data/llms/models"
-    data = _request_with_retry(url)
-    return data.get("data", [])
+    url = f"{AA_API_BASE}{AA_MODELS_PATH}"
+    payload = _request_with_retry(url)
+    # Envelope is not contractual between legacy ({"data": [...]}) and the new
+    # free endpoint (may return the array directly). Accept either shape.
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        data = payload.get("data")
+        if isinstance(data, list):
+            return data
+    raise RuntimeError(f"Unexpected response shape from {url}: {type(payload).__name__}")

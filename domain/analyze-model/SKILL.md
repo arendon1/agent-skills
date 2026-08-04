@@ -211,7 +211,7 @@ script: `bridges/opencode.py` — SQLite usage bridge for that surface.
 script: `bridges/pi.py` — JSONL usage bridge for that surface (per-message usage + logged cost).
 script: `bridges/base.py` — Bridge protocol definition.
 script: `client_openrouter.py` — OpenRouter HTTP client (models endpoint).
-script: `client_aa.py` — Artificial Analysis HTTP client (LLMs endpoint).
+script: `client_aa.py` — Artificial Analysis HTTP client (free `language/models/free` endpoint).
 script: `fetch_models.py` — Fetches from both APIs and merges into a unified catalog.
 script: `analyze_costs.py` — Cost analysis engine; accepts JSON or CSV usage logs.
 script: `forecast.py` — Linear-trend forecasting + cheaper-alternative finder.

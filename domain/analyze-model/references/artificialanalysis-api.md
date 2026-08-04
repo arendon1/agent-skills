@@ -1,7 +1,32 @@
 # Artificial Analysis API Reference
 
-Source: https://artificialanalysis.ai/api/v2/data/llms/models  
-Docs: https://artificialanalysis.ai/api-reference#free-api
+Source: https://artificialanalysis.ai/api/v2/language/models/free  
+Docs: https://artificialanalysis.ai/api-reference
+
+## ⚠️ MIGRATION (2026-08-04)
+
+Legacy endpoint `/api/v2/data/llms/models` retires **2026-11-04** (returns `410 Gone`
+after). Replaced by documented V2 contract:
+
+| Tier | Endpoint | Fields |
+| ---- | -------- | ------ |
+| Free (this client) | `GET /api/v2/language/models/free` | **Fewer fields** than legacy |
+| Pro | `GET /api/v2/language/models` | Full set |
+
+This client uses the **free** replacement (`client_aa.py` → `AA_MODELS_PATH =
+"/language/models/free"`). We have a free account/key (1,000 req/day), not Pro.
+
+**Action taken:** `URL` + envelope handling already updated. The response parser
+accepts both a bare array and a `{"data": [...]}` envelope.
+
+**Still to verify with a live key** (TODO): confirm the free endpoint still
+returns the fields the forecast pipeline depends on — `evaluations`
+(`artificial_analysis_intelligence_index`, `artificial_analysis_coding_index`)
+and `median_output_tokens_per_second` / `median_time_to_first_token_seconds`.
+If free drops them, forecasting still runs (all consumers use `.get()`) but
+cheaper-alternative quality degrades; consider Pro to recover them.
+
+Guide: https://artificialanalysis.ai/data-api/migrate-v2-data
 
 ## Authentication
 
@@ -16,9 +41,10 @@ Set in `.env` as `ARTIFICIAL_ANALYSIS_API_KEY`.
 
 ---
 
-## GET /api/v2/data/llms/models
+## GET /api/v2/language/models/free
 
-Returns LLM benchmarks, pricing, and speed metrics for all evaluated models.
+Returns LLM benchmarks, pricing, and speed metrics for all evaluated models
+(Free tier — fewer fields than legacy `/data/llms/models`).
 
 ### Response Envelope
 

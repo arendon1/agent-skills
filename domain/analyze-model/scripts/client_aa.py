@@ -76,23 +76,31 @@ def _request_with_retry(url: str) -> dict:
     raise RuntimeError(f"Failed after {_MAX_RETRIES} attempts: {url}")
 
 
-def fetch_llm_models() -> list[dict]:
-    """
-    Fetch LLM benchmark + pricing data from Artificial Analysis.
+def _normalize_model(m: dict) -> dict:
+    """Map a raw `language/models/free` model onto the legacy-compatible shape
+    that fetch_models.py / forecast.py / analyze_costs.py already read.
 
-    Returns:
-        List of model objects. See references/artificialanalysis-api.md for schema.
-        Each model includes: id, name, slug, model_creator, evaluations,
-        pricing, median_output_tokens_per_second, median_time_to_first_token_seconds.
-
-    Raises:
-        ValueError: If API key is not configured.
-        urllib.error.HTTPError: On unrecoverable HTTP errors.
+    The free endpoint nests speed fields under `performance` (legacy had them at
+    top level) and exposes fewer evaluation subfields. Normalizing here keeps
+    the downstream contract stable across the migration.
     """
-    url = f"{AA_API_BASE}{AA_MODELS_PATH}"
-    payload = _request_with_retry(url)
-    # Envelope is not contractual between legacy ({"data": [...]}) and the new
-    # free endpoint (may return the array directly). Accept either shape.
+    out = dict(m)
+    perf = m.get("performance")
+    if isinstance(perf, dict):
+        out.setdefault("median_output_tokens_per_second",
+                       perf.get("median_output_tokens_per_second"))
+        out.setdefault("median_time_to_first_token_seconds",
+                       perf.get("median_time_to_first_token_seconds"))
+        # legacy name has no _seconds suffix; consumers read this name
+        out.setdefault("median_time_to_first_answer_token",
+                       perf.get("median_time_to_first_answer_token_seconds"))
+        out.setdefault("median_end_to_end_response_time_seconds",
+                       perf.get("median_end_to_end_response_time_seconds"))
+    return out
+
+
+def _extract_rows(payload, url: str) -> list:
+    """Envelope is not contractual ({'data': [...]} vs bare array). Accept both."""
     if isinstance(payload, list):
         return payload
     if isinstance(payload, dict):
@@ -100,3 +108,40 @@ def fetch_llm_models() -> list[dict]:
         if isinstance(data, list):
             return data
     raise RuntimeError(f"Unexpected response shape from {url}: {type(payload).__name__}")
+
+
+def fetch_llm_models() -> list[dict]:
+    """
+    Fetch LLM benchmark + pricing data from Artificial Analysis (free tier).
+
+    Paginates the free endpoint (page_size capped at 200) and normalizes each
+    model to the legacy-compatible shape:
+      id, name, slug, model_creator, evaluations, pricing,
+      median_output_tokens_per_second, median_time_to_first_token_seconds,
+      median_time_to_first_answer_token.
+
+    Raises:
+        ValueError: If API key is not configured.
+        urllib.error.HTTPError: On unrecoverable HTTP errors.
+    """
+    page = 1
+    models: list[dict] = []
+    while True:
+        url = f"{AA_API_BASE}{AA_MODELS_PATH}?page={page}"
+        payload = _request_with_retry(url)
+        data = _extract_rows(payload, url)
+        models.extend(_normalize_model(m) for m in data)
+        # Stop when the API reports no more pages; bare-array responses (no
+        # pagination) are single-shot and break after the first page.
+        if isinstance(payload, dict):
+            pag = payload.get("pagination") or {}
+            try:
+                total = int(pag.get("total_pages", page))
+            except (TypeError, ValueError):
+                total = page
+            if not pag.get("has_more") or page >= total:
+                break
+        else:
+            break
+        page += 1
+    return models

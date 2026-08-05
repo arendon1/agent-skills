@@ -16,15 +16,21 @@ after). Replaced by documented V2 contract:
 This client uses the **free** replacement (`client_aa.py` → `AA_MODELS_PATH =
 "/language/models/free"`). We have a free account/key (1,000 req/day), not Pro.
 
-**Action taken:** `URL` + envelope handling already updated. The response parser
-accepts both a bare array and a `{"data": [...]}` envelope.
-
-**Still to verify with a live key** (TODO): confirm the free endpoint still
-returns the fields the forecast pipeline depends on — `evaluations`
-(`artificial_analysis_intelligence_index`, `artificial_analysis_coding_index`)
-and `median_output_tokens_per_second` / `median_time_to_first_token_seconds`.
-If free drops them, forecasting still runs (all consumers use `.get()`) but
-cheaper-alternative quality degrades; consider Pro to recover them.
+**Action taken (2026-08-04, VERIFIED with live key):**
+- `client_aa.py` now hits `/language/models/free`, paginates
+  (`?page=N`, page_size capped at 200; ~591 models total vs legacy's 591),
+  and **normalizes** each model back to the legacy-compatible shape so
+  `fetch_models.py` / `forecast.py` / `analyze_costs.py` are unchanged.
+- Speed fields arrive nested under `performance` on free; the client flattens
+  them to top level (`median_output_tokens_per_second`,
+  `median_time_to_first_token_seconds`, `median_time_to_first_answer_token`).
+- The two evaluation fields the forecast pipeline needs are present on free:
+  `artificial_analysis_intelligence_index`, `artificial_analysis_coding_index`
+  (plus a new `artificial_analysis_agentic_index`). The rest of the legacy
+  evaluation table (math, mmlu_pro, gpqa, …) no longer ships on free → Pro.
+- `pricing` keeps `price_1m_input_tokens` / `price_1m_output_tokens` (plus
+  cache fields, null on free). `price_1m_blended_3_to_1` is NOT returned by
+  free; no consumer reads it (forecast computes its own 3:1 blend).
 
 Guide: https://artificialanalysis.ai/data-api/migrate-v2-data
 
@@ -46,20 +52,19 @@ Set in `.env` as `ARTIFICIAL_ANALYSIS_API_KEY`.
 Returns LLM benchmarks, pricing, and speed metrics for all evaluated models
 (Free tier — fewer fields than legacy `/data/llms/models`).
 
-### Response Envelope
+### Response Envelope (free)
 
 ```json
 {
-  "status": 200,
-  "prompt_options": {
-    "parallel_queries": 1,
-    "prompt_length": "medium"
-  },
+  "tier": "free",
+  "intelligence_index_version": "4.1",
+  "pagination": { "page": 1, "page_size": 200, "total_pages": 3, "has_more": true },
   "data": [ <LLMModel> ]
 }
 ```
 
-> `prompt_length` defaults to `medium` (1k input tokens) for speed/latency data.
+> **Pagination:** `data` is capped at 200 rows per page. The client loops
+> `?page=1..total_pages` until `has_more` is false.
 
 ### LLMModel Object Fields
 
@@ -71,34 +76,49 @@ Returns LLM benchmarks, pricing, and speed metrics for all evaluated models
 | `model_creator` | object | `{id, name, slug}` |
 | `evaluations` | object | Benchmark scores (see below) |
 | `pricing` | object | USD per million tokens |
-| `median_output_tokens_per_second` | number | Generation speed |
-| `median_time_to_first_token_seconds` | number | Time to first token |
-| `median_time_to_first_answer_token` | number | Time to first non-reasoning token |
+| `performance` | object | Speed/latency metrics (nested on free) |
+| `release_date` | string | `YYYY-MM-DD` |
 
-### Evaluations Object
+**Raw free model shape** nests the speed fields under `performance`:
+
+```json
+"performance": {
+  "median_output_tokens_per_second": 83.09,
+  "median_time_to_first_token_seconds": 2.03,
+  "median_time_to_first_answer_token_seconds": 2.03,
+  "median_end_to_end_response_time_seconds": 8.05
+}
+```
+
+**Normalization in `client_aa.py`** (`_normalize_model`) flattens these back to
+top level so downstream consumers keep working:
+`median_output_tokens_per_second`, `median_time_to_first_token_seconds`,
+`median_time_to_first_answer_token` (legacy name, no `_seconds` suffix),
+`median_end_to_end_response_time_seconds` (kept).
+
+### Evaluations Object (free)
 
 | Field | Description | Range |
 | ----- | ----------- | ----- |
 | `artificial_analysis_intelligence_index` | Overall intelligence score | 0–100 |
 | `artificial_analysis_coding_index` | Coding benchmark | 0–100 |
-| `artificial_analysis_math_index` | Math benchmark | 0–100 |
-| `mmlu_pro` | MMLU Pro (knowledge breadth) | 0–1 |
-| `gpqa` | Graduate-level reasoning | 0–1 |
-| `hle` | Humanity's Last Exam | 0–1 |
-| `livecodebench` | Live coding benchmark | 0–1 |
-| `scicode` | Scientific coding | 0–1 |
-| `math_500` | MATH-500 | 0–1 |
-| `aime` | AIME math competition | 0–1 |
+| `artificial_analysis_agentic_index` | Agentic benchmark (new on free) | 0–100 |
 
-### Pricing Object
+> The legacy evaluation table (math, mmlu_pro, gpqa, hle, …) no longer ships on
+> free — available on Pro only.
+
+### Pricing Object (free)
 
 **Note: these are USD per MILLION tokens** (different from OpenRouter's per-token values).
 
 | Field | Description |
 | ----- | ----------- |
-| `price_1m_blended_3_to_1` | Blended price (3:1 input:output ratio) |
 | `price_1m_input_tokens` | Input price per 1M tokens |
 | `price_1m_output_tokens` | Output price per 1M tokens |
+| `price_1m_cache_hit_tokens` / `price_1m_cache_write_tokens` | Cache pricing (null on free) |
+
+> `price_1m_blended_3_to_1` is NOT returned by free. No consumer reads it —
+> `forecast.py` computes its own 3:1 blend.
 
 **Conversion to match OpenRouter pricing:**
 ```python

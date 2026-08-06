@@ -7,7 +7,7 @@ Vertical slices. Each task names its proof (test). Status cells owned by
 
 | id | status | task | cites |
 |----|--------|------|-------|
-| T1 | [ ] | Extract `process/grilling/SKILL.md` (auto): frontier/rounds algorithm, numbered questions + recommended answers, facts-are-agent's-job with non-blocking subagent dispatch, done-when-frontier-empty. Refactor `process/grill/SKILL.md` to invoke grilling; keep plan-folder + PRD.md ownership. Add `frontier` + `grilling` terms to CONTEXT.md. | V1,V2,V3,V4,V8 |
+| T1 | [x] | Extract `process/grilling/SKILL.md` (auto): frontier/rounds algorithm, numbered questions + recommended answers, facts-are-agent's-job with non-blocking subagent dispatch, done-when-frontier-empty. Refactor `process/grill/SKILL.md` to invoke grilling; keep plan-folder + PRD.md ownership. Add `frontier` + `grilling` terms to CONTEXT.md. | V1,V2,V3,V4,V8 |
 | T2 | [ ] | Rewrite `process/review/SKILL.md` to two-axis: Standards + Spec as parallel subagents (isolated contexts), Fowler 12-smell baseline as in-file reference, side-by-side report (`## Standards`/`## Spec`), keep REFUTE + go/no-go gate. | V1,V2,V5,V8 |
 | T3 | [ ] | Add `process/wait-what/SKILL.md` (auto): re-pitch corrective. Uses CONTEXT.md vocabulary, plain language, short. No artifact writes. | V1,V2,V3,V7,V8 |
 | T4 | [ ] | Add `process/to-questionnaire/SKILL.md` (user, loop: to-questionnaire, deliverable: questionnaire file) + `references/template.md`. Grills the send (recipient, what-needs-back), targets the gap, writes `to-questionnaire-<slug>.md` in cwd. | V1,V2,V3,V6,V8 |

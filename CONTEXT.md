@@ -44,6 +44,23 @@ deletions from Moodle go as `to_archive`, NOT `to_delete`.
 
 _Avoid_: "bidirectional sync", "clickup as source", "reorganize"
 
+## frontier
+
+In a grilling interview: every decision whose prerequisites are all settled —
+the questions askable NOW without guessing answers not yet heard. The whole
+frontier is asked in one round (numbered, recommended answer each), then
+recomputed from the answers. Empty frontier = interview done.
+
+_Avoid_: "next question", "pending questions", "open questions"
+
+## grilling
+
+The interview primitive (process layer, auto): design tree + frontier rounds +
+facts-are-the-agent's-job. Owns no artifacts. Invoked by loops that must
+sharpen an idea by conversation (`grill`, `triage`, `deepen`).
+
+_Avoid_: "interviewing", "questioning", "interrogation"
+
 ## hunk review pause
 
 A point in the agent loop where the agent stops, prints a chat

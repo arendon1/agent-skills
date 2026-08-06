@@ -1,10 +1,10 @@
 ---
 name: grill
 description: |
-  Sharpen a fuzzy idea into requirements before spec. Calibrated interrogation:
-  one question at a time, recommend an answer, land each in PRD.md or CONTEXT.md.
-  Creates the plan folder. The cheapest place to kill a bad idea is before a task
-  exists.
+  Sharpen a fuzzy idea into requirements before spec. Calibrated interrogation
+  via the grilling discipline: frontier rounds, recommended answers, facts are
+  the agent's job, land each decision in PRD.md or CONTEXT.md. Creates the plan
+  folder. The cheapest place to kill a bad idea is before a task exists.
   Use when the user has a vague idea, says "grill me", "stress-test this",
   "challenge my plan", "interview me", or before designing anything non-trivial.
 invocation: user
@@ -17,8 +17,9 @@ metadata:
 
 # grill — sharpen idea into PRD
 
-One question at a time. Every answer lands in `PRD.md` or `CONTEXT.md`, or gets
-parked as an explicit unknown. Never guess a requirement into existence.
+Stateful wrapper around the `grilling` discipline. Runs the interview (frontier
+rounds, recommended answers, facts as the agent's job) and lands every decision
+in `PRD.md` or `CONTEXT.md`. Never guess a requirement into existence.
 
 Plan-then-execute guesses the fuzzy parts and builds the wrong thing. Grill drags
 the fuzz into `PRD.md` *before* a single task exists. A bad assumption caught here
@@ -28,6 +29,7 @@ costs one question; caught in `LESSONS.md` it costs a bug.
 
 Owns: the **plan folder** + `PRD.md` + `CONTEXT.md` glossary updates (may invoke
 the `domain-modeling` discipline for the active glossary work).
+Runs: the `grilling` discipline for the interview itself.
 Hands off to: `design` (→ `ARD.md`), or `spec` (→ `SPEC.md`) for right-sized work.
 MUST NOT write `ARD.md`, `SPEC.md`, `PLAN.md`, or `LESSONS.md`.
 
@@ -72,10 +74,14 @@ One opening read, not a quiz. Match the grilling to it:
 Brutal grilling on a half-formed idea just demoralizes. Light grilling on a
 committed plan misses the load-bearing flaw.
 
-## STEP 3 — QUESTION LADDER
+## STEP 3 — RUN THE INTERVIEW (grilling discipline)
 
-Climb in order. Each rung, ask **one** question, **recommend** an answer, wait.
-Stop climbing the moment the PRD would be unambiguous — do not ask all seven by reflex.
+Run the `grilling` discipline for the interview mechanics: design tree,
+frontier, rounds (whole frontier in one round, numbered, recommended answers),
+facts as the agent's job with non-blocking helper dispatch.
+
+Seed the frontier with the question ladder below — climb in order of
+dependency, not by reflex. Stop the moment the PRD would be unambiguous.
 
 1. **Goal** — what must the code *do*, in one line? (→ `PRD.md` § Goal)
 2. **Done** — how do we know it works? name the observable. (→ `PRD.md` § Done)
@@ -86,17 +92,7 @@ Stop climbing the moment the PRD would be unambiguous — do not ask all seven b
 7. **Unknown** — what do we *not* know yet? (→ park as `?` in `PRD.md` § Open questions)
 
 If a question can be answered by exploring the codebase, explore the codebase
-instead of asking the user.
-
-### Answer format
-
-Each question carries a recommended answer so the user can grunt "yes" and move:
-
-```
-Q: auth — session cookie or JWT?
-rec: JWT — stateless; you named horizontal scaling as a constraint.
-(a) JWT  (b) cookie  (c) something else?
-```
+instead of asking the user — grilling rule: facts are your job.
 
 ### Terminology
 
@@ -140,7 +136,7 @@ Right-size: a one-line fix gets a minimal PRD (§G + §D only). A small feature 
 
 ## WHEN TO STOP
 
-Done when ALL hold:
+Done when ALL hold (grilling's frontier is empty AND):
 - §G is one line, one reading, zero "or maybe".
 - §C covers every non-negotiable the user stated or implied.
 - Every blocking unknown is either answered or parked as an explicit `?`.
@@ -161,6 +157,6 @@ and tell the user the next step:
 
 - MUST NOT make product decisions for the user. Recommend, never decide.
 - MUST NOT write `ARD.md`, `SPEC.md`, `PLAN.md`, or `LESSONS.md`. Hand off.
-- MUST NOT ask in bulk. One question, one recommendation, wait.
+- MUST NOT re-implement the interview — run the `grilling` discipline.
 - MUST NOT grill a trivial change. Right-size or skip (§11).
 - MUST read `CONTEXT.md` and use canonical terms throughout.

@@ -19,6 +19,16 @@ Moodle de Uniremington (aulavirtual.uniremington.edu.co).
 
 Antes de cualquier navegación:
 
+0. **REVISAR SESIÓN PERSISTENTE antes de pedir login**:
+   - `.browserdata/` (perfil Chrome con cookies de la sesión del Aula
+     Virtual) existe en la raíz del workspace? → la sesión puede persistir;
+     reusar el perfil (via `navegador_cdp`) o leer cookies exportadas.
+   - `.moodle_session.json` válido (`expires_at` > ahora, TTL 7 días)? →
+     cargar cookies a `requests.Session` (via `navegador_requests`), sin
+     navegador.
+   - Solo si NO hay sesión válida → ir al paso 1. No pedir login cuando ya
+     existe persistencia (el usuario inició sesión manualmente en el Aula
+     Virtual y las cookies quedaron en `.browserdata/`).
 1. Navegar a `https://aulavirtual.uniremington.edu.co/my/`
 2. Verificar estado:
    - **NO AUTENTICADO**: URL contiene `login/index.php` o texto "Usted no se ha identificado"

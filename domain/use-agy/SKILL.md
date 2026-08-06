@@ -385,56 +385,11 @@ first-class orchestration primitive.
 
 ## Quick Reference
 
-### Wrapper commands
-
-| Command | Purpose |
-|---------|---------|
-| `agy --version` | Version (safe non-interactive) |
-| `agy help` | Wrapper surface (NOT slash commands) |
-| `agy changelog` | Release notes |
-| `agy install` | Configure PATH / shell profile |
-| `agy update` | Self-update |
-| `agy models` | List installed models (display strings) |
-| `agy agents` | List available agents |
-| `agy plugin list` | List imported plugins |
-
-### Useful flags (run-mode)
-
-| Flag | Effect |
-|------|--------|
-| `-p`, `--print`, `--prompt` | Non-interactive single prompt |
-| `--model <name>` | Pick model (exact display string from `agy models`) |
-| `--effort low\|medium\|high` | Reasoning effort for the session |
-| `--add-dir <path>` | Repeatable context root |
-| `--print-timeout <dur>` | Bound `-p` run (default `5m`) |
-| `--output-format text\|json\|stream-json` | `-p` output format |
-| `-i`, `--prompt-interactive` | Interactive REPL with initial prompt |
-| `-c`, `--continue` | Resume most recent conversation |
-| `--conversation <id>` | Resume a specific conversation |
-| `--sandbox` | Sandbox shell |
-| `--dangerously-skip-permissions` | Auto-approve all tool calls |
-| `--mode accept-edits\|plan` | Agent execution mode |
-| `--new-project` | Start a new project for this session |
-| `--project <id>` | Use a specific project ID |
-| `--log-file <path>` | Override log file path |
-| `--json-schema <schema>` | Enforce structured output (stream-json final result) |
-
-### Plugin subcommands (`agy plugin --help`)
-
-`list`, `import [source]`, `install <target>`, `uninstall <name>`,
-`enable <name>`, `disable <name>`, `validate [path]`, `link <mp>
-<target>`, `help`. Plugins bundle skills, agents, rules, MCP servers,
-and hooks; `agy plugin list` returning empty is a valid state.
-
-### In-session slash commands
-
-Only inside a running `agy` TUI / REPL — full list in
-`references/commands.md`. Short version: `/resume` (`/switch`),
-`/rewind` (`/undo`), `/rename`, `/clear`, `/fork`, `/reset`, `/new`,
-`/config`, `/settings`, `/permissions`, `/model`, `/skills`, `/mcp`,
-`/open`, `/usage`, `/logout`, `/agents`. Prompt helpers: `@` path
-autocomplete, `esc esc` clears, `!` runs a shell command, `?` opens help.
-
+Full command tables (global options, wrapper subcommands, plugin
+subcommands, in-session slash commands) live in `references/commands.md`.
+TL;DR: `agy -p "<prompt>"` for one-shot non-interactive runs; `agy -i` for
+interactive; `agy models` lists display strings; `--dangerously-skip-permissions`
+is REQUIRED for `-p` worker runs (see Sandbox and permissions).
 ## Pitfalls
 
 - `agy help` shows wrapper commands, **not** interactive slash commands.

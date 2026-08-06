@@ -1,9 +1,7 @@
 ---
 name: use-clickup
-description: >-
-  Task and list management in ClickUp via the official API.
-  Use when creating tasks, updating dates, searching activities,
-  and managing lists.
+description: |
+  ClickUp task and list management via the official API. Use when creating or updating ClickUp tasks (due dates, statuses, assignees), searching task activities and history, creating lists, or viewing existing lists. Handles authentication, response caching, and known API quirks so agent-driven ClickUp edits land correctly.
 invocation: auto
 layer: domain
 provides: [clickup-api]

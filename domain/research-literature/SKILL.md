@@ -1,10 +1,7 @@
 ---
 name: research-literature
-description: >-
-  Busca artículos académicos usando EXA, Semantic Scholar y Google Scholar.
-  Usa cuando el usuario necesita encontrar fuentes para un paper, revisar
-  literatura, o dice "busca papers sobre...", "encuentra artículos de...",
-  "qué investigaciones hay sobre...".
+description: |
+  Busca artículos académicos y fuentes científicas usando EXA, Semantic Scholar y Google Scholar, con resultados estructurados para citar en papers. Usa cuando el usuario necesite encontrar fuentes para un paper o ensayo, revisar el estado del arte de un tema, preparar una revisión de literatura, o diga "busca papers sobre...", "encuentra artículos de...", "qué investigaciones hay sobre...", "fuentes para mi paper".
 invocation: auto
 layer: domain
 provides: [academic-search]

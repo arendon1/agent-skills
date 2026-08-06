@@ -1,9 +1,7 @@
 ---
 name: gestionar-cursos
-description: >-
-  Extrae información de cursos Moodle Uniremington y organiza estructura
-  de carpetas local. Usa cuando necesites inicializar cursos, sincronizar
-  contenido o verificar estado de un curso vs Moodle.
+description: |
+  Extrae y sincroniza información de cursos Moodle Uniremington: inicializa cursos desde URLs de Moodle, organiza la estructura de carpetas local y verifica estado vs Moodle. Usa cuando necesites iniciar un curso (gestionar-cursos init), sincronizar contenido o calificaciones con ClickUp (clickup-sync, sync-clickup-calificaciones), revisar foros evaluables, consultar calificaciones, o verificar qué cambió en un curso (estado).
 invocation: user
 layer: domain
 loop: gestionar-cursos

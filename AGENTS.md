@@ -115,8 +115,10 @@ metadata:
 - `description` — MUST be 1..1024 chars (Agent Skills ecosystem ceiling;
   Pi and Hermes reject longer). SHOULD be >= 200 chars — below that, trigger
   coverage is too thin. MUST contain the literal phrase `Use when` (or
-  `Usa cuando`). Front-load the trigger phrase: some harnesses surface only
-  the first ~60 chars (Hermes), so what the model sees first decides firing.
+  `Usa cuando`). Front-load the trigger CONTENT — capability + key use-case
+  words in the first ~60 chars; some harnesses surface only that (Hermes),
+  so what the model sees first decides firing. The `Use when` phrase need
+  not lead.
 - `invocation` + `layer` — REQUIRED on every skill.
 - `loop` + `deliverable` — REQUIRED when `invocation: user`.
 - `provides` — REQUIRED when `layer: domain`; lists capabilities the domain skill

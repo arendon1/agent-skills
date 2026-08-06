@@ -1,10 +1,7 @@
 ---
 name: generar-paper
-description: >-
-  Genera documentos académicos en formato APA 7 (estudiante) con validación estricta de
-  citas y salida en PDF vía Typst. Usa cuando el usuario necesita validar referencias,
-  formatear bibliografía, componer un paper con estructura IMRaD, o compilar un documento
-  académico a PDF.
+description: |
+  Genera documentos académicos en formato APA 7 (nivel estudiante) con validación estricta de citas y referencias, y salida en PDF vía Typst. Usa cuando el usuario necesite validar que las citas estén correctas y completas, formatear bibliografía o referencias en APA 7, componer o estructurar un paper (IMRaD: introducción, métodos, resultados, discusión), o compilar un documento académico a PDF final.
 invocation: user
 layer: domain
 loop: generar-paper

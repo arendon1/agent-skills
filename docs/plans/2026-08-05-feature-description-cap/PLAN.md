@@ -8,11 +8,11 @@ Vertical slices. Proof per task = named check. Status cells owned by `build`.
 |----|--------|------|-------|
 | T1 | [x] | audit.py: `MAX_DESC_CHARS = 1024` (FAIL if exceeded), `MIN_DESC_CHARS = 200` (WARN if below), keep "Use when"/"Usa cuando" check. Synthetic test: >1024 FAIL, <200 WARN, 200..1024 clean. | R1,R2,R6 |
 | T2 | [x] | AGENTS.md §5 field requirements + §15 constraints: description 1..1024 (MUST), >= 200 (SHOULD), front-load trigger phrase. | R3,R5 |
-| T3 | [ ] | Rewrite `use-clickup` description: 140 -> 300..500 chars, front-loaded "Use when". | R4 |
-| T4 | [ ] | Rewrite `gestionar-cursos` description: 194 -> 300..500, es-CO, "Usa cuando". | R4 |
-| T5 | [ ] | Rewrite `skill-forge` description: 208 -> 300..500, front-loaded "Use when". | R4 |
-| T6 | [ ] | Rewrite `research-literature` description: 254 -> 300..500, es-CO. | R4 |
-| T7 | [ ] | Rewrite `generar-paper` description: 275 -> 300..500, es-CO. | R4 |
+| T3 | [x] | Rewrite `use-clickup` description: 140 -> 300..500 chars, front-loaded "Use when". | R4 |
+| T4 | [x] | Rewrite `gestionar-cursos` description: 194 -> 300..500, es-CO, "Usa cuando". | R4 |
+| T5 | [x] | Rewrite `skill-forge` description: 208 -> 300..500, front-loaded "Use when". | R4 |
+| T6 | [x] | Rewrite `research-literature` description: 254 -> 300..500, es-CO. | R4 |
+| T7 | [x] | Rewrite `generar-paper` description: 275 -> 300..500, es-CO. | R4 |
 | T8 | [ ] | ADR-0002 (why 1024 not 1200, harness table) + gate: full audit sweep --strict 0/0, desc length scan (all 1..1024, >=200), manifest --check, conventional commits, push. | R7 |
 
 ## Order & dependencies

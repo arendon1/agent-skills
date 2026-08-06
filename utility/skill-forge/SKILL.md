@@ -1,9 +1,7 @@
 ---
 name: skill-forge
 description: |
-  Constitution enforcer. Scaffolds new skills and validates them against AGENTS.md.
-  Use when creating a new skill, auditing an existing skill for compliance, or
-  migrating a skill to the new frontmatter schema.
+  Constitution enforcer for the agent-skills repo: scaffolds new skills with compliant frontmatter (init), validates any skill against AGENTS.md (audit — frontmatter schema, layers, triggering contracts, agnosticism, size), and regenerates or verifies the harness-discovery manifest (manifest). Use when creating a new skill, auditing a skill for compliance, migrating a skill to the new frontmatter schema, or checking that the manifest is fresh.
 invocation: auto
 layer: utility
 metadata:

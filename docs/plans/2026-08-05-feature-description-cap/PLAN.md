@@ -13,7 +13,7 @@ Vertical slices. Proof per task = named check. Status cells owned by `build`.
 | T5 | [x] | Rewrite `skill-forge` description: 208 -> 300..500, front-loaded "Use when". | R4 |
 | T6 | [x] | Rewrite `research-literature` description: 254 -> 300..500, es-CO. | R4 |
 | T7 | [x] | Rewrite `generar-paper` description: 275 -> 300..500, es-CO. | R4 |
-| T8 | [ ] | ADR-0002 (why 1024 not 1200, harness table) + gate: full audit sweep --strict 0/0, desc length scan (all 1..1024, >=200), manifest --check, conventional commits, push. | R7 |
+| T8 | [x] | ADR-0002 (why 1024 not 1200, harness table) + gate: full audit sweep --strict 0/0, desc length scan (all 1..1024, >=200), manifest --check, conventional commits, push. | R7 |
 
 ## Order & dependencies
 

@@ -29,7 +29,8 @@ everyone. This skill defines the conventions; the `use-clickup` skill
 - Before starting ANY non-trivial work — check for an existing task, scope it
   if missing.
 - Claiming, updating, blocking, reviewing, or closing a tracked task.
-- Asked "what is the team working on", "who owns X", "is anything blocked".
+- Asked "what is the team working on", "who owns X", "is anything blocked",
+  "what is running on device X", "which harness produced this".
 - Suspicion of duplicate or out-of-scope work.
 
 ## OWNERSHIP
@@ -54,8 +55,8 @@ answer from memory. Run the search-task script of the `use-clickup` skill
 1. Open tasks by status — what is queued (`to do`, `ready`), in flight
    (`in progress`), awaiting review (`review`), or stuck (`blocked`).
 2. Tasks tagged `waiting-on-andres` — surface these to the operator first.
-3. Who owns each in-progress/review task — read the `Owner:` line in the
-   task description.
+3. Who owns each in-progress/review task — Owner field + `Owner:` line in the
+   description; group in-flight work by device and harness (identity tags).
 
 ## STEP 1 — SCOPE BEFORE WORK (scoping gate)
 
@@ -72,8 +73,12 @@ No non-trivial work starts unless it already exists as a task.
 ## STEP 2 — CLAIM
 
 1. Set status to `in progress`.
-2. Record the owner: first line of the task description `Owner: <agent-identity>`.
-3. Add a comment: started, what will be delivered, ETA if any.
+2. Record the owner: set the Owner custom field (value `<harness>@<device>`)
+   and mirror it as the first line of the task description
+   `Owner: <harness>@<device>`.
+3. Ensure the task carries the `harness:<name>` and `device:<name>` tags
+   (add them via the task-tag endpoint if missing — see references).
+4. Add a comment: started, what will be delivered, ETA if any.
 
 ## STEP 3 — UPDATE (progress)
 
@@ -129,6 +134,11 @@ Statuses are the ONLY state machine. Never encode progress in a list.
 | `future` | deferred / long-horizon |
 | `infra` | environment, deployment, tooling |
 | `waiting-on-andres` | needs the operator's decision/input (highest-value) |
+| `harness:<name>` | runtime the agent runs as — one per task |
+| `device:<name>` | physical machine (operator's alias or hostname) — one per task |
+
+Every task carries both identity tags, set at creation by the creating agent.
+They make work visible per device and per harness across the whole team.
 
 ## WHEN TO STOP
 
@@ -142,7 +152,9 @@ MUST:
 
 - Statuses encode progress; lists enclose projects. Never invert.
 - Create the task before starting non-trivial work (scoping gate).
-- Claim before working (Owner line in the description).
+- Claim before working: Owner field + `Owner:` description line, value
+  `<harness>@<device>`.
+- Tag every task with `harness:<name>` and `device:<name>` at creation.
 - Keep descriptions self-contained and current.
 - Comment evidence at every transition.
 - Re-read the space at session start and before each new work item.

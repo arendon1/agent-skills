@@ -46,6 +46,18 @@ grows past ~5 related tasks, give it its own list and register it in
 - `future` — deferred / long-horizon
 - `infra` — environment, deployment, tooling
 - `waiting-on-andres` — needs a decision/input from the human (highest-value query)
+- `harness:<name>` — runtime the agent runs as (e.g. `harness:pi`)
+- `device:<name>` — physical machine, operator's alias or hostname (e.g. `device:macbook-pro`, `device:phone`)
+
+Every task carries BOTH identity tags, set at creation. New harness/device
+tags must be pre-created at space level (`POST /space/{id}/tag`).
+
+## Owner field (custom field)
+
+- `Owner` (short_text) on each list — value `<harness>@<device>` (e.g. `pi@macbook-pro`).
+- Set via `POST /task/{task_id}/field/{field_id}`; read under `custom_fields`.
+- Mirrored as the first line of the task description (`Owner: <identity>`) so a
+  cold agent reads it without API calls.
 
 ## Conventions
 
@@ -53,7 +65,7 @@ grows past ~5 related tasks, give it its own list and register it in
    Never rely on memory for task state.
 1. Any work that could slip out of context gets a task here first. If in doubt, write it down.
 2. State machine: **status encodes state, list encodes project, comment encodes evidence.**
-   - Pending/future → `to do` + `future` tag. Started → `in progress` + Owner line.
+   - Pending/future → `to do` + `future` tag. Started → `in progress` + Owner field + Owner line.
    - External blocker → `blocked` + comment with the blocker + `waiting-on-andres` tag if it needs the human.
    - Needs review → `review` (waiting on a review pass), NOT `blocked` (cannot proceed).
    - Done → `complete` + closing comment.

@@ -143,11 +143,21 @@ _Avoid_: "rogue work", "unscoped build", "shadow task"
 
 ## owner claim
 
-Recording which agent works a task: first line of the task description
-`Owner: <agent-identity>` + start comment. The Owner line is the collision
-signal — claimed work is worked only by its owner.
+Recording which agent works a task: the `Owner` custom field (value
+`<harness>@<device>`, e.g. `pi@macbook-pro`) mirrored as the first line of the
+task description `Owner: <identity>` + start comment. The Owner record is the
+collision signal — claimed work is worked only by its owner.
 
 _Avoid_: "assignee", "taker", "responsible"
+
+## identity tags
+
+Every task carries two tags naming who created/owns it: `harness:<name>`
+(the runtime the agent runs as) and `device:<name>` (the physical machine,
+operator's alias or hostname). Set at creation; tags must pre-exist in the
+space. They make "what is running on the phone" answerable per device/harness.
+
+_Avoid_: "origin tag", "source tag", "routing tag"
 
 ## waiting-on-andres
 

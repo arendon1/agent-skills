@@ -111,3 +111,47 @@ treats it as `ambiguous` (the operator is supposed to have reviewed;
 "auto" mid-review is a sign of confusion, ask before acting).
 
 _Avoid_: "skip flag", "auto mode", "review toggle"
+
+## general list
+
+Default list in the Agent Ops space for all agent-tracked work without a
+dedicated home. Statuses encode the pipeline; the list itself is not a state.
+
+_Avoid_: "Agent Tasks", "task bucket", "inbox list"
+
+## status-as-state
+
+Rule: a task's ClickUp status is the ONLY state machine (`to do` → `ready` →
+`in progress` → `review` → `blocked` → `complete`). Progress never lives in
+lists, tags, or comments alone.
+
+_Avoid_: "list as status", "phase as list", "kanban column"
+
+## list-as-project
+
+Rule: a list exists only to enclose a big named project or goal (a cluster of
+~5+ related tasks). Lists are never created for status, phase, or priority.
+
+_Avoid_: "status list", "sprint list", "priority board"
+
+## scoping gate
+
+Rule: no non-trivial work starts until it exists as a task in Agent Ops
+(`to do`/`ready`). Work without a task is out of scope until registered.
+
+_Avoid_: "rogue work", "unscoped build", "shadow task"
+
+## owner claim
+
+Recording which agent works a task: first line of the task description
+`Owner: <agent-identity>` + start comment. The Owner line is the collision
+signal — claimed work is worked only by its owner.
+
+_Avoid_: "assignee", "taker", "responsible"
+
+## waiting-on-andres
+
+Tag for tasks that need the operator's decision or input; the highest-value
+query at session start.
+
+_Avoid_: "blocked-on-human", "needs-input", "ping-andres"

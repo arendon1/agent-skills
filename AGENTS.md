@@ -279,10 +279,12 @@ skill changes.
   designs, plans, lessons). Markdown files in `docs/plans/`. Project-local,
   version-controlled.
 - **External task memory** = pending/future work that must survive context
-  compaction. Lives in ClickUp **Agent Ops** space (`docs/ops/clickup-agent-ops.md`
-  holds the schema; ClickUp is the sole state). Consult it at session start / after
-  compaction (convention #0). Managed by the agent; Andrés has full read access.
-  NEVER put secrets in task content (repo is public).
+  compaction. Lives in ClickUp **Agent Ops** space (canonical schema:
+  `process/agents-pm/references/schema.md`; `docs/ops/clickup-agent-ops.md` is the
+  repo-local copy; ClickUp is the sole state). Managed by the `agents-pm` skill
+  (conventions + lifecycle). Consult it at session start / after compaction
+  (convention #0). Andrés has full read access. NEVER put secrets in task content
+  (repo is public).
 
 **The critical habit:** the agent MUST remember to check and remember to update
 the project artifacts. That habit is taught by `bootstrap` / the system prompt

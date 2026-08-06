@@ -3,6 +3,7 @@
     {
       "name": "process",
       "skills": [
+        "./process/agents-pm",
         "./process/build",
         "./process/check",
         "./process/debug",

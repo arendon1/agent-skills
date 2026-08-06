@@ -79,7 +79,7 @@ script: `create_task.py`
 
 ### use-clickup update-task
 
-**Usage:** `update-task <task_id> [--name] [--description] [--due_date] [--priority] [--tags]`
+**Usage:** `update-task <task_id> [--name] [--description] [--due_date] [--start_date] [--priority] [--tags] [--status]`
 script: `update_task.py`
 
 **Example:**
@@ -140,14 +140,6 @@ script: `view_lists.py`
 ```
 
 ---
-
-## Agent Ops — agent's external task memory
-
-The agent maintains a ClickUp space **Agent Ops** (space `1000270000003780`,
-workspace `90132304521`) as durable external memory for pending/future work that
-must survive context compaction. Query the `Agent Tasks` list at session start
-and after compaction. Schema + conventions: `docs/ops/clickup-agent-ops.md`.
-Never put secrets in task content (repo is public).
 
 ## Error Handling
 

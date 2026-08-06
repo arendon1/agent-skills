@@ -187,6 +187,8 @@ VALID_INVOCATIONS = {"auto", "user", "bootstrap"}
 VALID_LAYERS = {"process", "domain", "utility"}
 VALID_LANGS = {"en-US", "es-CO"}
 MAX_LINES = 500
+MAX_DESC_CHARS = 1024   # Agent Skills ecosystem ceiling: spec, Pi, Hermes, Codex
+MIN_DESC_CHARS = 200    # below this, trigger coverage is too thin
 
 
 def audit(skill_path: Path) -> Result:
@@ -217,8 +219,19 @@ def audit(skill_path: Path) -> Result:
     desc = str(fm.get("description", "")).strip()
     if not desc:
         r.errors.append("frontmatter: 'description' missing")
-    elif "use when" not in desc.lower() and "usa cuando" not in desc.lower():
-        r.errors.append("description missing 'Use when' (or 'Usa cuando') trigger phrase")
+    else:
+        if "use when" not in desc.lower() and "usa cuando" not in desc.lower():
+            r.errors.append("description missing 'Use when' (or 'Usa cuando') trigger phrase")
+        if len(desc) > MAX_DESC_CHARS:
+            r.errors.append(
+                f"description {len(desc)} chars > max {MAX_DESC_CHARS} (ecosystem ceiling; "
+                "Pi/Hermes reject longer)"
+            )
+        elif len(desc) < MIN_DESC_CHARS:
+            r.warnings.append(
+                f"description only {len(desc)} chars (< min {MIN_DESC_CHARS}); "
+                "too condensed to trigger reliably — expand what/when + trigger keywords"
+            )
 
     # --- invocation
     inv = str(fm.get("invocation", "")).strip()

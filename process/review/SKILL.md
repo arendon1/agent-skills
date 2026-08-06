@@ -4,7 +4,8 @@ description: |
   Adversarial senior review of the plan before build, or of the code after build.
   Constructs a skeptical reviewer anchored to the codebase, RESEARCH.md, and live
   best-practice, then tries to REFUTE — not rubber-stamp. Every finding cites
-  evidence. Ends in a go/no-go gate.
+  evidence. Code review runs two axes (Standards + Spec) as parallel isolated
+  reviewers, reported side by side. Ends in a go/no-go gate.
   Use when reviewing high-blast-radius work before build, or reviewing the diff
   after build, or when the user says "review the spec", "red-team this", "is this
   sound", "senior review".
@@ -73,10 +74,13 @@ Build a reviewer with real authority, not a generic critic:
   out-of-date assumption is a flaw.
 
 A reviewer with no evidence is just an opinion. Earn the authority first.
+Code review builds TWO seniors (see PHASE 2) so the axes never pollute each
+other's context.
 
 ## PHASE 2 — REFUTE
 
 ### Design review axes
+
 - **Goal vs reality** — does the PRD solve the actual problem, or a proxy?
 - **Missing invariant** — what can go wrong that no `§V` catches? (most findings)
 - **Interface drift** — does `§I` match what callers already expect? (cite the
@@ -87,18 +91,60 @@ A reviewer with no evidence is just an opinion. Earn the authority first.
   covers.
 - **Altitude** — tasks too vague to act on, or so granular they are just typing?
 
-### Code review axes
-- **Spec compliance** — does the code do what `SPEC.md` `§V`/`§I` say?
-- **Regression** — does the change break an existing invariant or test?
-- **Behavior preservation** — does a refactor actually preserve behavior?
-- **Test quality** — do the new tests verify behavior (good) or implementation
-  (bad)? Are there tests for the cited invariants?
-- **Hidden coupling** — does the change introduce coupling the spec doesn't name?
-- **Error handling** — are failure modes covered or papered over?
+### Code review: two axes, two isolated reviewers
+
+A change can pass one axis and fail the other:
+
+- Code that follows every standard but implements the wrong thing →
+  **Standards pass, Spec fail**.
+- Code that does exactly what the issue asked but breaks conventions →
+  **Spec pass, Standards fail**.
+
+Reporting them separately stops one axis from masking the other. Run BOTH axes
+as parallel isolated reviewers (separate contexts, no cross-pollution), then
+aggregate their reports side by side. NEVER merge or rerank findings across axes.
+
+**Standards axis** — does the diff follow this repo's documented standards?
+Sources: anything documenting how code should be written (`CODING_STANDARDS.md`,
+`CONTRIBUTING.md`). On top of documented standards, always carry the **smell
+baseline** below. Rules: a documented repo standard always overrides the
+baseline; each baseline smell is a labelled heuristic, never a hard violation;
+skip anything tooling already enforces.
+
+**Spec axis** — does the diff faithfully implement the originating spec?
+Sources, in order: issue/ticket references in commit messages; the path the user
+passed; a spec file under `docs/`, `specs/`, or the active plan folder; else
+ask. If no spec exists, the Spec axis reports "no spec available" and skips.
+
+Report format (per axis, verbatim — do not merge):
+
+- **Standards** — per file/hunk: (a) documented-standard violations: cite the
+  standard (file + rule); (b) baseline smells: name it and quote the hunk.
+  Distinguish hard violations from judgement calls.
+- **Spec** — (a) requirements asked but missing or partial; (b) behaviour in the
+  diff not asked for (scope creep); (c) requirements that look implemented but
+  wrong. Quote the spec line per finding.
+
+### Smell baseline (Fowler, ch.3 — applies even when the repo documents nothing)
+
+| smell | reads as | fix |
+|-------|----------|-----|
+| Mysterious Name | name does not reveal what it does or holds | rename; no honest name = murky design |
+| Duplicated Code | same logic shape in > 1 hunk or file | extract shared shape, call from both |
+| Feature Envy | method reaches into another object's data more than its own | move method onto the data it envies |
+| Data Clumps | same few fields/params keep travelling together | bundle into one type, pass that |
+| Primitive Obsession | primitive/string standing in for a domain concept | give the concept its own small type |
+| Repeated Switches | same switch/if-cascade on same type recurs | polymorphism, or one map both sites share |
+| Shotgun Surgery | one logical change scatters edits across files | gather what changes together into one module |
+| Divergent Change | one file edited for several unrelated reasons | split so each module changes for one reason |
+| Speculative Generality | abstraction/hooks added for needs the spec lacks | delete; inline back until a real need shows |
+| Message Chains | long `a.b().c().d()` navigation callers depend on | hide the walk behind one method |
+| Middle Man | class/function mostly just delegates onward | cut it, call the real target direct |
+| Refused Bequest | subclass ignores or overrides most inherited behaviour | drop inheritance, use composition |
 
 ## PHASE 3 — CLASSIFY
 
-Each finding: `evidence -> claim -> severity`.
+Each finding (from either axis, in code review): `evidence -> claim -> severity`.
 
 - **BLOCK** — shipping this ships a real defect. Must fix first.
 - **HARDEN** — add/sharpen a `§V` so the build cannot regress it.
@@ -112,13 +158,13 @@ BLOCK.
 - Each HARDEN finding -> a draft `§V` line (testable, cites the interface and
   the behavior it guards). Hand to the `spec` skill to write (design review) or the `lessons`
   reflex (code review, post-fix).
-- End on an explicit gate (caveman):
+- End on an explicit gate (caveman). In code review, state the worst issue per
+  axis and gate on the aggregate:
 
 ```
 ## review verdict
-BLOCK: 1 — §I.api shape != caller src/client.ts:40. fix §I before build.
-HARDEN: 2 — drafted V8 (idempotent refund), V9 (tx around dual write).
-NOTE: 1 — T4 vague, split before build.
+Standards: 1 BLOCK (middle man in api.ts:40) — fix before merge.
+Spec: 2 HARDEN — drafted V8 (idempotent refund), V9 (tx around dual write).
 gate: NO-GO until BLOCK cleared. then build §T after spec writes V8,V9.
 ```
 
@@ -130,6 +176,8 @@ build.
 - MUST NOT rewrite any artifact. Draft `§V` and hand to `spec` / `lessons`.
 - MUST cite evidence (file:line or source) for every finding.
 - MUST flag unverifiable findings as `[unverified]`, never pass them as fact.
+- MUST run code-review axes as parallel isolated reviewers; MUST NOT merge or
+  rerank findings across axes.
 - MUST end on GO or NO-GO. Never a shrug.
 - MUST NOT review trivia. Right-size or skip (§11).
 - MUST NOT rewrite the user's intent. Harden the work; do not replace its goal.

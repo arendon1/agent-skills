@@ -204,3 +204,4 @@ MUST know these before querying:
 | Team-level `GET /team/{id}/task` ignores archived folders | `api-tasks.md` | Discover archived folders first, then query each list individually |
 | `order_by=closed` returns 500 | `api-tasks.md` | Sort client-side on `date_closed` instead |
 | `Authorization: Bearer <token>` fails for PATs | `client.py` | Use raw token without Bearer prefix: `Authorization: <token>` |
+| `markdown_description=True` flattens markdown | `client.py` scripts | Send descriptions as plain `description` (`markdown_description=False`) so `##` headings survive in GET |

@@ -119,18 +119,18 @@ c.post('/task/<task_id>/comment', json={'comment_text': 'DONE: <evidence>'})"
 
 ## Agent identity
 
-Every agent runs as `<Harness>@<Device>` — title-cased (capitalize the first
-letter of each half), stable across sessions, e.g. `Pi@Macbook`, `Pi@Phone`,
-`Opencode@Desktop`:
+Every agent runs as `<Harness>@<Device>` — PascalCase each registry name
+(split on hyphens, capitalize each segment, join), stable across sessions,
+e.g. `Pi@Macbook`, `MinimaxCode@Phone`, `Opencode@Desktop`:
 - `<Harness>` — the runtime the agent runs inside, from the harness registry
-  (e.g. `Pi`, `Hermes`, `Minimax-code`, `Opencode`).
+  (e.g. `Pi`, `Hermes`, `MinimaxCode`, `Opencode`).
 - `<Device>` — the physical machine, from the device registry (e.g. `Macbook`,
   `Desktop`, `Phone`).
 
 Stable identity keeps ownership trackable; do not change it mid-effort. The
-matching identity tags stay lowercase in the space (`pi`, `macbook`); the
-title-cased form is used in the Owner field, the `Owner:` description line,
-and comments.
+matching identity tags stay lowercase in the space (`pi`, `minimax-code`);
+the PascalCase form is used in the Owner field, the `Owner:` description
+line, and comments.
 
 ## Pitfalls
 
@@ -143,4 +143,5 @@ and comments.
 | `update-task --tags` silently drops new tags | Tags apply only at creation; add to existing tasks via `POST /task/{id}/tag/<name>` |
 | Custom fields don't show in `fields` | Read them under `custom_fields` on the task object |
 | Stale reads | use-clickup caches GETs (tasks 1 min); any write clears the cache — re-read after writes |
+| Markdown headings vanish in GET | Send descriptions as plain text (`markdown_description=False`) so `##` survives; ClickUp flattens `markdown_description=True` payloads |
 | Cold-agent resume | Description must carry objective + context + verified facts + next steps |

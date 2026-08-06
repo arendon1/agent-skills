@@ -90,17 +90,18 @@ POST /space/1000270000003780/tag
 - **Field:** `Owner`, type `short_text`, on each list. On General it exists;
   resolve its id with `GET /list/{list_id}/field`, create if missing:
   `POST /list/{list_id}/field` body `{ "name": "Owner", "type": "short_text" }`.
-- **Value format:** `<Harness>@<Device>` — title-cased, e.g. `Pi@Macbook`,
-  `Pi@Phone`, `Opencode@Desktop`, `Hermes@Macbook`.
+- **Value format:** `<Harness>@<Device>` — PascalCase each registry name
+  (split on hyphens, capitalize each segment, join without separator), e.g.
+  `Pi@Macbook`, `MinimaxCode@Phone`, `Opencode@Desktop`, `Hermes@Macbook`.
 - **Set:** `POST /task/{task_id}/field/{field_id}` body `{ "value": "Pi@Macbook" }`.
 - **Read:** task objects expose it under the `custom_fields` array:
   `[f for f in t.get("custom_fields", []) if f.get("name") == "Owner"]`.
 - The task description's first line mirrors it — `Owner: <Harness>@<Device>` —
   so a cold agent reads ownership from the description while the operator
   filters by the field in the app.
-- Identity tags stay lowercase (`pi`, `macbook`); only the Owner value is
-  title-cased. The mapping is registry name → capitalize first letter of each
-  half.
+- Identity tags stay lowercase (`pi`, `minimax-code`); only the Owner value
+  is PascalCase. The mapping: registry name → split on hyphens, capitalize
+  each segment, join (`minimax-code` → `MinimaxCode`).
 
 ## API quirks (verified live)
 

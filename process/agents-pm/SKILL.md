@@ -74,7 +74,8 @@ No non-trivial work starts unless it already exists as a task.
 
 1. Set status to `in progress`.
 2. Record the owner: set the Owner custom field (value `<Harness>@<Device>`,
-   title-cased) and mirror it as the first line of the task description
+   PascalCase — split registry name on hyphens, capitalize each segment) and
+   mirror it as the first line of the task description
    `Owner: <Harness>@<Device>`.
 3. Ensure the task carries its harness and device tags (from the identity
    registry in references — add via the task-tag endpoint if missing).

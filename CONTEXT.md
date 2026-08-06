@@ -152,12 +152,12 @@ _Avoid_: "assignee", "taker", "responsible"
 
 ## identity tags
 
-Every task carries two tags naming who created/owns it: `harness:<name>`
-(the runtime the agent runs as) and `device:<name>` (the physical machine,
-operator's alias or hostname). Set at creation; tags must pre-exist in the
-space. They make "what is running on the phone" answerable per device/harness.
+Every task carries two plain-name tags: one `device` (`desktop`, `macbook`,
+`phone`) and one `harness` (`pi`, `hermes`, `minimax-code`, `opencode`), set
+at creation. No prefix — the two dimensions are told apart by the registry in
+`process/agents-pm/references/schema.md`, which is the canonical list.
 
-_Avoid_: "origin tag", "source tag", "routing tag"
+_Avoid_: "origin tag", "source tag", "routing tag", "harness: prefix"
 
 ## waiting-on-andres
 

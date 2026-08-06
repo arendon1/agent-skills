@@ -55,7 +55,7 @@ tags (they must pre-exist in the space — see `schema.md`):
 ```bash
 python create_task.py 1000270000007301 "Short actionable title" \
   --description "## Objective\n<what and why>\n\nOwner: <identity>\n\n## Context\n<pointers>\n\n## Next steps\n1. ..." \
-  --tags harness:pi,device:macbook-pro
+  --tags pi,macbook
 ```
 
 ## 2. Claim
@@ -72,12 +72,12 @@ c.post('/task/<task_id>/comment', json={'comment_text': 'Started by <identity>: 
 "
 ```
 
-If a task lacks the `harness:<name>` / `device:<name>` tags (e.g. pre-dating
-this convention), add them without touching other tags:
+If a task lacks your identity tags (e.g. pre-dating this convention), add
+them without touching other tags:
 
 ```python
-c.post("/task/<task_id>/tag/harness%3Api")
-c.post("/task/<task_id>/tag/device%3Amacbook-pro")
+c.post("/task/<task_id>/tag/pi")
+c.post("/task/<task_id>/tag/macbook")
 ```
 
 ## 3. Update (progress)
@@ -120,14 +120,14 @@ c.post('/task/<task_id>/comment', json={'comment_text': 'DONE: <evidence>'})"
 ## Agent identity
 
 Every agent runs as `<harness>@<device>`, stable across sessions:
-- `<harness>` — the runtime/product the agent runs inside (what it identifies
-  as; e.g. `pi`, `hermes`).
-- `<device>` — the physical machine: the operator's short alias if one is
-  defined (e.g. `phone`, `macbook-pro`), else the machine hostname.
+- `<harness>` — the runtime the agent runs inside, from the harness registry
+  (e.g. `pi`, `hermes`, `minimax-code`, `opencode`).
+- `<device>` — the physical machine, from the device registry (e.g. `macbook`,
+  `desktop`, `phone`).
 
 Stable identity keeps ownership trackable; do not change it mid-effort. The
-matching `harness:<name>` / `device:<name>` tags must pre-exist in the space
-before a task can carry them.
+matching identity tags must pre-exist in the space before a task can carry
+them.
 
 ## Pitfalls
 

@@ -54,16 +54,35 @@ Notes:
 | `future` | deferred / long-horizon |
 | `infra` | environment, deployment, tooling |
 | `waiting-on-andres` | needs the operator's decision/input (highest-value) |
-| `harness:<name>` | runtime the agent runs as — e.g. `harness:pi`, `harness:hermes` |
-| `device:<name>` | physical machine — operator's alias or hostname — e.g. `device:macbook-pro`, `device:phone` |
 
-**Every task carries BOTH `harness:<name>` and `device:<name>` tags**, set at
-creation by the creating agent (its own pair). A new harness or device first
-needs its tag created in the space:
+## Identity tags (plain names — registry)
+
+Tags are the bare names, no prefix: every task carries ONE device tag + ONE
+harness tag, set at creation by the creating agent (its own pair). The two
+dimensions are told apart by membership in this registry, not by a prefix.
+
+**Devices** (color `#0086b3`):
+
+- `desktop`
+- `macbook`
+- `phone`
+
+**Harnesses** (color `#7b68ee`):
+
+- `pi`
+- `hermes`
+- `minimax-code`
+- `opencode`
+
+Rules:
+
+- Keep this registry in sync with the space (it is the canonical list).
+- A new device or harness needs its tag created in the space BEFORE tasks can
+  carry it:
 
 ```json
 POST /space/1000270000003780/tag
-{ "tag": { "name": "device:phone", "tag_bg": "#0086b3", "tag_fg": "#ffffff" } }
+{ "tag": { "name": "phone", "tag_bg": "#0086b3", "tag_fg": "#ffffff" } }
 ```
 
 ## Owner field (custom field)
@@ -71,8 +90,8 @@ POST /space/1000270000003780/tag
 - **Field:** `Owner`, type `short_text`, on each list. On General it exists;
   resolve its id with `GET /list/{list_id}/field`, create if missing:
   `POST /list/{list_id}/field` body `{ "name": "Owner", "type": "short_text" }`.
-- **Value format:** `<harness>@<device>` — e.g. `pi@macbook-pro`, `pi@phone`.
-- **Set:** `POST /task/{task_id}/field/{field_id}` body `{ "value": "pi@macbook-pro" }`.
+- **Value format:** `<harness>@<device>` — e.g. `pi@macbook`, `opencode@desktop`, `pi@phone`.
+- **Set:** `POST /task/{task_id}/field/{field_id}` body `{ "value": "pi@macbook" }`.
 - **Read:** task objects expose it under the `custom_fields` array:
   `[f for f in t.get("custom_fields", []) if f.get("name") == "Owner"]`.
 - The task description's first line mirrors it — `Owner: <harness>@<device>` —
@@ -85,7 +104,7 @@ POST /space/1000270000003780/tag
 |---|---|
 | Task tags apply at creation | `POST /list/{id}/task` with `tags` works — space tags must pre-exist |
 | `PUT /task/{id}` with `tags` is unreliable | Existing tags are kept; new ones are silently dropped |
-| Add a tag to an existing task | `POST /task/{task_id}/tag/<name>` — URL-encode: `device%3Aphone` |
+| Add a tag to an existing task | `POST /task/{task_id}/tag/<name>` (URL-encode special chars: `phone%2Bhome` if any) |
 | Remove a tag | `DELETE /task/{task_id}/tag/<name>` |
 | List-level tag endpoints | `GET/POST /list/{id}/tag` return 404 in this workspace — use space-level |
 | Custom fields on tasks | Read under `custom_fields`, not `fields` |

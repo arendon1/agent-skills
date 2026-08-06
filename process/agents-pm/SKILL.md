@@ -76,8 +76,8 @@ No non-trivial work starts unless it already exists as a task.
 2. Record the owner: set the Owner custom field (value `<harness>@<device>`)
    and mirror it as the first line of the task description
    `Owner: <harness>@<device>`.
-3. Ensure the task carries the `harness:<name>` and `device:<name>` tags
-   (add them via the task-tag endpoint if missing — see references).
+3. Ensure the task carries its harness and device tags (from the identity
+   registry in references — add via the task-tag endpoint if missing).
 4. Add a comment: started, what will be delivered, ETA if any.
 
 ## STEP 3 — UPDATE (progress)
@@ -134,11 +134,12 @@ Statuses are the ONLY state machine. Never encode progress in a list.
 | `future` | deferred / long-horizon |
 | `infra` | environment, deployment, tooling |
 | `waiting-on-andres` | needs the operator's decision/input (highest-value) |
-| `harness:<name>` | runtime the agent runs as — one per task |
-| `device:<name>` | physical machine (operator's alias or hostname) — one per task |
+| `<harness>` | runtime the agent runs as — one per task (registry: `references/schema.md`) |
+| `<device>` | physical machine — one per task (registry: `references/schema.md`) |
 
-Every task carries both identity tags, set at creation by the creating agent.
-They make work visible per device and per harness across the whole team.
+Every task carries both identity tags (one harness, one device), set at
+creation by the creating agent. They make work visible per device and per
+harness across the whole team.
 
 ## WHEN TO STOP
 
@@ -154,7 +155,8 @@ MUST:
 - Create the task before starting non-trivial work (scoping gate).
 - Claim before working: Owner field + `Owner:` description line, value
   `<harness>@<device>`.
-- Tag every task with `harness:<name>` and `device:<name>` at creation.
+- Tag every task with its harness and device tags (identity registry) at
+  creation.
 - Keep descriptions self-contained and current.
 - Comment evidence at every transition.
 - Re-read the space at session start and before each new work item.

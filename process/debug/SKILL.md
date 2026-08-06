@@ -67,7 +67,9 @@ Ways to construct a loop, in roughly this order:
 7. Property/fuzz loop — run 1000 random inputs and look for the failure mode.
 8. Bisection harness — automate "boot at state X, check, repeat" for `git bisect`.
 9. Differential loop — same input through old vs new version, diff outputs.
-10. Human-in-the-loop bash script — last resort, drive the human with a structured loop.
+10. Human-in-the-loop bash script — last resort, drive the human with a
+    structured loop. Copy `scripts/hitl-loop.template.sh`, fill in the steps,
+    run it; captured values print as KEY=VALUE for you to parse.
 
 **Tighten the loop** (treat it as a product):
 - Faster? (cache setup, skip unrelated init, narrow scope)

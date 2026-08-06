@@ -43,7 +43,8 @@
         "./domain/use-cmux",
         "./domain/use-firecrawl",
         "./domain/use-herdr",
-        "./domain/use-hunk"
+        "./domain/use-hunk",
+        "./domain/use-mineru-cloud"
       ]
     },
     {

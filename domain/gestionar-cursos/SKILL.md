@@ -353,7 +353,7 @@ capturadas, el script no hace nada (no hay qué sincronizar).
    - Si ambas → SKIP (no duplica status ni comentario).
 3. **PUT /task/{id}** con `{"status": "calificado"}` (usa el NOMBRE,
    no el status_id — la API de ClickUp rechaza IDs con 400).
-4. **POST /task/{id}/comment** con formato:
+4. **`POST /task/{id}/comment`** con formato:
    ```
    [calificaciones-auto] Calificación sincronizada desde Moodle
 

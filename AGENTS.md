@@ -112,7 +112,11 @@ metadata:
 
 **Field requirements (enforced by audit):**
 - `name` — lowercase-hyphens, matches the skill directory name.
-- `description` — MUST contain the literal phrase `Use when`.
+- `description` — MUST be 1..1024 chars (Agent Skills ecosystem ceiling;
+  Pi and Hermes reject longer). SHOULD be >= 200 chars — below that, trigger
+  coverage is too thin. MUST contain the literal phrase `Use when` (or
+  `Usa cuando`). Front-load the trigger phrase: some harnesses surface only
+  the first ~60 chars (Hermes), so what the model sees first decides firing.
 - `invocation` + `layer` — REQUIRED on every skill.
 - `loop` + `deliverable` — REQUIRED when `invocation: user`.
 - `provides` — REQUIRED when `layer: domain`; lists capabilities the domain skill
@@ -364,6 +368,9 @@ refactor(use-clickup): migrate frontmatter to layer/domain/provides
   references to any agent, model, harness, or AI surface.
 - **Language:** `en-US` or `es-CO`. No mixing within a single skill.
 - **Size:** `SKILL.md` MUST stay under 500 lines.
+- **Description (§5):** `description` MUST stay 1..1024 chars (ecosystem
+  ceiling), SHOULD be >= 200; trigger phrase front-loaded (`Use when` /
+  `Usa cuando`).
 - **Frontmatter (§5):** `name`, `description` with "Use when", `invocation`,
   `layer`; plus `loop`/`deliverable` (user) and `provides` (domain).
 - **Structure:** `SKILL.md`, `scripts/`, `references/`. Optional: `examples/`,

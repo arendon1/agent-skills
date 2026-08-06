@@ -55,7 +55,7 @@ must be pre-created at space level (`POST /space/{id}/tag`) and registered in
 
 ## Owner field (custom field)
 
-- `Owner` (short_text) on each list — value `<harness>@<device>` (e.g. `pi@macbook`).
+- `Owner` (short_text) on each list — value `<Harness>@<Device>` (e.g. `Pi@Macbook`).
 - Set via `POST /task/{task_id}/field/{field_id}`; read under `custom_fields`.
 - Mirrored as the first line of the task description (`Owner: <identity>`) so a
   cold agent reads it without API calls.

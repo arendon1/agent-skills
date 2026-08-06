@@ -119,15 +119,18 @@ c.post('/task/<task_id>/comment', json={'comment_text': 'DONE: <evidence>'})"
 
 ## Agent identity
 
-Every agent runs as `<harness>@<device>`, stable across sessions:
-- `<harness>` — the runtime the agent runs inside, from the harness registry
-  (e.g. `pi`, `hermes`, `minimax-code`, `opencode`).
-- `<device>` — the physical machine, from the device registry (e.g. `macbook`,
-  `desktop`, `phone`).
+Every agent runs as `<Harness>@<Device>` — title-cased (capitalize the first
+letter of each half), stable across sessions, e.g. `Pi@Macbook`, `Pi@Phone`,
+`Opencode@Desktop`:
+- `<Harness>` — the runtime the agent runs inside, from the harness registry
+  (e.g. `Pi`, `Hermes`, `Minimax-code`, `Opencode`).
+- `<Device>` — the physical machine, from the device registry (e.g. `Macbook`,
+  `Desktop`, `Phone`).
 
 Stable identity keeps ownership trackable; do not change it mid-effort. The
-matching identity tags must pre-exist in the space before a task can carry
-them.
+matching identity tags stay lowercase in the space (`pi`, `macbook`); the
+title-cased form is used in the Owner field, the `Owner:` description line,
+and comments.
 
 ## Pitfalls
 

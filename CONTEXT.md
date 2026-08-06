@@ -144,7 +144,7 @@ _Avoid_: "rogue work", "unscoped build", "shadow task"
 ## owner claim
 
 Recording which agent works a task: the `Owner` custom field (value
-`<harness>@<device>`, e.g. `pi@macbook-pro`) mirrored as the first line of the
+`<Harness>@<Device>`, e.g. `Pi@Macbook`) mirrored as the first line of the
 task description `Owner: <identity>` + start comment. The Owner record is the
 collision signal — claimed work is worked only by its owner.
 

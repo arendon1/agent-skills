@@ -90,13 +90,17 @@ POST /space/1000270000003780/tag
 - **Field:** `Owner`, type `short_text`, on each list. On General it exists;
   resolve its id with `GET /list/{list_id}/field`, create if missing:
   `POST /list/{list_id}/field` body `{ "name": "Owner", "type": "short_text" }`.
-- **Value format:** `<harness>@<device>` — e.g. `pi@macbook`, `opencode@desktop`, `pi@phone`.
-- **Set:** `POST /task/{task_id}/field/{field_id}` body `{ "value": "pi@macbook" }`.
+- **Value format:** `<Harness>@<Device>` — title-cased, e.g. `Pi@Macbook`,
+  `Pi@Phone`, `Opencode@Desktop`, `Hermes@Macbook`.
+- **Set:** `POST /task/{task_id}/field/{field_id}` body `{ "value": "Pi@Macbook" }`.
 - **Read:** task objects expose it under the `custom_fields` array:
   `[f for f in t.get("custom_fields", []) if f.get("name") == "Owner"]`.
-- The task description's first line mirrors it — `Owner: <harness>@<device>` —
+- The task description's first line mirrors it — `Owner: <Harness>@<Device>` —
   so a cold agent reads ownership from the description while the operator
   filters by the field in the app.
+- Identity tags stay lowercase (`pi`, `macbook`); only the Owner value is
+  title-cased. The mapping is registry name → capitalize first letter of each
+  half.
 
 ## API quirks (verified live)
 

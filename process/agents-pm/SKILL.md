@@ -73,9 +73,9 @@ No non-trivial work starts unless it already exists as a task.
 ## STEP 2 — CLAIM
 
 1. Set status to `in progress`.
-2. Record the owner: set the Owner custom field (value `<harness>@<device>`)
-   and mirror it as the first line of the task description
-   `Owner: <harness>@<device>`.
+2. Record the owner: set the Owner custom field (value `<Harness>@<Device>`,
+   title-cased) and mirror it as the first line of the task description
+   `Owner: <Harness>@<Device>`.
 3. Ensure the task carries its harness and device tags (from the identity
    registry in references — add via the task-tag endpoint if missing).
 4. Add a comment: started, what will be delivered, ETA if any.

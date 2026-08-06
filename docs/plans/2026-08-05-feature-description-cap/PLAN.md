@@ -7,7 +7,7 @@ Vertical slices. Proof per task = named check. Status cells owned by `build`.
 | id | status | task | cites |
 |----|--------|------|-------|
 | T1 | [x] | audit.py: `MAX_DESC_CHARS = 1024` (FAIL if exceeded), `MIN_DESC_CHARS = 200` (WARN if below), keep "Use when"/"Usa cuando" check. Synthetic test: >1024 FAIL, <200 WARN, 200..1024 clean. | R1,R2,R6 |
-| T2 | [ ] | AGENTS.md §5 field requirements + §15 constraints: description 1..1024 (MUST), >= 200 (SHOULD), front-load trigger phrase. | R3,R5 |
+| T2 | [x] | AGENTS.md §5 field requirements + §15 constraints: description 1..1024 (MUST), >= 200 (SHOULD), front-load trigger phrase. | R3,R5 |
 | T3 | [ ] | Rewrite `use-clickup` description: 140 -> 300..500 chars, front-loaded "Use when". | R4 |
 | T4 | [ ] | Rewrite `gestionar-cursos` description: 194 -> 300..500, es-CO, "Usa cuando". | R4 |
 | T5 | [ ] | Rewrite `skill-forge` description: 208 -> 300..500, front-loaded "Use when". | R4 |

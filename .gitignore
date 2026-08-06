@@ -13,3 +13,10 @@ node_modules/
 # Skill-local scratch (not artifacts)
 *.log
 tmp/
+
+# Secrets — NEVER commit (skills repo is public)
+.env
+**/.env
+.env.*
+!.env.example
+

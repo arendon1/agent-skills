@@ -141,6 +141,14 @@ script: `view_lists.py`
 
 ---
 
+## Agent Ops — agent's external task memory
+
+The agent maintains a ClickUp space **Agent Ops** (space `1000270000003780`,
+workspace `90132304521`) as durable external memory for pending/future work that
+must survive context compaction. Query the `Agent Tasks` list at session start
+and after compaction. Schema + conventions: `docs/ops/clickup-agent-ops.md`.
+Never put secrets in task content (repo is public).
+
 ## Error Handling
 
 | Code | Meaning | Retry? | Action |

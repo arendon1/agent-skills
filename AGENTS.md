@@ -177,6 +177,12 @@ asking if still ambiguous.
 **Archiving:** when all `PLAN.md` tasks are `x`, optionally move the folder to
 `docs/plans/archive/`.
 
+**ADRs:** system-level decisions for the skills repo itself live in
+`docs/adr/NNNN-<slug>.md` (numbered, decision + rationale + date). A decision
+is real only when a repo file carries it — soul memory is not the source of
+truth (§10). Rejected proposals go to `.out-of-scope/<slug>.md` at the repo
+root with a one-line reason, so they are not re-proposed on enthusiasm.
+
 **Format:** artifacts are Markdown. HTML only when the user asks for it ad-hoc.
 
 ---

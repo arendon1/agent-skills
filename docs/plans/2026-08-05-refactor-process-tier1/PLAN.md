@@ -12,7 +12,7 @@ Vertical slices. Each task names its proof (test). Status cells owned by
 | T3 | [x] | Add `process/wait-what/SKILL.md` (auto): re-pitch corrective. Uses CONTEXT.md vocabulary, plain language, short. No artifact writes. | V1,V2,V3,V7,V8 |
 | T4 | [x] | Add `process/to-questionnaire/SKILL.md` (user, loop: to-questionnaire, deliverable: questionnaire file) + `references/template.md`. Grills the send (recipient, what-needs-back), targets the gap, writes `to-questionnaire-<slug>.md` in cwd. | V1,V2,V3,V6,V8 |
 | T5 | [x] | Patch `process/debug/SKILL.md`: (a) no-correct-seam = architectural finding (documented, post-fix handoff), (b) `[DEBUG-<suffix>]` tagged logs with one-grep cleanup, (c) ranked falsifiable hypotheses shown to user before testing. | V1,V2,V10,V8 |
-| T6 | [ ] | ADR + out-of-scope infra: `docs/adr/0001-politicas-from-soul.md` (migrate POLÍTICA v1-v10, decision+rationale+date), `.out-of-scope/mattpocock-deferred-tier2.md` (rejected-from-Matt list + why), AGENTS.md §6 ADR convention line. | V9 |
+| T6 | [x] | ADR + out-of-scope infra: `docs/adr/0001-politicas-from-soul.md` (migrate POLÍTICA v1-v10, decision+rationale+date), `.out-of-scope/mattpocock-deferred-tier2.md` (rejected-from-Matt list + why), AGENTS.md §6 ADR convention line. | V9 |
 | T7 | [ ] | Gate: run audit on all touched skills (T1-T5), `manifest.py` + `--check`, grep agnosticism (§9) over new bodies, verify CONTEXT.md/AGENTS.md edits, conventional commit. | V1,V8,V9 |
 
 ## Order & dependencies

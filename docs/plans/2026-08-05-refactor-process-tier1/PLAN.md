@@ -38,6 +38,13 @@ Vertical slices. Each task names its proof (test). Status cells owned by
 - T7: `manifest.py --check` exit 0 && full `audit` sweep PASS && git log
   shows one conventional commit per task or single wrap commit.
 
+## Completion
+
+- ALL tasks `[x]` + T7 gate green => **archive the folder** to
+  `docs/plans/archive/2026-08-05-refactor-process-tier1/` per §6.
+  Do not close the plan in place. (User instruction: "don't forget to
+  open it when finished" = archive on completion.)
+
 ## Stop conditions
 
 - Any audit FAIL -> fix before proceeding (constitution hard gate).

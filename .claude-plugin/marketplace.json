@@ -12,6 +12,7 @@
         "./process/domain-modeling",
         "./process/git",
         "./process/grill",
+        "./process/grilling",
         "./process/handoff",
         "./process/lessons",
         "./process/plan",
@@ -21,8 +22,10 @@
         "./process/spec",
         "./process/tdd",
         "./process/teach",
+        "./process/to-questionnaire",
         "./process/triage",
-        "./process/verify"
+        "./process/verify",
+        "./process/wait-what"
       ]
     },
     {

@@ -1,56 +1,19 @@
-# ClickUp Checklists API
+# ClickUp API — Checklists (REWRITTEN from live audit, 2026-08-15)
 
-## Create Checklist
+> All VERIFIED live on Free Forever. Full lifecycle works.
 
-`POST /task/{task_id}/checklist`
+## Endpoints
 
-Creates a new checklist on a task.
+- `POST /api/v2/task/{task_id}/checklist` body `{"name": "..."}` → 200
+- `POST /api/v2/checklist/{checklist_id}/checklist_item` body `{"name": "..."}` → 200 (also `assignee` option)
+- `DELETE /api/v2/checklist/{checklist_id}/checklist_item/{item_id}` → 200
+- `DELETE /api/v2/checklist/{checklist_id}` → 200
 
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Checklist name |
+## Reading
 
-**Response (200):**
-```json
-{
-  "checklist": {
-    "id": "b955c4dc-...",
-    "task_id": "9hz",
-    "name": "My Checklist",
-    "orderindex": 0,
-    "resolved": 0,
-    "unresolved": 0,
-    "items": []
-  }
-}
-```
+- Checklists appear inside task objects: `GET /task/{id}` → `checklists[]` with `items[]`.
+- **Item ids nest under `checklist.items[].id`** — not top-level (old reference wrong).
 
----
+## Usage
 
-## Create Checklist Item
-
-`POST /checklist/{checklist_id}/checklist_item`
-
-Adds an item to a checklist.
-
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Item name |
-| `assignee` | integer | No | Assignee user ID |
-
----
-
-## Update Checklist Item
-
-`PUT /checklist/{checklist_id}/checklist_item/{item_id}`
-
-Updates a checklist item (e.g., mark as resolved).
-
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | No | New item name |
-| `resolved` | boolean | No | Mark as resolved |
-| `parent` | string | No | Parent item ID for nesting |
+Checklists are the lightweight progress tracker inside a ticket (alternative to subtasks for non-task steps).

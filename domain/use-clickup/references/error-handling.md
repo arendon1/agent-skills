@@ -1,60 +1,50 @@
-# ClickUp Error Handling
+# ClickUp API — Error Handling (REWRITTEN from live audit, 2026-08-15)
 
-## HTTP Status Codes
+> Every entry VERIFIED live on team 90132304521, Free Forever plan.
+> Old error model (401=auth failed, 403=no perms, 404=not found) is **wrong for this API** — see below.
 
-| Code | Meaning | Retry? | Action |
-|------|---------|--------|--------|
-| 200 | Success | — | Continue |
-| 201 | Created | — | Resource created successfully |
-| 204 | No Content | — | Deletion or clear operation succeeded |
-| 400 | Bad Request | No | Fix the request payload or parameters |
-| 401 | Unauthorized | No | API key invalid or expired — check at https://app.clickup.com/settings |
-| 403 | Forbidden | No | API key lacks permissions for this resource |
-| 404 | Not Found | No | Verify the resource ID exists |
-| 409 | Conflict | No | Duplicate resource or state conflict |
-| 429 | Rate Limited | Yes | **Exponential backoff:** 1s → 2s → 4s |
-| 500 | Internal Server Error | Yes | **Retry up to 3x** with backoff |
-| 502 | Bad Gateway | Yes | Temporary — retry |
-| 503 | Service Unavailable | Yes | Temporary — retry |
+## The real error model (VERIFIED)
 
-## Rate Limiting
+| Situation | Actual response |
+|---|---|
+| Missing Authorization header | `400 OAUTH_017` |
+| Invalid/wrong key | `401` (OAUTH family) |
+| Nonexistent resource id (folders, teams, spaces as team) | `401 OAUTH_027` / `OAUTH_192` "not authorized" |
+| Nonexistent **list** id | `400 INPUT_003` "List ID invalid" |
+| Existed-then-deleted resource | `404` + ECODE (e.g. `PROJ_006`) |
+| Nonexistent route | plain-text `404 page not found` (no JSON, no ECODE) |
+| Real permission denial | `403` — rare; only `TEAM_110` (enterprise-only endpoint) observed on this account |
+| Rate limit | `429 APP_002` + `Retry-After: 60` |
+| Status not found on task create | `400 CRTSK_001` |
+| Custom fields disabled | `400 FIELD_605` "Custom Field ClickApp is not enabled in this location" |
+| Webhook URL not allowlisted | `400 OAUTH_194` "Specified URL not allowed" |
 
-ClickUp enforces rate limits per API key. Exact limits are not publicly documented but typically:
+## Rate limiting (VERIFIED — critical)
 
-- **~100 requests per minute** for most endpoints
-- Bulk operations (e.g., creating many tasks) should include delays
+- **~100 requests/min PER API KEY, SHARED across all devices/sessions using the key.**
+- Exhaustion → `429 APP_002` + `Retry-After: 60` seconds. Sleep that long before retry.
+- Observed: 2.5s between calls insufficient during bursts; 6s safe. For scripts doing many calls, add a small sleep and/or respect 429 backoff.
+- Because the budget is shared, any poller/daemon using the key must stay well under the budget (a 60s poll ≈ 1–2 calls/min is fine).
 
-## Retry Strategy
+## Retry strategy (recommended)
 
-The client in `scripts/client.py` implements automatic retries:
+| Status | Action |
+|---|---|
+| 429 | Sleep `Retry-After` (default 60s), retry up to 3x |
+| 500/502/503 | Exponential backoff 1s/2s/4s, retry 3x |
+| 400/401/403/404 | No retry — fix the call; treat 401-with-OAUTH_027 and 400 INPUT_003 as "bad id", not auth failure |
 
-```python
-MAX_RETRIES = 3
+## HTTP code cheat-sheet (updated)
 
-# Exponential backoff
-for attempt in range(MAX_RETRIES):
-    try:
-        response = client.request(...)
-        if response.status_code < 500:
-            return response
-    except RequestException:
-        if attempt == MAX_RETRIES - 1:
-            raise
-        time.sleep(2 ** attempt)  # 1s, 2s, 4s
-```
-
-**Behavior:**
-- 4xx errors: Return immediately (client error — retrying won't help)
-- 5xx errors: Retry with exponential backoff
-- Network errors: Retry with exponential backoff
-
-## Error Response Format
-
-Error responses include a JSON body:
-
-```json
-{
-  "err": "Error message",
-  "ECODE": "ERROR_CODE"
-}
-```
+| Code | Reality on this API |
+|---|---|
+| 200 | Success |
+| 201 | Created (docs, chat) |
+| 204 | Deleted / no content |
+| 400 | Bad request — including OAUTH_017 (missing key), INPUT_003 (bad list id), feature blockers (FIELD_605, CRTSK_001) |
+| 401 | Invalid key, or "not authorized" on nonexistent ids (OAUTH_027/192) |
+| 403 | True permission denial — TEAM_110 enterprise-only (only observed case) |
+| 404 | Deleted resource (with ECODE) or nonexistent route (plain text) |
+| 405 | Method not allowed — route exists but that method doesn't (docs: PUT/DELETE doc, GET /webhook/{id}) |
+| 429 | Rate limit (APP_002) — back off per Retry-After |
+| 500 | Server error or known broken endpoints (order_by=closed → ITEMV2_003; list comments) |

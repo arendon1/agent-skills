@@ -1,65 +1,24 @@
-# ClickUp Comments API
+# ClickUp API — Comments (REWRITTEN from live audit, 2026-08-15)
 
-## Create Task Comment
+> All VERIFIED live on Free Forever.
 
-`POST /task/{task_id}/comment`
+## Task comments — WORKING
 
-Adds a comment to a task.
+- `GET /api/v2/task/{task_id}/comment` → 200
+- `POST /api/v2/task/{task_id}/comment` body `{"comment_text": "..."}` → 200
+- `GET /api/v2/list/{list_id}/comment` → 200 (read-only)
+- **`DELETE /api/v2/comment/{comment_id}` → 200 — UNDOCUMENTED but the working delete path** (old reference's delete route was missing).
 
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `comment_text` | string | Yes | Comment content |
-| `assignee` | integer | No | Assignee user ID |
-| `notify_all` | boolean | No | Notify all watchers |
-| `group_assignee` | string | No | Group ID to assign |
+## List comments — BROKEN
 
-**Response (200):** `{ "id": "458", "hist_id": "26508", "date": 1568036964079 }`
+- `POST /api/v2/list/{list_id}/comment` → **500 ERROR_HANDLER** (server error, no payload accepted).
+Use task comments instead.
 
----
+## Usage in the protocol
 
-## Create List Comment
+- Claim comment: `Claimed by <hand> — <plan>` as the first task comment (the claim lock).
+- Evidence comments at milestones and at Review (the accept artifact context).
 
-`POST /list/{list_id}/comment`
+## Quirks
 
-Adds a comment to a list.
-
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `comment` | string | Yes | Comment content |
-| `assignees` | array | No | User IDs to assign |
-| `notify_all` | boolean | No | Notify all users |
-| `email` | boolean | No | Send email notification |
-
----
-
-## Get Task Comments
-
-`GET /task/{task_id}/comment`
-
-Returns all comments on a task.
-
-**Response:**
-```json
-{
-  "comments": [
-    {
-      "id": "12345",
-      "comment_text": "This is a comment.",
-      "user": { "id": 183, "username": "John Doe" },
-      "resolved": false,
-      "date": "1568036964079",
-      "reply_count": "1"
-    }
-  ]
-}
-```
-
----
-
-## Get List Comments
-
-`GET /list/{list_id}/comment`
-
-Returns all comments on a list. Same response format as task comments.
+- Comment objects: `id`, `comment_text`, `user` (always the key's user), `date_created`, `resolved`.

@@ -1,137 +1,81 @@
-# ClickUp Tasks API
+# ClickUp API — Tasks (REWRITTEN from live audit, 2026-08-15, 87 verified calls)
+
+> All VERIFIED live on Free Forever. Includes search/query truth — **global text search does not exist**.
 
 ## Create Task
 
-`POST /list/{list_id}/task`
-
-Creates a new task in a list.
-
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Task name |
-| `description` | string | No | Plain text description |
-| `markdown_description` | string | No | Markdown description |
-| `assignees` | array | No | User IDs to assign |
-| `tags` | array | No | Tag names |
-| `status` | string | No | Task status |
-| `priority` | integer | No | 1=urgent, 2=high, 3=normal, 4=low |
-| `due_date` | integer | No | Unix time in milliseconds |
-| `due_date_time` | boolean | No | Whether due_date includes time |
-| `start_date` | integer | No | Start date in milliseconds |
-| `start_date_time` | boolean | No | Whether start_date includes time |
-| `parent` | string | No | Parent task ID (for subtasks) |
-| `time_estimate` | integer | No | Estimated time in milliseconds |
-| `custom_fields` | array | No | `[{id, value}]` objects |
-
-**Response (200):** Full task object with `id`, `name`, `url`, `list`, `status`, etc.
-
-**Example:**
+`POST /api/v2/list/{list_id}/task` body:
 ```json
 {
-  "name": "My Task",
-  "description": "Task description",
-  "tags": ["tag1"],
-  "priority": 2,
-  "due_date": 1678886400000
+  "name": "...",
+  "description": "...",            // plain text; markdown_description flattens at write (VERIFIED)
+  "status": "To Do",               // must exist on the list (400 CRTSK_001 otherwise)
+  "priority": 2,                   // 1 urgent, 2 high, 3 normal, 4 low
+  "tags": ["research"],            // works at creation (auto-creates space tags, VERIFIED)
+  "parent": "<task_id>",           // for subtasks (2-level nesting VERIFIED)
+  "assignees": [162143192],        // user id from /user
+  "due_date": 1752700000000        // ms epoch
 }
 ```
-
----
-
-## Update Task
-
-`PUT /task/{task_id}`
-
-Updates an existing task. Only include fields you want to change.
-
-**Request body:** Same fields as Create Task, all optional.
-
-**Note:** Custom fields cannot be updated with this endpoint. Use the Set Custom Field Value endpoint instead.
-
----
+→ 200. Also accepts `markdown_description: true` but **flattens markdown into `description`** — send plain text.
 
 ## Get Tasks
 
-`GET /list/{list_id}/task`
+- `GET /api/v2/list/{list_id}/task` → 200. Query params (all VERIFIED):
+  - `include_closed=true` — closed tasks hidden WITHOUT it.
+  - `statuses[]=To%20Do` OR `status=To%20Do` — both work.
+  - **QUIRK: `statuses[]=Complete` returns closed tasks even WITHOUT include_closed** — an explicit closed-status filter overrides the hidden-by-default rule.
+  - `tags[]=research` — works.
+  - `subtasks=true` — includes subtasks in results.
+  - `archived=true` — EXCLUSIVE filter (returns ONLY archived; not "include").
+  - **`limit` is IGNORED** (returns everything).
+  - **`query` is IGNORED** (returns everything).
+- `GET /api/v2/team/{team_id}/task` → 200 — team-wide. Params (VERIFIED):
+  - `include_closed=true`, `date_updated_gt=<ms>` / `date_updated_lt=<ms>` — strict ms filters, work.
+  - `order_by=created|updated` — work. **`order_by=closed` → 500 `ITEMV2_003`** (confirmed broken).
+  - `reverse=true`, `list_ids[]=`, `space_ids[]=`, `tags[]=research` — all work.
+  - **`limit` ignored.**
+- `GET /api/v2/task/{task_id}` → 200 — closed tasks fully visible here.
+  - **QUIRK: `?subtasks=true` accepted but always returns empty `subtasks[]`** even for a real parented subtask (broken; use list-level `subtasks=true` instead).
 
-Returns tasks in a list.
+## Update Task
 
-**Query params:** `archived`, `page`, `limit`, `include_closed`, `subtasks`
+`PUT /api/v2/task/{task_id}` — name, description, status, priority, assignees, due_date all work.
+**⚠️ `tags` key in PUT is a TOTAL NO-OP** (VERIFIED: neither adds, replaces, nor clears). Add/remove tags via:
+- `POST /api/v2/task/{task_id}/tag/{name}` → 200 (URL-encode special chars). **Auto-creates the space tag if missing** (VERIFIED — the "tags must pre-exist" rule is wrong).
+- `DELETE /api/v2/task/{task_id}/tag/{name}` → 200 (case-insensitive).
 
-> **CRITICAL — include_closed:** When tasks are in a closed/done status
-> (any status with type `closed` or `done`, including custom statuses created
-> per space), they are hidden by default. **Always pass `include_closed=true`**
-> to see completed tasks. Without it, lists with only closed tasks will appear
-> empty (`task_count: 0`).
->
-> To discover which statuses are considered closed in a space, check the
-> space's status list: `GET /space/{space_id}` → `statuses[]` → `type` field
-> (`open`, `custom`, `done`, `closed`). Any status with type `done` or `closed`
-> requires `include_closed=true` to appear in task queries.
+## Delete Task
 
----
+`DELETE /api/v2/task/{task_id}` → 204.
 
-## Get Filtered Team Tasks
+## Subtasks
 
-`GET /team/{team_id}/task`
+- Create with `"parent": <task_id>` (2-level nesting VERIFIED — a subtask can have a subtask).
+- Subtasks inherit the list's statuses.
+- `GET /task/{id}` has NO `subtasks` key (parent shows no count — old reference wrong).
 
-Returns tasks filtered across the workspace. This is the recommended endpoint
-for cross-list queries when you don't have a specific list ID.
+## Dependencies — WORK ON FREE FOREVER (VERIFIED)
 
-**Query params:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `list_ids[]` | array | Filter by list IDs |
-| `folder_ids[]` | array | Filter by folder IDs |
-| `space_ids[]` | array | Filter by space IDs |
-| `include_closed` | boolean | Include closed/completed tasks |
-| `subtasks` | boolean | Include subtasks |
-| `order_by` | string | Sort field: `created`, `updated`. Note: `closed` returns 500 — sort client-side instead. |
-| `reverse` | boolean | Reverse sort order |
-| `page` | integer | Page number (0-indexed) |
-| `limit` | integer | Results per page |
+- `POST /api/v2/task/{task_id}/dependency` with `depends_on` / `dependency_of` → 200. Persists (confirmed via `?include=dependencies`). Accepts even a deleted-task reference.
+- Read via `GET /task/{id}?include=dependencies`.
 
-**Python usage:**
-```python
-from search_task import search_workspace_tasks
+## Time Tracking
 
-tasks = search_workspace_tasks(
-    team_id="90132304521",
-    include_closed=True,
-    space_ids=["901311224662"],
-    limit=50
-)
-# Results auto-sorted by date_closed desc when include_closed=True
-```
+- `POST /api/v2/team/{team_id}/time_entries` — works (VERIFIED) with `start`+`end` (ms) or `duration`+`assignee`. **`start`+`duration` alone → 400 `TIMESPENT_002`.** Free-tier status: docs say "unlimited for a limited time" (rolling trial).
+- `GET /team/{id}/time_entries` → 200 (read works).
+- `time_in_status` field → `400 TIS_027` (blocked).
 
-**Notes:**
-- `order_by=closed` is NOT supported server-side (returns 500).
-  Use client-side sorting on `date_closed` instead.
-- Tasks returned include `list`, `folder`, and `space` nested objects
-  with `id` and `name` fields.
-- **Archived folders are invisible** to this endpoint. Tasks inside
-  archived folders will NOT appear in team-level queries. To find
-  them: fetch folders with `?archived=true`, get their embedded
-  `lists`, then query each list directly with `include_closed=true`.
+## Attachments
 
----
+`POST /api/v2/task/{task_id}/attachment` → 200 (VERIFIED).
 
-## Search Tasks (Global)
+## Custom fields on tasks — BLOCKED on Free
 
-`GET /tasks`
+Setting field values is unreachable because custom fields can't be created (FIELD_605, `api-custom-fields.md`).
 
-Search tasks across the workspace with filters.
+## Broken endpoints (do not use)
 
-**Query params:**
-| Param | Description |
-|-------|-------------|
-| `tags[]` | Filter by tags |
-| `assignees[]` | Filter by assignees |
-| `due_date_gt` | Due date greater than (ms) |
-| `due_date_lt` | Due date less than (ms) |
-| `date_created_gt` | Created after (ms) |
-| `date_created_lt` | Created before (ms) |
-| `date_updated_gt` | Updated after (ms) |
-| `date_updated_lt` | Updated before (ms) |
-| `custom_fields` | Filter by custom field value |
+- `order_by=closed` → 500 ITEMV2_003.
+- List comments (`POST /list/{id}/comment`) → 500 ERROR_HANDLER (use task comments).
+- Global text search (`GET /api/v2/task?query=...`, `/task?team_id=`, `/tasks?query=`) → **404 — the endpoint does not exist.** Search-first (scoping gate) = `GET /team/{id}/task` + client-side keyword match.

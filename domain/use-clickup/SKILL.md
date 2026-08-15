@@ -22,7 +22,7 @@ ClickUp exposes two API versions for different resource types:
 
 | Version | Base URL | Resources |
 |---------|---------|-----------|
-| v2 | `api.clickup.com/api/v2` | Tasks, Lists, Folders, Spaces, Comments, Checklists, Tags, Custom Fields, Goals |
+| v2 | `api.clickup.com/api/v2` | Tasks, Lists, Folders, Spaces, Comments, Checklists, Tags, Custom Fields (blocked on Free), Goals, Webhooks |
 | v3 | `api.clickup.com/api/v3` | Docs, Chat (channels, messages, reactions) |
 
 The client routes to the correct version. Use `client.get()` for v2 resources,
@@ -146,13 +146,15 @@ script: `view_lists.py`
 | Code | Meaning | Retry? | Action |
 |------|---------|--------|--------|
 | 200 | Success | - | Continue |
-| 400 | Bad request | No | Fix input |
-| 401 | Auth failed | No | Verify API key |
-| 403 | No permissions | No | Verify access |
-| 404 | Not found | No | Verify ID |
-| 409 | Conflict | No | Resolve duplicate |
-| 429 | Rate limit | Yes | Backoff 1s, 2s, 4s |
-| 500 | Server error | Yes | Retry 3x |
+| 400 | Bad request — includes OAUTH_017 (missing key), INPUT_003 (bad list id), feature blockers (FIELD_605 custom fields, CRTSK_001 bad status) | No | Fix the call |
+| 401 | Invalid key, OR **nonexistent resource id** (OAUTH_027/192 — misleading) | No | Check the id; verify key only for genuine 401s |
+| 403 | True permission denial — only TEAM_110 (enterprise-only) observed on Free | No | Verify plan/endpoint |
+| 404 | Deleted resource (ECODE) or nonexistent route (plain text) | No | Verify ID / route |
+| 405 | Method not allowed — endpoint exists without that method (doc PUT/DELETE, GET /webhook/{id}) | No | Use a working method |
+| 429 | Rate limit ~100/min PER KEY shared across devices (APP_002) | **Yes** | Sleep Retry-After (60s), retry |
+| 500 | Server error or known broken endpoints (order_by=closed, list comments) | 5xx only | Retry 3x w/ backoff |
+
+> Full model: `references/error-handling.md`. Note: no 409 observed on this API.
 
 ## References — Full API Summary
 
@@ -179,6 +181,8 @@ canonical reference for forming API queries.
 | `date-formatting.md` | Timestamps (ms), ISO conversion helpers | `iso_to_milliseconds()`, `milliseconds_to_iso()` |
 | `error-handling.md` | HTTP codes, rate limits, retry strategy | Status codes 200-503, backoff logic |
 | `api-user.md` | Authenticated user verification | `GET /user` |
+| `api-webhooks.md` | Webhooks (NEW — verified working on Free, URL allowlist) | `POST /team/{id}/webhook`, `GET/PUT/DELETE /webhook/{id}` |
+| `api-limits-free-tier.md` | Free Forever limits & capabilities (NEW — verified) | 5 spaces · 40 lists/space · 60MB · rate limit |
 | `api-chat.md` | Chat channels, messages, reactions (v3) | `GET /workspaces/{id}/chat/channels`, `POST .../messages`, `POST .../replies` |
 | `api-docs.md` | Docs & pages (v3) | `GET /workspaces/{id}/docs`, `POST .../docs`, `GET .../pages` |
 
@@ -199,9 +203,15 @@ MUST know these before querying:
 
 | Quirk | Where documented | Workaround |
 |-------|-----------------|------------|
-| Archived folders hide their lists from `GET /folder/{id}/list` | `api-folders.md`, `api-lists.md` | Fetch folder details (`GET /folder/{id}`) — lists are embedded inline under `lists` key |
-| `include_closed=true` is mandatory for closed tasks | `api-tasks.md` | Always pass `include_closed=true` when querying tasks; lists with only closed tasks appear empty otherwise. Custom statuses with type `done`/`closed` are invisible without this flag — discover them via `GET /space/{id}` → `statuses[].type` |
-| Team-level `GET /team/{id}/task` ignores archived folders | `api-tasks.md` | Discover archived folders first, then query each list individually |
-| `order_by=closed` returns 500 | `api-tasks.md` | Sort client-side on `date_closed` instead |
+| **Custom fields are impossible on Free Forever** | `api-custom-fields.md` | FIELD_605 — the design uses zero custom fields (claim via comment) |
+| **Global text search does not exist** | `api-tasks.md` | `/api/v2/task?query=` → 404; search-first = `GET /team/{id}/task` + client-side keyword match |
+| **List status CRUD routes are dead** | `api-lists.md` | Set statuses via `PUT /list/{id}` with `override_statuses:true` + full statuses array (only working path) |
+| **`PUT /task/{id}` with `tags` is a total no-op** | `api-tasks.md`, `api-tags.md` | Add/remove via `POST/DELETE /task/{id}/tag/{name}` — which ALSO auto-creates space tags ("must pre-exist" is wrong) |
+| **Rate limit ~100/min PER KEY, shared across devices** | `error-handling.md` | 429 APP_002 + Retry-After 60; pollers must stay under budget; client now sleeps Retry-After |
+| **401 OAUTH_027/192 = bad resource id, not bad key** | `error-handling.md` | Check the id first; only genuine 401s mean key problems |
+| `statuses[]=Complete` returns closed tasks even without `include_closed` | `api-tasks.md` | Explicit closed-status filter overrides hidden-by-default |
+| `order_by=closed` returns 500 (ITEMV2_003); `limit`/`query` silently ignored | `api-tasks.md` | Sort client-side; don't rely on limit/query |
+| Docs are create-and-read-only at doc level (no update/delete endpoints — by design) | `api-docs.md` | Pages are full CRUD; update/delete pages, trash docs in UI |
+| Webhooks work on Free but endpoint URL must be on an allowlisted public domain | `api-webhooks.md` | trycloudflare/quick tunnels rejected (OAUTH_194); needs fixed domain (ts.net untested) |
 | `Authorization: Bearer <token>` fails for PATs | `client.py` | Use raw token without Bearer prefix: `Authorization: <token>` |
 | `markdown_description=True` flattens markdown | `client.py` scripts | Send descriptions as plain `description` (`markdown_description=False`) so `##` headings survive in GET |

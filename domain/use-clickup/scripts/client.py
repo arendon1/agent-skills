@@ -228,8 +228,28 @@ class ClickUpClient:
                     **kwargs
                 )
 
-                # Handle specific errors
+                # Handle specific errors (audited 2026-08-15 — see references/error-handling.md)
+                if response.status_code == 429:
+                    # Rate limit ~100/min PER KEY, shared across devices (APP_002).
+                    # Sleep Retry-After (capped at 60s) and retry the request.
+                    retry_after = response.headers.get("Retry-After", "60")
+                    try:
+                        retry_after = int(retry_after)
+                    except (TypeError, ValueError):
+                        retry_after = 60
+                    time.sleep(min(retry_after, 60))
+                    continue
+
                 if response.status_code == 401:
+                    # The API returns 401 OAUTH_027/OAUTH_192 for NONEXISTENT resource
+                    # ids (not just bad keys). Return those to the caller so it sees the
+                    # real status; only raise for genuine key problems.
+                    try:
+                        ecode = response.json().get("ECODE")
+                    except Exception:
+                        ecode = None
+                    if ecode in ("OAUTH_027", "OAUTH_192"):
+                        return response
                     raise RuntimeError(
                         "Invalid or expired ClickUp API key. "
                         "Verify your API key at https://app.clickup.com/settings"
@@ -237,8 +257,9 @@ class ClickUpClient:
 
                 if response.status_code == 403:
                     raise RuntimeError(
-                        "No permissions for this operation. "
-                        "Verify that your API key has access to the resource."
+                        "No permissions for this operation (403). On Free Forever the only "
+                        "observed 403 is TEAM_110 (enterprise-only endpoint). See "
+                        "references/error-handling.md for the full error model."
                     )
 
                 # If successful or non-recoverable error, return

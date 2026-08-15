@@ -1,60 +1,58 @@
-# ClickUp Lists API
+# ClickUp API — Lists & Statuses (REWRITTEN from live audit, 2026-08-15)
 
-## Create List
+> All VERIFIED live on Free Forever. This file is the ONLY reliable source for status provisioning — the documented status-CRUD routes are dead.
 
-`POST /list`
+## Create List — two working routes only
 
-Creates a new list in a folder or space.
-
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | List name |
-| `content` | string | No | Description |
-| `folder_id` | string | No* | Parent folder ID |
-| `space_id` | string | No* | Parent space ID (if no folder) |
-| `priority` | integer | No | 1=urgent, 2=high, 3=normal, 4=low |
-| `assignee` | integer | No | Assignee user ID |
-| `due_date` | integer | No | Due date in milliseconds |
-| `status` | string | No | List color |
-
-> *Either `folder_id` or `space_id` must be provided.
-
-**Response (200):** List object with `id`, `name`, `folder`, `space`, `statuses`, `inbound_address`.
-
----
-
-## Create Folderless List
-
-`POST /space/{space_id}/list`
-
-Creates a list directly in a space without a folder.
-
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | List name |
-| `content` | string | No | Description |
-
----
+- `POST /api/v2/folder/{folder_id}/list` (folder list)
+- `POST /api/v2/space/{space_id}/list` (folderless list)
+- **Bare `POST /api/v2/list` → 404** (old reference wrong). The id lives in the URL, not the body.
 
 ## Get Lists
 
-`GET /folder/{folder_id}/list`
+- `GET /api/v2/space/{space_id}/list` → 200 — folderless lists (the reliable listing).
+- `GET /api/v2/folder/{folder_id}/list` → 200 — folder lists.
+- `GET /api/v2/list/{list_id}` → 200 — full shape: `override_statuses` flag, `statuses[]` (id/status/color/type/status_group), `folder`, `space`, `permission_level`, `deleted`.
 
-Returns all lists in a folder.
+## Update List — **THE status provisioning endpoint**
 
-> **WARNING:** When the parent folder is archived, this endpoint returns an
-> empty array even though lists exist. Use `GET /folder/{id}` and read the
-> `lists` key from the folder response instead.
+`PUT /api/v2/list/{list_id}` body:
+```json
+{
+  "name": "...",               // optional
+  "override_statuses": true,   // required when setting statuses
+  "statuses": [                // REQUIRED in same request when override_statuses:true
+    {"status": "Backlog", "type": "open", "orderindex": 0, "color": "#87909e"},
+    {"status": "To Do", "type": "custom", "orderindex": 1, "color": "#87909e"},
+    {"status": "In Progress", "type": "custom", "orderindex": 2, "color": "#87909e"}
+    // ... one "open"-type status REQUIRED, exactly one
+  ]
+}
+```
+- `{"override_statuses": true}` WITHOUT the array → `400 STATUS_002` "Open is a required status type and there can only be one".
+- With the array → 200, `override_statuses` flips to true, statuses persisted (verified).
+- **This is the ONLY working way to set list statuses.**
 
----
+## List status CRUD — DEAD (VERIFIED)
 
-## Get Folderless Lists
+- `POST /list/{id}/status` → `400 STATUS_026` "Status name is required" on EVERY payload shape (nested docs shape, flat, `{"name":...}`) — name is present in all; the route half-exists but rejects everything.
+- `PUT /list/{id}/status/{name}` / `DELETE /list/{id}/status/{name}` → raw 404 (route absent).
+- Space-level status routes → raw 404 (see `api-spaces.md`).
+- Consequence: statuses can only be set wholesale via `PUT /list/{id}` (above). Plan the full 6-column pipeline at list creation.
 
-`GET /space/{space_id}/list`
+## Delete List
 
-Returns lists directly in a space (not in folders). Pass `?archived=true`
-to include archived lists.
+`DELETE /api/v2/list/{list_id}` → 200 — **SOFT delete**: subsequent `GET /list/{id}` → 200 with `"deleted": true`; disappears from `GET /space/{id}/list`.
 
-**Response:** `{ "lists": [...] }`
+## List tags — DO NOT EXIST
+
+`GET /list/{id}/tag` and `POST /list/{id}/tag` → raw 404. Use space-level tags (`api-spaces.md`).
+
+## List custom fields
+
+`GET /list/{id}/field` → 200 (`fields[]`, empty on fresh lists). **Create/delete are impossible on Free Forever**: `POST /list/{id}/field` → `400 FIELD_605` (Custom Fields ClickApp not enabled); `DELETE /field/{id}` and `/list/{id}/field/{id}` → 405 (no route). See `api-custom-fields.md`.
+
+## Quirks
+
+- Bad list id → `400 INPUT_003` "List ID invalid" (not 404).
+- Task create with unknown status → `400 CRTSK_001` "Status not found".

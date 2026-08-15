@@ -1,58 +1,38 @@
-# ClickUp Folders API
+# ClickUp API — Folders (REWRITTEN from live audit, 2026-08-15)
 
-## Create Folder
-
-`POST /space/{space_id}/folder`
-
-Creates a new folder in a space.
-
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Folder name |
-| `list_ids` | array | No | List IDs to associate |
-| `task_ids` | array | No | Task IDs to associate |
-| `order` | integer | No | Order within the space |
-| `override_name` | boolean | No | Override existing folder with same name |
-
-**Response (200):** Folder object with `id`, `name`, `order`, `space`, `lists`, `tasks`.
-
----
+> All VERIFIED live on Free Forever.
 
 ## Get Folders
 
-`GET /space/{space_id}/folder`
+`GET /api/v2/space/{space_id}/folder` → 200 — `folders[]`.
+**No "hidden" folder exists on this account** (verified even in a fresh space with folderless lists) — folderless lists sit directly at space level under `GET /space/{id}/list`. The old "hidden folder" was an artifact of the deleted space.
 
-Returns all folders in a space.
+## Get Folder
 
-**Query params:** `archived` (boolean)
+`GET /api/v2/folder/{folder_id}` → 200 — folder object with `lists[]` INLINE (verified).
 
-> **IMPORTANT:** Archived folders are hidden by default. Always pass `?archived=true`
-> to discover all folders in a space.
+## Get Folder Lists
 
-**Response:**
-```json
-{
-  "folders": [
-    {
-      "id": "1057",
-      "name": "Folder Name",
-      "orderindex": 5,
-      "hidden": false,
-      "task_count": "20",
-      "space": { "id": "789", "name": "Space Name" }
-    }
-  ]
-}
-```
+`GET /api/v2/folder/{folder_id}/list` → 200 — `lists[]`.
+The "archived folder returns empty lists" warning is **NOT testable via API**: `PUT /folder/{id} {"archived": true}` → 200 but is a **silent no-op** (`archived` stays false). Archive is UI-only.
 
-## Get Folder Details
+## Create Folder
 
-`GET /folder/{folder_id}`
+`POST /api/v2/space/{space_id}/folder` body `{"name": "..."}` → 200. Works. No 3-folder limit observed (5 created fine).
 
-Returns full folder details **including its lists embedded inline**.
+## Create List in Folder
 
-> **CRITICAL:** When a folder is archived, `GET /folder/{id}/list` returns an
-> empty array — but the lists still exist! They are embedded in the folder
-> response under the `lists` key. Always fetch folder details first to
-> discover lists in archived folders.
+`POST /api/v2/folder/{folder_id}/list` body `{"name": "..."}` → 200 (this is one of only two list-create routes; bare `POST /list` → 404).
+
+## Update Folder
+
+`PUT /api/v2/folder/{folder_id}` → 200 (name). `archived` field is a silent no-op.
+
+## Delete Folder
+
+`DELETE /api/v2/folder/{folder_id}` → 200 — **SOFT delete**: subsequent `GET /folder/{id}` still 200 with `"deleted": true`; disappears from listings. Delete inner lists first to fully clean.
+
+## Quirks
+
+- Bad folder id → `401 OAUTH_027` (looks like auth failure, it's a bad id).
+- `orderindex` not `order` in folder/list objects.

@@ -1,71 +1,24 @@
-# ClickUp Custom Fields API
+# ClickUp API — Custom Fields (REWRITTEN from live audit, 2026-08-15)
 
-## Overview
+> All VERIFIED live on **Free Forever**. Bottom line: **custom fields are unusable on the free plan** — the design correctly uses zero custom fields.
 
-Custom fields allow extended task data beyond built-in fields. Each field has a type: `short_text`, `number`, `date`, `dropdown`, `users`, `labels`, `checkbox`, `email`, `phone`, `url`, `location`, `currency`, `text`, `rating`, `formula`, `automatic_progress`, `task_relation`.
+## The hard blocker (VERIFIED)
 
-## Set Custom Field Value
+- `POST /api/v2/list/{list_id}/field` body `{"name": "X", "type": "short_text"}` → **400 `FIELD_605` "A Custom Field ClickApp is not enabled in this location."**
+- The Custom Fields ClickApp cannot be enabled for this space on Free Forever. No body variant works (all 4 tested).
+- `dropdown` type → additionally `400 FIELD_422` "Invalid field type 'dropdown'" (documented type rejected).
 
-`POST /task/{task_id}/field/{field_id}`
+## What does work
 
-Sets the value of a custom field on a task.
+- `GET /api/v2/list/{list_id}/field` → 200 (`{"fields": []}` on fresh lists). Read side only.
+- Setting/removing a value on a task (`POST /task/{id}/field/{field_id}`) exists in docs but is unreachable (no field can exist).
 
-**Request body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `value` | varies | Yes | Value depends on field type |
-| `value_options` | object | No | Type-specific options |
+## Deletion — no route
 
-**Value types by field type:**
-| Type | Value format |
-|------|-------------|
-| `short_text`, `text`, `email`, `phone`, `url` | String |
-| `number`, `rating` | Number |
-| `date` | Unix time in milliseconds |
-| `checkbox` | Boolean `true`/`false` |
-| `dropdown` | Integer (option index) |
-| `users` | Array of user IDs |
-| `labels` | Array of label IDs |
-| `currency` | Number (value in cents) |
-| `location` | `{ "lat": 40.7, "lng": -74 }` |
+- `DELETE /field/{field_id}` → 405 raw
+- `DELETE /list/{list_id}/field/{field_id}` → 405 raw
+No custom-field delete endpoint exists.
 
-**Date fields** require `value_options: { "time": true }` to display time.
+## Consequence for the Agent Ops design
 
-**Example (date with time):**
-```json
-{
-  "value": 1667367645000,
-  "value_options": { "time": true }
-}
-```
-
----
-
-## Get Accessible Custom Fields
-
-`GET /list/{list_id}/field`
-
-Returns all custom fields available in a list.
-
-**Response:**
-```json
-{
-  "fields": [
-    {
-      "id": "d2ab17e0-...",
-      "name": "Sprint Goal",
-      "type": "short_text",
-      "type_config": {},
-      "required": false
-    }
-  ]
-}
-```
-
----
-
-## Remove Custom Field Value
-
-`DELETE /task/{task_id}/field/{field_id}`
-
-Clears a custom field value from a task. Returns `204 No Content`.
+Owner/Reviewer/Orchestrator as custom fields are impossible. The design's zero-fields stance (claim via comment, identity in the claim comment) is not minimalism — it is the plan's reality.

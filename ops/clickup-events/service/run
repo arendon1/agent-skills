@@ -1,0 +1,17 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# clickup-events — Agents space poller (notify-only). Supervised by runit.
+export HOME=/data/data/com.termux/files/home
+export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec-ld-preload.so
+export PATH=/data/data/com.termux/files/home/.pi/agent/bin:/data/data/com.termux/files/home/.local/bin:/data/data/com.termux/files/usr/bin
+
+# API keys — single source of truth: ~/storage/shared/Projects/.env
+if [ -f "$HOME/storage/shared/Projects/.env" ]; then
+    set -a
+    . "$HOME/storage/shared/Projects/.env"
+    set +a
+fi
+
+# Optional: termux-wake-lock prevents Android Doze from freezing ticks (battery cost).
+# command -v termux-wake-lock >/dev/null && termux-wake-lock
+
+exec python3 "$HOME/bin/clickup-poller.py" 2>&1

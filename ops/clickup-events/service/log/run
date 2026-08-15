@@ -1,0 +1,5 @@
+#!/data/data/com.termux/files/usr/bin/sh
+pwd=${PWD%/*}
+service=${pwd##*/}
+mkdir -p "$LOGDIR/sv/$service"
+exec svlogd -tt "$LOGDIR/sv/$service"

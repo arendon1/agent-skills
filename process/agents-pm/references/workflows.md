@@ -1,33 +1,31 @@
-# agents-pm — Workflows
+# agents-pm — Workflows (v2)
 
-Exact commands for the agents-pm lifecycle. All commands run through the
-`use-clickup` skill (its `scripts/` directory). Adjust the command prefix to
-the local installation of that skill. `<identity>` = `<harness>@<device>`
-(see `schema.md`).
+Exact commands for the agents-pm lifecycle. All commands run through the `use-clickup`
+skill (its `scripts/` directory). Adjust the command prefix to the local installation.
+`<hand>` = the agent's device-harness identity used in claim comments, e.g. `phone-pi`,
+`tablet-pi`, `macbook-pi` (plain lowercase; identity lives ONLY in claim comments).
 
 ## 0. Read the space (session start / after compaction)
 
-Open + closed tasks in General, grouped by status, with owner + tags:
+Open + closed tasks in General, grouped by status, with work-type tags:
 
 ```python
 # run from the use-clickup skill's scripts/ directory
 from client import get_client
 c = get_client()
-tasks = c.get("/list/1000270000007301/task",
+tasks = c.get("/list/1000270000008318/task",
               params={"include_closed": "true"}).json()["tasks"]
 for t in sorted(tasks, key=lambda x: x.get("date_updated", ""), reverse=True):
     st = t.get("status", {}).get("status")
-    owner = [f["value"] for f in t.get("custom_fields", [])
-             if f.get("name") == "Owner"]
     tags = [tag["name"] for tag in t.get("tags", [])]
-    print(st, "|", t["name"][:55], "|", (owner[0] if owner else "-"), "|", ",".join(tags))
+    print(st, "|", t["name"][:55], "|", ",".join(tags))
 ```
 
-Per-device / per-harness views (answers "what is running on the phone"):
+Per-status views — the "needs Andrés" queue (review + blocked):
 
 ```python
-r = c.get("/list/1000270000007301/task",
-          params={"include_closed": "true", "tags[]": "device:phone"})
+r = c.get("/list/1000270000008318/task",
+          params={"include_closed": "true", "statuses[]": "review"})
 for t in r.json()["tasks"]:
     print(t.get("status", {}).get("status"), "|", t["name"][:60])
 ```
@@ -35,55 +33,60 @@ for t in r.json()["tasks"]:
 Or the script (open tasks only):
 
 ```bash
-python search_task.py --list_id 1000270000007301
+python search_task.py --list_id 1000270000008318
 ```
 
-Group mentally by status. Surface `waiting-on-andres` tags to the operator
-first, then `blocked`, then in-progress ownership (Owner field + description).
+Group mentally by status. Surface `review` (accept queue) and `blocked` (read the blocker
+comment) first, then `in progress` (claim comments tell who's on what).
 
 ## 1. Scope before work
 
-Search before starting — no work without a task:
+Search before starting — no work without a ticket. **Global text search does not exist**;
+use the team query + client-side keyword match:
 
-```bash
-python search_task.py --name "<keyword>"
+```python
+from client import get_client
+c = get_client()
+r = c.get("/team/90132304521/task", params={"include_closed": "true"})
+hits = [t for t in r.json()["tasks"] if "<keyword>" in t["name"].lower()]
 ```
 
-Create a missing task with a self-contained description AND your identity
-tags (they must pre-exist in the space — see `schema.md`):
+Create a missing task with a self-contained description AND work-type tags:
 
 ```bash
-python create_task.py 1000270000007301 "Short actionable title" \
-  --description "## Objective\n<what and why>\n\nOwner: <identity>\n\n## Context\n<pointers>\n\n## Next steps\n1. ..." \
-  --tags pi,macbook
+python create_task.py 1000270000008318 "Short actionable title" \
+  --description "## Objective\n<what and why>\n\n## Next steps\n1. ..." \
+  --tags research,analysis
 ```
+
+(New task lands in `backlog` by default — statuses are lowercase exact.)
 
 ## 2. Claim
 
 ```bash
 python update_task.py <task_id> --status "in progress"
-# Owner field + description Owner line + start comment via client:
 python -c "
 from client import get_client
 c = get_client()
-fid = next(f['id'] for f in c.get('/list/1000270000007301/field').json()['fields'] if f['name']=='Owner')
-c.post(f'/task/<task_id>/field/{fid}', json={'value': '<identity>'})
-c.post('/task/<task_id>/comment', json={'comment_text': 'Started by <identity>: <what + ETA>'})
+c.post('/task/<task_id>/comment', json={'comment_text': 'Claimed by phone-pi — <what I will deliver>'})
 "
 ```
 
-If a task lacks your identity tags (e.g. pre-dating this convention), add
-them without touching other tags:
+Then RE-READ the task; if another hand's claim comment appears, release
+(`--status "to do"`) and back off. Multi-step ticket? Add subtasks:
 
-```python
-c.post("/task/<task_id>/tag/pi")
-c.post("/task/<task_id>/tag/macbook")
+```bash
+python -c "
+from client import get_client
+c = get_client()
+c.post('/list/1000270000008318/task', json={'name': '<step>', 'parent': '<task_id>', 'status': 'backlog'})
+"
 ```
 
 ## 3. Update (progress)
 
 ```bash
-python update_task.py <task_id> --description "<refreshed, still self-contained>"
+python update_task.py <task_id> --description "<refreshed, self-contained, Evidence Log appended>"
 python -c "from client import get_client; \
 c=get_client(); \
 c.post('/task/<task_id>/comment', json={'comment_text': '<evidence: facts, links, results>'})"
@@ -95,53 +98,43 @@ c.post('/task/<task_id>/comment', json={'comment_text': '<evidence: facts, links
 python update_task.py <task_id> --status blocked
 python -c "from client import get_client; \
 c=get_client(); \
-c.post('/task/<task_id>/tag/waiting-on-andres'); \
-c.post('/task/<task_id>/comment', json={'comment_text': 'BLOCKER: <precise reason + what unblocks>'})"
+c.post('/task/<task_id>/comment', json={'comment_text': 'BLOCKER: <precise reason + who/what unblocks>'})"
 ```
+
+No tag needed — `blocked` status IS the escalation surface.
 
 ## 5. Review
 
 ```bash
 python update_task.py <task_id> --status review
+# fill ## Proof of work in the description
 python -c "from client import get_client; \
 c=get_client(); \
-c.post('/task/<task_id>/comment', json={'comment_text': 'Ready for review: <what to check, who reviews>'})"
+c.post('/task/<task_id>/comment', json={'comment_text': 'Ready for accept: <what to check>'})"
 ```
 
 ## 6. Complete
 
-```bash
-python update_task.py <task_id> --status complete
-python -c "from client import get_client; \
-c=get_client(); \
-c.post('/task/<task_id>/comment', json={'comment_text': 'DONE: <evidence>'})"
-```
+Only Andrés moves `review` → `complete`. After accept, the task closes (query with
+`include_closed=true`; `statuses[]=complete` returns them even without the flag).
 
-## Agent identity
+## Hand identity
 
-Every agent runs as `<Harness>@<Device>` — PascalCase each registry name
-(split on hyphens, capitalize each segment, join), stable across sessions,
-e.g. `Pi@Macbook`, `MinimaxCode@Phone`, `Opencode@Desktop`:
-- `<Harness>` — the runtime the agent runs inside, from the harness registry
-  (e.g. `Pi`, `Hermes`, `MinimaxCode`, `Opencode`).
-- `<Device>` — the physical machine, from the device registry (e.g. `Macbook`,
-  `Desktop`, `Phone`).
-
-Stable identity keeps ownership trackable; do not change it mid-effort. The
-matching identity tags stay lowercase in the space (`pi`, `minimax-code`);
-the PascalCase form is used in the Owner field, the `Owner:` description
-line, and comments.
+Identity is carried ONLY by the claim comment (`Claimed by <hand> — <plan>`). Use plain
+lowercase `<device>-<harness>` forms: `phone-pi`, `tablet-pi`, `macbook-pi`,
+`desktop-pi`, `macbook-opencode`, etc. There is no Owner field, no identity tags.
 
 ## Pitfalls
 
 | Pitfall | Workaround |
 |---|---|
-| Space-level status query shows only `to do`/`complete` | Statuses are list-level (`override_statuses=true`); read them from `GET /list/{id}` |
-| General list hides under a "hidden" folder | It is space-level; query `/space/{id}/list` — the folder is not meaningful |
-| Status strings are case-sensitive | Use exact lowercase: `in progress`, `review`, `blocked`, `complete` |
-| Closed tasks invisible without a flag | Always `include_closed=true` when querying |
-| `update-task --tags` silently drops new tags | Tags apply only at creation; add to existing tasks via `POST /task/{id}/tag/<name>` |
-| Custom fields don't show in `fields` | Read them under `custom_fields` on the task object |
+| Status names are stored lowercase | Match exactly: `in progress`, `review`, `complete` (updates are case-insensitive, readbacks are lowercase) |
+| Closed tasks invisible without a flag | `include_closed=true` (or `statuses[]=complete` explicitly) |
+| `update-task --tags` silently drops tags | Tags apply at creation only; add via `POST /task/{id}/tag/<name>` (auto-creates) |
+| Global search 404s | Team query `GET /team/{id}/task` + client-side keyword match |
+| Custom fields 403/400 | None exist — never try to use them |
 | Stale reads | use-clickup caches GETs (tasks 1 min); any write clears the cache — re-read after writes |
-| Markdown headings vanish in GET | Send descriptions as plain text (`markdown_description=False`) so `##` survives; ClickUp flattens `markdown_description=True` payloads |
-| Cold-agent resume | Description must carry objective + context + verified facts + next steps |
+| Rate limit (429) | Shared ~100/min per key across devices; back off Retry-After 60; keep polling light |
+| Markdown headings vanish in GET | Send descriptions as plain text (`markdown_description=False`) |
+| Cold-agent resume | Description must carry Objective + Goal + Evidence Log + Next steps |
+| Docs | Banned — never create; artifacts are local files linked in the description |

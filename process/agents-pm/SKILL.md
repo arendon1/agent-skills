@@ -1,7 +1,7 @@
 ---
 name: agents-pm
 description: |
-  Agent project management over the shared ClickUp Agent Ops space: keep every
+  Agent project management over the shared ClickUp **Agents** space: keep every
   agent's work visible, scoped, claimed, and non-overlapping across devices and
   harnesses. Statuses drive progress; lists enclose big named projects or goals.
   Use when starting a session or after context compaction, before picking up any
@@ -12,135 +12,140 @@ invocation: auto
 layer: process
 language: en-US
 metadata:
-  version: "1.0.0"
+  version: "2.0.0"
 ---
 
 # agents-pm
 
-Cross-device project management for a team of agents, backed by the shared
-ClickUp **Agent Ops** space. One pipeline, one source of truth, visible to
-everyone. This skill defines the conventions; the `use-clickup` skill
-(domain, provides `clickup-api`) is the transport.
+Cross-device project management for a team of agents, backed by the shared ClickUp
+**Agents** space. One pipeline, one source of truth, visible to everyone. This skill
+defines the conventions; the `use-clickup` skill (domain, provides `clickup-api`) is the
+transport. **Version 2 (2026-08-15): rebuilt from scratch after a full API audit** — the
+space, statuses, and tags are new; the Owner field, identity tags, and process tags are
+gone (see `references/schema.md`).
 
 ## WHEN (self-trigger)
 
-- Session start / after context compaction — read the space before asserting
-  anything about the team's work.
-- Before starting ANY non-trivial work — check for an existing task, scope it
-  if missing.
+- Session start / after context compaction — read the space before asserting anything
+  about the team's work.
+- Before starting ANY non-trivial work — check for an existing task, scope it if missing.
 - Claiming, updating, blocking, reviewing, or closing a tracked task.
 - Asked "what is the team working on", "who owns X", "is anything blocked",
-  "what is running on device X", "which harness produced this".
+  "what is running on device X".
 - Suspicion of duplicate or out-of-scope work.
-
-## OWNERSHIP
-
-Owns the Agent Ops conventions: the status pipeline, the list-as-project rule,
-the task lifecycle, and the read-side habit. Handles task state ONLY through
-the `use-clickup` skill. Does not duplicate ClickUp API knowledge.
 
 ## PREREQUISITE
 
-Load the `use-clickup` skill (provides `clickup-api`) before running any
-command in this skill. All API calls go through its client and scripts. The
-ClickUp API key must be available to that skill (its auth resolution covers
-`.env` and the `CLICKUP_API_KEY` environment variable).
+Load the `use-clickup` skill before running any command. All API calls go through its
+client and scripts (audited 2026-08-15 — see its references for verified behavior).
 
 ## STEP 0 — READ THE SPACE (session start, after compaction)
 
-Query the General list before asserting anything about team state. Never
-answer from memory. Run the search-task script of the `use-clickup` skill
-(see `references/workflows.md` for exact commands) and group results:
+Query the General list before asserting anything about team state. Never answer from
+memory. Group results:
 
-1. Open tasks by status — what is queued (`to do`, `ready`), in flight
-   (`in progress`), awaiting review (`review`), or stuck (`blocked`).
-2. Tasks tagged `waiting-on-andres` — surface these to the operator first.
-3. Who owns each in-progress/review task — Owner field + `Owner:` line in the
-   description; group in-flight work by device and harness (identity tags).
+1. Open tasks by status — `backlog` (queued), `to do` (released, awaiting claim),
+   `in progress` (claimed — who?), `blocked` (stuck — read the blocker comment),
+   `review` (awaiting Andrés's accept — surface first).
+2. Work-type tags (research/build/analysis/…) — the lanes.
+3. The "needs Andrés" queue is simply the status filter `review` + `blocked`.
 
 ## STEP 1 — SCOPE BEFORE WORK (scoping gate)
 
 No non-trivial work starts unless it already exists as a task.
 
-1. Search the space for an existing task covering the work (by name keywords,
-   workspace-wide, including closed).
+1. Search the space for an existing task (team query `GET /team/{id}/task` + client-side
+   keyword match — **global text search does not exist**).
 2. Found + unclaimed → proceed to STEP 2.
-3. Found + claimed by another agent → do NOT start; flag the overlap.
-4. Not found → create the task in `to do` FIRST, with a self-contained
-   description (objective, context pointers, verified facts, explicit next
-   steps), then claim it.
+3. Found + claimed by another hand (claim comment present) → do NOT start; flag overlap.
+4. Not found → create the task in `backlog` FIRST, self-contained description, with its
+   work-type tags, then claim it.
 
 ## STEP 2 — CLAIM
 
-1. Set status to `in progress`.
-2. Record the owner: set the Owner custom field (value `<Harness>@<Device>`,
-   PascalCase — split registry name on hyphens, capitalize each segment) and
-   mirror it as the first line of the task description
-   `Owner: <Harness>@<Device>`.
-3. Ensure the task carries its harness and device tags (from the identity
-   registry in references — add via the task-tag endpoint if missing).
-4. Add a comment: started, what will be delivered, ETA if any.
+1. Status → `in progress`.
+2. Post the claim comment: `Claimed by <hand> — <what I'll deliver>`.
+3. Re-read the task; if another hand's claim comment appeared, release (back to `to do`).
+4. Multi-step ticket? Add **subtasks** — they're the progress bar (Andrés's ask).
 
 ## STEP 3 — UPDATE (progress)
 
-On every meaningful milestone:
-
-1. Refresh the description so it stays self-contained — a cold agent must be
-   able to resume from it alone.
-2. Add a comment with evidence (verified facts, links, results).
-3. Move the status only when the actual state changes.
+On every meaningful milestone: refresh the description (self-contained), append to
+`## Evidence Log`, add an evidence comment. Move status only when state actually changes.
 
 ## STEP 4 — BLOCK
 
 1. Status → `blocked`.
-2. Comment the blocker precisely (what, why, what unblocks it).
-3. If the operator must act: add the tag `waiting-on-andres`.
+2. Comment the blocker precisely (what, why, who/what unblocks it).
+3. If Andrés must act, he'll see it via the `blocked` status — no tag needed.
 
 ## STEP 5 — REVIEW
 
-Work that needs a review pass goes to `review` (NOT `blocked` — blocked means
-cannot proceed). Comment who reviews and what to check.
+Done → status → `review` + fill `## Proof of work`. **Only Andrés moves `review` →
+`complete`** (the accept gate; never skipped).
 
 ## STEP 6 — COMPLETE
 
-Done → status `complete` (closes the task) + closing comment with evidence.
-Closed tasks are the archive; query them with `include_closed=true`.
+Andrés accepts → status `complete` (closes). Closed tasks are the archive; query with
+`include_closed=true`. Note: `statuses[]=complete` returns closed tasks even without
+the flag.
 
-## STATUS PIPELINE
+## STATUS PIPELINE (exact lowercase — ClickUp normalizes to lowercase on write)
+
+`backlog` → `to do` → `in progress` → `blocked` → `review` → `complete`
 
 | Status | Meaning | Set by |
 |---|---|---|
-| `to do` | backlog, not started | creator |
-| `ready` | picked for next | any agent |
-| `in progress` | being worked; Owner recorded | the worker |
-| `review` | awaiting a review pass | the worker |
-| `blocked` | cannot proceed; blocker commented | the worker |
-| `complete` | done, closed | the worker |
+| `backlog` | idea dump, not started | creator (Andrés / phone-pi) |
+| `to do` | RELEASED — Andrés's GO; awaiting claim | **only Andrés** |
+| `in progress` | being worked; claimed via comment | the worker |
+| `blocked` | cannot proceed; blocker in comment | the worker |
+| `review` | awaiting Andrés's accept | the worker |
+| `complete` | accepted; closes the task | **only Andrés** |
 
 Statuses are the ONLY state machine. Never encode progress in a list.
 
+## TAGS — WORK-TYPE FACETS (mix-and-match, no process tags)
+
+| Tag | Meaning | Example |
+|---|---|---|
+| `research` | explore, discover, learn | "is X worth doing?" |
+| `build` | create something | code, projects, artifacts |
+| `analysis` | evaluate, compare, data work | model reviews, cost analysis |
+| `report` | a document to be read | papers, reports |
+| `university` | university work | courses, Moodle, papers |
+| `business` | professional lane | job search, compensation |
+| `personal` | life — wife, home, errands | "something for my wife" |
+| `infrastructure` | devices, environment, tooling | phone/tablet upkeep |
+| `automation` | bots, syncs, schedulers | daemons, webhook/poller |
+| `design` | UI/UX, architecture, visuals | prototypes, diagrams |
+| `writing` | language craft | copy, editing, newsletters |
+| `finance` | money work | transactions, budgets |
+| `content` | produced media | posts, videos, images |
+| `learning` | skill-building, study | teach sessions, courses |
+
+Rules: **full words only** (never `uni`/`infra` — Andrés's directive); any combination,
+zero to a few per task; tags are created at space level and registered here. No
+`waiting-on-andres` (review/blocked cover it), no `future` (backlog covers it), no `skill`
+(research covers it), no identity tags (the claim comment carries identity).
+
 ## LISTS
 
-- **General** — default list; all agent-tracked work that has no dedicated
-  home. ID in `references/schema.md`.
-- A list exists ONLY to enclose a big named project or goal — a cluster of
-  ~5+ related tasks. Creating a list to represent status, phase, or priority
-  is forbidden. New lists are recorded in `references/schema.md`.
+- **General** — default list; all agent-tracked work without a dedicated home.
+  ID in `references/schema.md`.
+- A list exists ONLY to enclose a big named project (~5+ related tasks). New lists are
+  registered in `references/schema.md`.
 
-## TAGS
+## CUSTOM FIELDS — NONE
 
-| Tag | Meaning |
-|---|---|
-| `skill` | skill-building work |
-| `future` | deferred / long-horizon |
-| `infra` | environment, deployment, tooling |
-| `waiting-on-andres` | needs the operator's decision/input (highest-value) |
-| `<harness>` | runtime the agent runs as — one per task (registry: `references/schema.md`) |
-| `<device>` | physical machine — one per task (registry: `references/schema.md`) |
+Custom fields are blocked on the Free plan (`FIELD_605`) and the design deliberately uses
+zero. Identity = the claim comment. There is no Owner field.
 
-Every task carries both identity tags (one harness, one device), set at
-creation by the creating agent. They make work visible per device and per
-harness across the whole team.
+## DOCS — BANNED
+
+ClickUp Docs are permanent by design (undeletable, even in the UI) — **core directive
+(Andrés): never create Docs.** Long-form artifacts are local files; tasks link paths and
+stay fully self-contained (device-death safe).
 
 ## WHEN TO STOP
 
@@ -154,25 +159,27 @@ MUST:
 
 - Statuses encode progress; lists enclose projects. Never invert.
 - Create the task before starting non-trivial work (scoping gate).
-- Claim before working: Owner field + `Owner:` description line, value
-  `<harness>@<device>`.
-- Tag every task with its harness and device tags (identity registry) at
-  creation.
-- Keep descriptions self-contained and current.
+- Claim before working: status `in progress` + claim comment.
+- Tag every task with its work-type facets at creation.
+- Keep descriptions self-contained and current (Evidence Log).
 - Comment evidence at every transition.
 - Re-read the space at session start and before each new work item.
 - Use `include_closed=true` when querying.
+- Match status strings exactly (lowercase).
+- Respect the shared rate limit (~100/min per key across devices).
 
 MUST NOT:
 
 - Put secrets in task content (shared space).
 - Duplicate existing work — search first.
 - Cache task state across sessions; the space is the sole source of truth.
-- Start work claimed by another agent without resolving the overlap.
+- Start work claimed by another hand without resolving the overlap.
+- Create ClickUp Docs (banned).
+- Set `to do` (Andrés's GO column) — only Andrés releases work.
 
 ## REFERENCES
 
 | File | Covers |
 |---|---|
-| `references/schema.md` | Canonical Agent Ops schema: IDs, statuses, tags, list evolution |
+| `references/schema.md` | Canonical Agents space schema: IDs, statuses, tags, description contract |
 | `references/workflows.md` | Exact commands per step, agent identity, pitfalls |

@@ -152,8 +152,8 @@ research-literature → fuentes.json
 2. **Prefiere fuentes con DOI y alto conteo de citas.** Son más fáciles de validar
    y tienen mayor probabilidad de ser legítimas.
 3. **Diversidad de fuentes:** no entregar 15 papers del mismo autor o venue. Si los
-   resultados son homogéneos, ajustar los filtros (quitar `--domains`, reducir
-   `--min-citations`, ampliar rango de años).
+   resultados son homogéneos, ajustar los filtros (quitar `--include-domains`, reducir
+   `--min-citations`, ampliar el rango de fechas).
 4. **Transparencia:** informar al usuario qué herramientas se usaron y cuántos
    resultados aportó cada una. Si se usó Google Scholar, advertir que los metadatos
    pueden ser menos precisos.

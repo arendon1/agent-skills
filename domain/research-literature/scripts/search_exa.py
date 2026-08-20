@@ -55,6 +55,7 @@ VALID_ACTIONS = (ACTION_SEARCH, ACTION_SIMILAR, ACTION_CONTENTS, ACTION_ANSWER)
 # exa-py categories (subset; full list lives in the SDK)
 VALID_CATEGORIES = (
     "company",
+    "people",
     "research paper",
     "news",
     "pdf",
@@ -64,7 +65,7 @@ VALID_CATEGORIES = (
     "linkedin profile",
     "financial report",
 )
-VALID_SEARCH_TYPES = ("auto", "instant", "neural", "fast", "deep", "deep-reasoning")
+VALID_SEARCH_TYPES = ("auto", "instant", "neural", "fast", "deep-lite", "deep", "deep-reasoning")
 VALID_ANSWER_MODELS = ("exa", "exa-pro")
 
 
@@ -182,10 +183,18 @@ def run_similar(args: argparse.Namespace, exa: Exa) -> dict[str, Any]:
         params["include_domains"] = [d.strip() for d in args.include_domains.split(",") if d.strip()]
     if args.exclude_domains:
         params["exclude_domains"] = [d.strip() for d in args.exclude_domains.split(",") if d.strip()]
+    if args.include_text:
+        params["include_text"] = [t.strip() for t in args.include_text.split(",") if t.strip()]
+    if args.exclude_text:
+        params["exclude_text"] = [t.strip() for t in args.exclude_text.split(",") if t.strip()]
     if args.start_published_date:
         params["start_published_date"] = args.start_published_date
     if args.end_published_date:
         params["end_published_date"] = args.end_published_date
+    if args.start_crawl_date:
+        params["start_crawl_date"] = args.start_crawl_date
+    if args.end_crawl_date:
+        params["end_crawl_date"] = args.end_crawl_date
 
     print(f"Buscando en EXA (similar): {args.url}", file=sys.stderr)
     response = exa.find_similar(**params)
@@ -376,6 +385,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # ---- search / similar shared ----
+    p.add_argument(
+        "query_pos",
+        nargs="?",
+        default=None,
+        help=argparse.SUPPRESS,  # hidden positional that aliases --query for back-compat
+    )
     p.add_argument("--query", help="Tema o frase de búsqueda (acción=search).")
     p.add_argument("--url", help="URL fuente (similar) o único URL (contents).")
     p.add_argument(
@@ -491,6 +506,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
+    # Resolve the optional positional into --query so all documented examples
+    # (`search_exa.py "free-text query"`) keep working.
+    if args.query is None and getattr(args, "query_pos", None):
+        args.query = args.query_pos
     exa = Exa(EXA_API_KEY)  # type: ignore[arg-type]
 
     try:

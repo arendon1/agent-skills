@@ -42,9 +42,9 @@ El agente debe intentar EXA primero. Si no hay API key o los resultados son insu
 pasa a Semantic Scholar. Google Scholar es el último recurso para búsqueda manual.
 
 > **Atajo desde el coding-agent:** cuando el agente corre dentro de un
-> coding-agent que tenga cargada la extensión `exa-search` (p. ej. `pi-extensions`
-> para el coding-agent `pi`), prefiere la tool `exa_search` nativa sobre este
-> script — misma API, menos boilerplate, cancelable con Esc. El script sigue
+> coding-agent que tenga cargada una extensión de búsqueda con EXA (por
+> ejemplo la tool `exa_search`), prefiere esa tool sobre este script —
+> misma API, menos boilerplate, cancelable desde el agente. El script sigue
 > siendo el path canónico para flujos batch fuera del agente.
 
 ## Workflow

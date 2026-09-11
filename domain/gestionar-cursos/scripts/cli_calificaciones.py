@@ -408,6 +408,8 @@ def _seccion_md_calificacion(item: dict, courseid: str) -> str:
         f"| Porcentaje sobre rango | {item.get('porcentaje') or '—'} |",
         f"| Aporte al total del curso | {item.get('aporte_curso') or '0,00 %'} |",
     ]
+    if item.get("url"):
+        lineas += ["", f"> 🔗 **Revisar actividad:** [Abrir en Moodle]({item['url']})"]
     if item.get("feedback"):
         lineas += ["", f"> **Retroalimentación del docente:** {item['feedback']}"]
 
@@ -484,12 +486,68 @@ def _normalizar(s: str) -> str:
     return s.strip()
 
 
+def _encontrar_md_por_mod_id(ruta_curso: str, mod_id) -> str | None:
+    """Busca el .md de la actividad por su ID de actividad (view.php?id=<mod_id>).
+
+    Los .md generados por cli_init llevan 'URL: ...mod/<tipo>/view.php?id=<id>'.
+    Esta es la fuente AUTORITATIVA para desambiguar actividades homónimas
+    (ej. dos 'Registro de lectura' con id distinto). Devuelve el path o None.
+    """
+    if not mod_id:
+        return None
+    patron = re.compile(rf"view\.php\?id={re.escape(str(mod_id))}\b")
+    for unidad in sorted(Path(ruta_curso).glob("Unidad-*")):
+        for sub in ("actividades", "contenido", "materiales", "Foros"):
+            subdir = unidad / sub
+            if not subdir.is_dir():
+                continue
+            for md in sorted(subdir.glob("*.md")):
+                try:
+                    contenido = md.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    continue
+                if patron.search(contenido):
+                    return str(md)
+    return None
+
+
+def _md_tiene_otro_id(md_path, mod_id) -> bool:
+    """True si el .md declara un ID de ACTIVIDAD distinto al del item.
+
+    Solo mira IDs de módulos (mod/<tipo>/view.php?id=), NO el id del curso
+    (course/view.php?id=) ni ids de recursos — para no rechazar el .md propio
+    por contener el id del curso.
+    """
+    try:
+        with open(md_path, encoding="utf-8", errors="ignore") as f:
+            contenido = f.read()
+    except OSError:
+        return False
+    ids = re.findall(
+        r"mod/(?:assign|quiz|forum|page|resource|url|hvp|lesson|workshop|glossary|data|folder|book|choice|feedback)/view\.php\?id=(\d+)",
+        contenido,
+    )
+    return any(i != str(mod_id) for i in ids)
+
+
 def _encontrar_md_para_item(ruta_curso: str, item: dict) -> str | None:
     """Encuentra el archivo .md de la actividad que coincide con el item."""
+    # PRIMERO por id de actividad (URL): desambigua actividades con el MISMO
+    # nombre (ej. dos 'Registro de lectura' con id distinto). Es la fuente
+    # autoritativa; los .md generados por cli_init llevan 'view.php?id=<mod_id>'.
+    por_id = _encontrar_md_por_mod_id(ruta_curso, item.get("mod_id"))
+    if por_id:
+        return por_id
     nombre = item["nombre"]
     nombre_base = re.sub(r"\s*\([\d%]+[^)]*\)", "", nombre).strip()
     nombre_base = re.sub(r"\s*\(envío\)", "", nombre_base, flags=re.IGNORECASE).strip()
     nombre_base = re.sub(r"\s*\(evaluación\)", "", nombre_base, flags=re.IGNORECASE).strip()
+
+    def valida(path):
+        """Solo acepta el .md si NO pertenece a otra actividad (id distinto)."""
+        if path and item.get("mod_id") and _md_tiene_otro_id(path, item["mod_id"]):
+            return None
+        return path
 
     # 1) Buscar alias explícitos
     for patron_nombre, patron_stem in _ALIAS_PGA_A_MD:
@@ -497,12 +555,12 @@ def _encontrar_md_para_item(ruta_curso: str, item: dict) -> str | None:
             for unidad in sorted(Path(ruta_curso).glob("Unidad-*/actividades/")):
                 for md in sorted(unidad.glob("*.md")):
                     if re.search(patron_stem, md.stem, re.IGNORECASE):
-                        return str(md)
+                        return valida(str(md))
             for sub in ("contenido", "materiales"):
                 for unidad in sorted(Path(ruta_curso).glob(f"Unidad-*/{sub}/")):
                     for md in sorted(unidad.glob("*.md")):
                         if re.search(patron_stem, md.stem, re.IGNORECASE):
-                            return str(md)
+                            return valida(str(md))
 
     # 2) Matching exacto por nombre normalizado
     nombre_norm = _normalizar(nombre_base)
@@ -510,7 +568,7 @@ def _encontrar_md_para_item(ruta_curso: str, item: dict) -> str | None:
         for md in sorted(unidad.glob("*.md")):
             stem_base = re.sub(r"\s*\([\d%]+[^)]*\)", "", md.stem).strip()
             if _normalizar(stem_base) == nombre_norm:
-                return str(md)
+                return valida(str(md))
 
     # 3) Matching por subsecuencia de tokens
     tokens_item = set(_normalizar(nombre_base).split())
@@ -534,9 +592,9 @@ def _encontrar_md_para_item(ruta_curso: str, item: dict) -> str | None:
         for unidad in sorted(Path(ruta_curso).glob("Unidad-*/Foros/")):
             for md in sorted(unidad.glob("*.md")):
                 if _normalizar(nombre_base) in _normalizar(md.stem):
-                    return str(md)
+                    return valida(str(md))
 
-    return mejor
+    return valida(mejor)
 
 
 def _actualizar_snapshot(snapshot_path: str, items: list[dict]):

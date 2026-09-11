@@ -400,3 +400,21 @@ def test_parsear_gradebook_segmenta_aporta(mock_rich_console):
     by_name = {i["nombre"]: i for i in items}
     assert by_name["Registro de lectura (5%)"]["aporta_nota"] is True
     assert by_name["Humanidades III: Unidad 2"]["aporta_nota"] is False
+
+
+def test_encontrar_md_por_mod_id_desambigua(mock_rich_console, tmp_path):
+    """Dos 'Registro de lectura' con id distinto -> cada item a SU .md, por el link."""
+    import cli_calificaciones as cc
+
+    unidad = tmp_path / "Unidad-1" / "actividades"
+    unidad.mkdir(parents=True)
+    (unidad / "Registro de lectura (5%).md").write_text(
+        "# R\n\nURL: https://moodle/mod/assign/view.php?id=1111\n", encoding="utf-8"
+    )
+    (unidad / "Registro de lectura sem 2.md").write_text(
+        "# R2\n\nURL: https://moodle/mod/assign/view.php?id=2222\n", encoding="utf-8"
+    )
+    item_grad = {"nombre": "Registro de lectura (5%)", "mod_id": "1111"}
+    item_ungrad = {"nombre": "Registro de lectura(5%)", "mod_id": "2222"}
+    assert str(cc._encontrar_md_para_item(str(tmp_path), item_grad)).endswith("Registro de lectura (5%).md")
+    assert str(cc._encontrar_md_para_item(str(tmp_path), item_ungrad)).endswith("Registro de lectura sem 2.md")

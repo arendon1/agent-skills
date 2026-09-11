@@ -62,7 +62,16 @@ console = Console()
 
 CLICKUP_SPACE_ID = "901311224662"
 STATUS_CALIFICADO = "calificado"
+STATUS_PENDIENTE = "pendiente"
 COMMENT_TAG = "[calificaciones-auto]"
+# -- Status semántico → real -------------------------------------------------
+# La lista real puede NO tener 'calificado'/'pendiente' (solo 'to do'/'complete').
+# Orden = prioridad de candidatos por nombre; luego por type (cerrado/abierto).
+_STATUS_ANALOGOS_CALIFICADO = ["calificado", "complete", "completed", "done", "closed", "resolved"]
+_STATUS_ANALOGOS_PENDIENTE = ["pendiente", "to do", "todo", "to-do", "open", "in progress"]
+_STATUS_TYPE_CALIFICADO = {"closed", "resolved"}
+_STATUS_TYPE_PENDIENTE = {"open", "inprogress"}
+_STATUS_DONE_LITERALES = {"calificado", "complete", "completed", "done", "closed", "resolved", "graded"}
 
 
 def get_status_name(client, space_id: str, status_name: str) -> str:
@@ -81,6 +90,31 @@ def get_status_name(client, space_id: str, status_name: str) -> str:
         f"Status '{status_name}' no encontrado en space {space_id}. "
         f"Disponibles: {[s['status'] for s in space.get('statuses', [])]}"
     )
+
+
+def resolver_status_semantico(client, space_id: str, semantic: str) -> str | None:
+    """Resuelve un status SEMÁNTICO ('calificado'/'pendiente') a un NOMBRE real.
+
+    Prioridad: literal exacto → análogos por nombre → por type (cerrado/abierto).
+    Devuelve el nombre real (case-sensitive) o None si no se pudo (el caller anota,
+    nunca aborta). Así funciona aunque la lista solo tenga 'to do'/'complete'.
+    """
+    resp = client.get(f"/space/{space_id}")
+    statuses = resp.json().get("statuses", [])
+    by_name = {s["status"].lower(): s for s in statuses}
+    sem = (semantic or "").lower()
+
+    if sem in by_name:
+        return by_name[sem]["status"]
+    analogos = _STATUS_ANALOGOS_CALIFICADO if sem == "calificado" else _STATUS_ANALOGOS_PENDIENTE
+    for cand in analogos:
+        if cand.lower() in by_name:
+            return by_name[cand.lower()]["status"]
+    tipos = _STATUS_TYPE_CALIFICADO if sem == "calificado" else _STATUS_TYPE_PENDIENTE
+    for s in statuses:
+        if s.get("type") in tipos:
+            return s["status"]
+    return None
 
 
 def resolver_paths(ruta_curso: str) -> tuple[str, str, str]:
@@ -106,12 +140,18 @@ def resolver_paths(ruta_curso: str) -> tuple[str, str, str]:
     return curso_key, snapshot_path, clickup_json
 
 
-def tarea_ya_calificada(client, task_id: str) -> bool:
-    """Verifica si la tarea ya está en status 'calificado'."""
+def tarea_ya_calificada(client, task_id: str, status_done: str | None = None) -> bool:
+    """True si la tarea ya está en un status de cerrado/calificado.
+
+    Con status_done (nombre real resuelto) compara contra él; si no, contra los
+    literales de hecho. No asume que 'calificado' exista en la lista real.
+    """
     resp = client.get(f"/task/{task_id}")
     task = resp.json()
-    status = task.get("status", {}).get("status", "").lower()
-    return status == STATUS_CALIFICADO
+    status = (task.get("status", {}).get("status", "") or "").lower()
+    if status_done:
+        return status == status_done.lower()
+    return status in _STATUS_DONE_LITERALES
 
 
 def tiene_comentario_sync(client, task_id: str) -> bool:
@@ -211,9 +251,13 @@ def main():
     with open(snapshot_path) as f:
         snapshot = json.load(f)
 
-    # 3) Resolver status "calificado" del space Universidad
-    status_name = get_status_name(client, CLICKUP_SPACE_ID, STATUS_CALIFICADO)
-    print(f"Status '{STATUS_CALIFICADO}' → '{status_name}'\n")
+    # 3) Resolver status 'calificado' (semántico) → nombre REAL de la lista.
+    #    Con fallback a 'complete'/done; None → solo comentario (no aborta).
+    status_name = resolver_status_semantico(client, CLICKUP_SPACE_ID, STATUS_CALIFICADO)
+    if status_name:
+        print(f"Status '{STATUS_CALIFICADO}' → '{status_name}'\n")
+    else:
+        print("⚠ No se pudo resolver status 'calificado'; se omitirá el cambio de status (solo comentario).\n")
 
     # 4) Encontrar tareas calificadas: cruzar por nombre snapshot ↔ clickup
     actualizadas = []
@@ -241,7 +285,7 @@ def main():
             continue
 
         # Verificar estado actual
-        ya_calificada = tarea_ya_calificada(client, task_id)
+        ya_calificada = tarea_ya_calificada(client, task_id, status_name)
         ya_comentario = tiene_comentario_sync(client, task_id)
 
         if ya_calificada and ya_comentario:
@@ -251,17 +295,19 @@ def main():
 
         if args.dry_run:
             accion = []
-            if not ya_calificada:
+            if not ya_calificada and status_name:
                 accion.append(f"status → {status_name}")
             if not ya_comentario:
                 accion.append("comentario")
             print(f"· {nombre:35s}  DRY: {', '.join(accion) or 'noop'}")
             continue
 
-        # 5a) Actualizar status si no está ya
-        if not ya_calificada:
+        # 5a) Actualizar status si no está ya (solo si se resolvió un nombre real)
+        if not ya_calificada and status_name:
             update_status(client, task_id, status_name)
             print(f"✓ {nombre:35s}  status → {status_name}")
+        elif not ya_calificada:
+            print(f"= {nombre:35s}  status no resuelto — se omite (solo comentario)")
         else:
             print(f"= {nombre:35s}  status ya era {status_name}")
 

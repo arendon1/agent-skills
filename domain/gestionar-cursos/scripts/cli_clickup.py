@@ -356,7 +356,11 @@ def _build_update_entry(
         "task_id": task_id,
         "list_id": list_id,
         "diff": {
-            "status": {"from": "pendiente", "to": "calificado"},
+            # `to` es SEMÁNTICO ('calificado'); el applier lo resuelve al nombre real
+            # (→ 'complete') via resolver_status_semantico. `from` = None: el cache
+            # (clickup.json) no guarda el status previo, así no se dispara el abort por
+            # carrera (status desconocido ≠ 'pendiente' hardcodeado).
+            "status": {"from": None, "to": "calificado"},
             "name": None,
             "due_date_ms": None,
         },

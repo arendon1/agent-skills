@@ -139,6 +139,41 @@ def derivar_estado_final(estado_grado, estado_entrega, fecha_cierre, hoy=None) -
     return "Vencido (entrega sin verificar)" if vencido else "Sin calificar (entrega sin verificar)"
 
 
+def _extraer_peso_nombre(nombre) -> float | None:
+    """Ponderación real desde el nombre: '<Actividad> (N%)' → N (float) o None.
+
+    La ponderación del curso vive en el nombre (PGA/sílabo), p.ej. 'Registro de
+    lectura (5%)'. Es la autoridad para saber si una actividad SUMA nota.
+    """
+    if not nombre:
+        return None
+    m = re.search(r"\(([\d.,]+)\s*%\)", str(nombre))
+    return _a_float(m.group(1)) if m else None
+
+
+def _anotar_aporta_nota(items):
+    """Anota peso_nombre / aporta / aporta_nota a cada item.
+
+    Regla:
+      - Si el nombre trae '<Actividad> (N%)': N>0 => aporta_nota=True (importante),
+        N==0 => aporta_nota=False (existe, NO suma).
+      - Si el nombre NO trae peso: aporta_nota = (aporte_curso > 0). Así los
+        módulos/contenido (0,00 % de aporte) se marcan 'no aportan'.
+    """
+    for it in items:
+        pn = _extraer_peso_nombre(it["nombre"])
+        if pn is not None:
+            it["peso_nombre"] = pn
+            it["aporta"] = pn
+            it["aporta_nota"] = pn > 0
+        else:
+            aporte = _a_float(it.get("aporte_curso", "")) or 0
+            it["peso_nombre"] = None
+            it["aporta"] = aporte
+            it["aporta_nota"] = aporte > 0
+    return items
+
+
 def _abrir_driver_cdp() -> "webdriver.Chrome":
     """Conecta Selenium a Chrome vía CDP localhost:9222.
 
@@ -323,6 +358,7 @@ def _parsear_gradebook(html: str) -> list[dict]:
             "estado_entrega": estado_entrega, # eje entrega (nunca inferido de la nota)
             "feedback": feedback,
         })
+    _anotar_aporta_nota(items)
     return items
 
 
@@ -518,6 +554,12 @@ def _actualizar_snapshot(snapshot_path: str, items: list[dict]):
         actividades[matched]["estado_final"] = estado_final
         actividades[matched]["calificacion"]["estado_final"] = estado_final
         actividades[matched]["calificacion"]["fecha_cierre"] = fecha_cierre_act
+        # Ponderación real (aporta_nota): prioriza lo que SUMA nota; lo que no
+        # aporta (0%) se marca aparte (existe pero no cuenta).
+        actividades[matched]["aporta_nota"] = item.get("aporta_nota", True)
+        actividades[matched]["peso_nombre"] = item.get("peso_nombre")
+        actividades[matched]["calificacion"]["aporta_nota"] = item.get("aporta_nota", True)
+        actividades[matched]["calificacion"]["peso_nombre"] = item.get("peso_nombre")
 
     snapshot["calificaciones_capturadas"] = ahora
     with open(snapshot_path, "w", encoding="utf-8") as f:
@@ -525,30 +567,41 @@ def _actualizar_snapshot(snapshot_path: str, items: list[dict]):
 
 
 def _imprimir_resumen(items: list[dict]):
-    """Imprime tabla resumen de calificaciones."""
-    pga = [i for i in items if "Contenido interactivo" not in i["tipo"]]
-    table = Table(title="Calificaciones PGA (excluye Contenido interactivo)", show_lines=False)
+    """Resumen de calificaciones SEGMENTADO por ponderación real (aporta_nota).
+
+    Apartado 1: actividades que SUMA nota (peso>0 en el nombre o aporte_curso>0).
+    Apartado 2: las que NO aportan (0% / sin peso → módulos, diagnóstico).
+    Estas existen (se listan) pero no cuentan para la nota.
+    """
+    aportan = [i for i in items if i.get("aporta_nota", True)]
+    no_aportan = [i for i in items if not i.get("aporta_nota", True)]
+
+    table = Table(title="Calificaciones — ponderación real (aportan nota)", show_lines=False)
     table.add_column("Actividad", style="cyan", no_wrap=True)
     table.add_column("Tipo", style="dim")
     table.add_column("Nota", justify="right")
     table.add_column("Rango", justify="right", style="dim")
-    table.add_column("Pond. cat.", justify="right", style="dim")
+    table.add_column("Peso", justify="right", style="dim")
     table.add_column("Aporte curso", justify="right", style="green")
     table.add_column("Estado")
 
-    for it in pga:
+    for it in aportan:
         nota_display = it["calificacion"] or "—"
         estilo = (
             "bold green" if it["estado"] == "Aprobado"
             else "bold red" if it["estado"] == "Reprobado"
             else "dim"
         )
+        peso_display = (
+            f"{it['peso_nombre']:g}%" if it.get("peso_nombre") is not None
+            else (it.get("aporte_curso") or "—")
+        )
         table.add_row(
             it["nombre"],
             it["tipo"],
             nota_display,
             it["rango"] or "—",
-            it["ponderacion_pct"] or "—",
+            peso_display,
             it["aporte_curso"] or "0,00 %",
             f"[{estilo}]{it['estado']}[/{estilo}]",
         )
@@ -556,13 +609,24 @@ def _imprimir_resumen(items: list[dict]):
 
     # Aporte total al curso (tolera "-", "", "Sin calificar" sin crashear).
     aporte_total = sum(_parse_porcentaje(it["aporte_curso"]) for it in items)
+    calif_aportan = [i for i in aportan if i["calificacion"]]
     console.print(
         Panel(
             f"[bold]Aporte total al curso: {aporte_total:.2f}%[/bold]\n"
-            f"Items calificados: {sum(1 for it in items if it['calificacion'])} / {len(items)}",
+            f"Calificados (de los que aportan): {len(calif_aportan)} / {len(aportan)}",
             title="Resumen",
         )
     )
+
+    if no_aportan:
+        console.print(
+            Panel(
+                f"[dim]{len(no_aportan)} sin ponderación (0 % / módulos) — existen, pero NO suman nota:[/dim]\n"
+                + "\n".join(f"  • {it['nombre']}" for it in no_aportan),
+                title="[yellow]No aportan nota[/yellow]",
+                border_style="yellow",
+            )
+        )
 
 
 def main():

@@ -354,3 +354,46 @@ def test_derivar_estado_final_matriz(mock_rich_console):
     assert cc.derivar_estado_final("Sin nota", "Sin verificar", "2026-09-06T23:59", hoy) == "Vencido (entrega sin verificar)"
     # Sin nota y entrega sin verificar, abierto
     assert cc.derivar_estado_final("Sin nota", "Sin verificar", "2026-09-20T23:59", hoy) == "Sin calificar (entrega sin verificar)"
+
+
+def test_extraer_peso_nombre(mock_rich_console):
+    """Extrae la ponderación real del nombre '<Actividad> (N%)'."""
+    import cli_calificaciones as cc
+
+    assert cc._extraer_peso_nombre("Registro de lectura (5%)") == 5.0
+    assert cc._extraer_peso_nombre("Hablemos de comunicación (10%) foro completo") == 10.0
+    assert cc._extraer_peso_nombre("Elaboración de paralelo (5%)") == 5.0
+    assert cc._extraer_peso_nombre("Prueba inicial") is None
+    assert cc._extraer_peso_nombre("Humanidades III: Unidad 2") is None
+
+
+def test_anotar_aporta_nota_por_peso_y_aporte(mock_rich_console):
+    """aporta_nota: manda el peso del nombre; sin peso, el aporte_curso>0."""
+    import cli_calificaciones as cc
+
+    items = [
+        {"nombre": "Registro de lectura (5%)", "aporte_curso": "5,00 %"},
+        {"nombre": "Prueba inicial", "aporte_curso": "0,00 %"},  # módulo/diagnóstico
+        {"nombre": "Reflexiones sobre la lectura (10%)", "aporte_curso": "0,00 %"},
+    ]
+    cc._anotar_aporta_nota(items)
+    assert items[0]["aporta_nota"] is True and items[0]["peso_nombre"] == 5.0
+    assert items[1]["aporta_nota"] is False
+    assert items[2]["aporta_nota"] is True and items[2]["peso_nombre"] == 10.0
+
+
+def test_parsear_gradebook_segmenta_aporta(mock_rich_console):
+    """Con el gradebook real, las actividades con peso en nombre aportan;
+    los módulos/0% sin peso se marcan como no aportan."""
+    import cli_calificaciones as cc
+
+    html = (
+        "<table>"
+        + _html_gradebook_item("Registro de lectura (5%)", nota="4,80")
+        + _html_gradebook_item("Humanidades III: Unidad 2", nota="10,00")
+        + "</table>"
+    )
+    items = cc._parsear_gradebook(html)
+    by_name = {i["nombre"]: i for i in items}
+    assert by_name["Registro de lectura (5%)"]["aporta_nota"] is True
+    assert by_name["Humanidades III: Unidad 2"]["aporta_nota"] is False

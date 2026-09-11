@@ -38,25 +38,11 @@ calls these directly; this doc is for maintainers and integrators.
 | **Notes** | On 2056 (usage limit exceeded), the `remains_time` for that window is the seconds until reset. Other relevant error codes: 1002 (rate limit), 1008 (insufficient balance), 2045 (rate growth), 2049 (invalid key). |
 | **Source** | clankercode/pi-quota-monitor; platform.minimax.io/docs/api-reference/errorcode.md |
 
-## Google AI Pro (via antigravity-cli CLI)
-
-| | |
-|---|---|
-| **v1 method** | Liveness probe: `agy --model gemini-3.5-flash-low --effort low --print "ping"` |
-| **v1 auth** | Uses `agy`'s own authenticated session (OAuth token in macOS keychain / `~/.gemini/antigravity-cli/`) |
-| **v1.1 method** | Quota: `POST https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels` with OAuth Bearer |
-| **v1.1 auth** | OAuth Bearer; public client ID `1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com`. Token refresh via `https://oauth2.googleapis.com/token` (grant_type=refresh_token). |
-| **v1.1 response** | `{models: {<modelId>: {quotaInfo: {remainingFraction: 0..1, resetTime: RFC3339}}}}` |
-| **Windows** | 5h rolling + weekly (NOT daily). Per-model `resetTime` is RFC3339. |
-| **No signal** | v1 has no programmatic quota signal. Real-dispatch errors contain `"Resource exhausted"` text but no headers. |
-| **Sources** | andyvandaric/opencode-ag-auth/scripts/check-quota.mjs (218 lines); gyozalab/QuotaGem README confirms 5h+weekly window model. |
-
 ## Probing model per provider (cheapest, no thinking)
 
 | Provider | Probe model | Why |
 |---|---|---|
 | opencode-go Go | `deepseek-v4-flash` | cheapest on OG |
 | MiniMax | `M 2.7 High Speed` | cheapest on the sub |
-| AGY | `gemini-3.5-flash-low` (via `agy` CLI) | cheapest Gemini |
 
 OpenRouter is not probed (assume credits present); `check-subs probe openrouter` only reads the `/auth/key` endpoint.

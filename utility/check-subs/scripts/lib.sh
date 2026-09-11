@@ -49,18 +49,16 @@ get_probe_model() {
   case "$1" in
     opencode-go) echo "deepseek-v4-flash" ;;
     minimax)     echo "m2.7-highspeed" ;;
-    agy)         echo "gemini-3.5-flash-low" ;;
     *) echo "" ;;
   esac
 }
 
-# Probe kind: subscription has windows, pay-per-use has credits, agy is liveness.
+# Probe kind: subscription has windows, pay-per-use has credits.
 get_kind() {
   case "$1" in
     opencode-go) echo "subscription" ;;
     minimax)     echo "subscription" ;;
     openrouter)  echo "pay-per-use" ;;
-    agy)         echo "liveness" ;;
     *) echo "" ;;
   esac
 }

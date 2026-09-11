@@ -34,8 +34,6 @@ second config file.
     "apiKey": "sk-cp-..."              // env: MINIMAX_API_KEY
   },
 
-  // Google AI Pro (no config — uses `agy` CLI's authenticated session)
-
   // Optional: override per-window thresholds (defaults from SKILL.md).
   "thresholds": {
     "5h":      { "warn": 70, "danger": 85 },
@@ -59,8 +57,7 @@ into `https://opencode.ai/workspace/<id>/go` once, then copy the `auth`
 cookie value from devtools). Without them, `check-subs probe opencode-go`
 returns `not-configured` and the other 3 providers still work.
 
-AGY requires no config — install the `agy` CLI and authenticate once with
-Google sign-in. After that, `check-subs probe agy` runs liveness probes.
+
 
 ## How to get the OG cookie
 

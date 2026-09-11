@@ -63,12 +63,16 @@ probe() {
   local parsed
   parsed="$(printf '%s' "$resp" | perl -ne '
     BEGIN { %map = ("rollingUsage","5h","weeklyUsage","weekly","monthlyUsage","monthly"); }
-    while (m{(rollingUsage|weeklyUsage|monthlyUsage):\$R\[\d+\]=\{status:"([^"]+)",resetInSec:(\d+),usagePercent:(\d+)\}}g) {
+    while (m{(rollingUsage|weeklyUsage|monthlyUsage):\$R\[\d+\]=\{status:"([^"]+)",resetInSec:(\d+),usagePercent:([\d.]+),}g) {
       my ($prop, $st, $reset, $pct) = ($1, $2, $3, $4);
       my $key = $map{$prop};
       next unless defined $key;
-      next if $st ne "ok";
-      next if $pct !~ /^\d+$/ || $pct < 0;
+      # v13.10.3 — NO descartar ventanas no-ok. Antes había un `next if $st ne "ok"`
+      # que borraba silenciosamente las ventanas agotadas (ej. weekly en
+      # "rate-limited" con usagePercent 101.9), y el provider igual se reportaba
+      # como status:"ok". Eso hacía que el orquestador despachara a una sub
+      # agotada. Ahora se incluyen con su status real y el provider deriva el suyo.
+      next if $pct !~ /^[\d.]+$/ || $pct < 0;
       $reset_ms = $reset * 1000;
       $windows{$key} = qq({"key":"$key","consumedPercent":$pct,"resetEtaMs":$reset_ms,"status":"$st"});
     }
@@ -89,12 +93,17 @@ probe() {
     return 0
   fi
 
-  jq -c --argjson w "$parsed" '{
-    status: "ok",
-    api: "GET /workspace/{id}/go (HTML scrape)",
-    kind: "subscription",
-    windows: $w
-  }' <<<'null' 2>/dev/null || {
+  # El status del provider se DERIVA de las ventanas: si alguna no está en "ok"
+  # (ej. weekly "rate-limited"), el provider NO puede reportarse como "ok".
+  jq -c --argjson w "$parsed" '
+    ($w | to_entries | map(select(.value.status != "ok") | .key)) as $blocked
+    | {
+        status: (if ($blocked | length) == 0 then "ok" else "rate-limited" end),
+        api: "GET /workspace/{id}/go (HTML scrape)",
+        kind: "subscription",
+        blockedWindows: $blocked,
+        windows: $w
+      }' <<<'null' 2>/dev/null || {
     log_warn "og: jq wrap error"
     printf '%s' '{"status":"parse-error","api":"GET /workspace/{id}/go (HTML scrape)"}'
   }

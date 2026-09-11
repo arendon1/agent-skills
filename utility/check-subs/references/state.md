@@ -53,15 +53,6 @@ it atomically.
         "weekly": { "key": "weekly", "consumedPercent": 70, "resetEtaMs": 518400000,"resetAt": "2026-08-06T03:14:00Z", "status": "ok" }
       },
       "next_probe_at": "2026-07-31T05:00:00Z"
-    },
-
-    "agy": {
-      "status": "ok",
-      "api": "agy CLI (liveness only)",
-      "liveness": { "alive": true, "last_ok": "2026-07-31T03:14:00Z" },
-      "quota_signal": "none",
-      "comment": "v1: liveness only; v1.1 will read full quota via cloudcode-pa",
-      "next_probe_at": "2026-07-31T03:19:00Z"   // default cadence, no signal to defer
     }
   }
 }

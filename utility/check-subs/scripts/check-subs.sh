@@ -2,7 +2,7 @@
 # check-subs.sh — main entry point for the check-subs skill.
 #
 # Subcommands:
-#   probe [provider]    — run probes (all 4 or just one); write state file
+#   probe [provider]    — run probes (all 3 or just one); write state file
 #   status [--human]    — read state file; pretty-print or JSON
 #   record P W P S      — post-dispatch feedback: record reset for (provider, window, percent, resetEtaSec)
 #   thresholds          — show the current threshold table
@@ -20,13 +20,12 @@ source "$SCRIPT_DIR/lib.sh"
 cmd_probe() {
   local target="${1:-all}"
   ensure_state_dir
-  local providers=(openrouter opencode-go minimax agy)
+  local providers=(openrouter opencode-go minimax)
   case "$target" in
     all) ;;
     openrouter)  providers=(openrouter) ;;
     opencode-go|og) providers=(opencode-go) ;;
     minimax)     providers=(minimax) ;;
-    agy)         providers=(agy) ;;
     *)
       log_error "unknown provider: $target"
       exit 64 ;;
@@ -40,7 +39,6 @@ cmd_probe() {
       openrouter)  block="$("$SCRIPT_DIR/providers/or.sh"      2>/dev/null || printf '{"status":"error"}')" ;;
       opencode-go) block="$("$SCRIPT_DIR/providers/og.sh"      2>/dev/null || printf '{"status":"error"}')" ;;
       minimax)     block="$("$SCRIPT_DIR/providers/minimax.sh" 2>/dev/null || printf '{"status":"error"}')" ;;
-      agy)         block="$("$SCRIPT_DIR/providers/agy.sh"     2>/dev/null || printf '{"status":"error"}')" ;;
     esac
     state_merge_provider "$p" "$block"
   done
@@ -69,9 +67,13 @@ cmd_status() {
           "  limit_remaining: " + (($pv.credits.limit_remaining // "n/a") | tostring) + "\n"
         else "" end) +
         (if $pv.windows then
-          ([$pv.windows | to_entries[] |
-            "  " + .key + ":  " + (.value.consumedPercent|tostring) + "% consumed, resets in " + ((.value.resetEtaMs // 0) / 1000 | tostring) + "s\n"
-          ] | join(""))
+          # Flat shape: key is window name like "5h" / "weekly" / "monthly"
+          (
+            [
+              $pv.windows | to_entries[] |
+              "  " + .key + ":  " + (.value.consumedPercent|tostring) + "% consumed, resets in " + ((.value.resetEtaMs // 0) / 1000 | tostring) + "s\n"
+            ] | join("")
+          )
         else "" end) +
         (if $pv.liveness then
           "  liveness: " + (($pv.liveness.alive // false) | tostring) + " (last ok: " + ($pv.liveness.last_ok // "?") + ")\n"
@@ -97,7 +99,7 @@ cmd_record() {
   local next_at; next_at=$(date -u -r $((epoch + reset_eta_sec)) +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
                        || date -u -d "@$((epoch + reset_eta_sec))" +%Y-%m-%dT%H:%M:%SZ)
 
-  # Update the window block in place.
+  # Update the window block in place (flat shape: key is the window name).
   local current; current="$(state_get '.')"
   echo "$current" | jq --arg p "$provider" --arg w "$window" --argjson pct "$pct" \
                        --arg next "$next_at" --arg now "$now" '
@@ -132,7 +134,53 @@ cmd_config() {
   printf '  opencode-go.workspaceId:%s\n' "$(resolve opencode-go workspaceId OPENCODE_GO_WORKSPACE_ID)"
   printf '  opencode-go.authCookie: %s\n' "$(mask_key "$(resolve opencode-go authCookie OPENCODE_GO_AUTH_COOKIE)")"
   printf '  minimax.apiKey:         %s\n' "$(mask_key "$(resolve minimax apiKey MINIMAX_API_KEY)")"
-  printf '  agy CLI:                %s\n' "$(command -v agy >/dev/null 2>&1 && echo "$(command -v agy)" || echo 'NOT IN PATH')"
+}
+
+cmd_watch() {
+  # Refresh interval (seconds). Default 30. Honors CHECK_SUBS_WATCH_INTERVAL.
+  local interval="${CHECK_SUBS_WATCH_INTERVAL:-30}"
+  [ $# -gt 0 ] && interval="$1"
+
+  # ANSI: clear screen, move cursor home, hide cursor.
+  printf '\033[2J\033[?25l'
+
+  # Cleanup on exit — restore cursor.
+  trap 'printf "\033[?25h\n"; exit 0' INT TERM EXIT
+
+  while true; do
+    {
+      printf '\033[H'  # home
+      printf 'check-subs watch — refresh every %ss (Ctrl-C to quit)\n' "$interval"
+      printf 'updated: %s   state: %s\n\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$STATE_FILE"
+
+      # Probe (silent: probe prints to stderr only)
+      "$SCRIPT_DIR/check-subs.sh" probe all >/dev/null 2>&1 || true
+
+      # Render human status
+      "$SCRIPT_DIR/check-subs.sh" status --human 2>/dev/null
+
+      # Footer with useful at-a-glance info
+      printf '\n'
+      if [ -f "$STATE_FILE" ]; then
+        jq -r '
+          .providers | to_entries[] |
+          select(.value.status == "ok") |
+          (
+            if .key == "opencode-go" then
+              "  [og]        5h=" + (.value.windows["5h"].consumedPercent // "?" | tostring) + "%  weekly=" + (.value.windows.weekly.consumedPercent // "?" | tostring) + "%  monthly=" + (.value.windows.monthly.consumedPercent // "?" | tostring) + "%"
+            elif .key == "minimax" then
+              "  [minimax]   5h=" + (.value.windows["5h"].consumedPercent // "?" | tostring) + "%  weekly=" + (.value.windows.weekly.consumedPercent // "?" | tostring) + "%"
+            elif .key == "openrouter" then
+              "  [or]        usage_monthly=$" + (.value.credits.usage_monthly // "?" | tostring)
+            else empty end
+          )
+        ' "$STATE_FILE" 2>/dev/null
+        printf '  [thresholds] 5h: warn@70%% danger@85%% | weekly: warn@75%% danger@90%%\n'
+      fi
+    } || true
+
+    sleep "$interval"
+  done
 }
 
 # ---- entry -----------------------------------------------------------------
@@ -142,13 +190,17 @@ usage() {
 check-subs — subscription liveness + quota probe
 
 USAGE:
-  check-subs probe [provider]    probe all 4 (or one) and write state
+  check-subs probe [provider]    probe all 3 (or one) and write state
   check-subs status [--human]    show current state
+  check-subs watch [interval]    live TUI: probe + status loop every Ns (default 30)
   check-subs record P W P S      record post-dispatch reset (provider window pct etaSec)
   check-subs thresholds          show threshold table
   check-subs config              show resolved config (masked keys)
 
-PROVIDERS: openrouter, opencode-go, minimax, agy
+ENV:
+  CHECK_SUBS_WATCH_INTERVAL      default watch interval (seconds, default 30)
+
+PROVIDERS: openrouter, opencode-go, minimax
 
 STATE:   $STATE_FILE
 CONFIG:  $CONFIG_FILE
@@ -161,6 +213,7 @@ main() {
   case "$cmd" in
     probe)      cmd_probe "$@" ;;
     status)     cmd_status "$@" ;;
+    watch)      cmd_watch "$@" ;;
     record)     cmd_record "$@" ;;
     thresholds) cmd_thresholds ;;
     config)     cmd_config ;;

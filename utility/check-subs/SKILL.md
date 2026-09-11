@@ -1,9 +1,9 @@
 ---
 name: check-subs
 description: |
-  Probes 4 AI provider subscriptions (OpenRouter, opencode-go Go, MiniMax, Google
-  AI Pro) and reports liveness and remaining quota per usage window. Writes a
-  state file that any downstream consumer can read to make routing decisions.
+  Probes 3 AI providers (OpenRouter, opencode-go Go, MiniMax) and reports liveness
+  and remaining quota per usage window. Writes a state file that any downstream
+  consumer can read to make routing decisions.
   Use when an agent is about to dispatch a task to a subscription-based model,
   after a 429/2056/quota-exhausted response, when the user asks for current
   subscription state, or before opening a long working session.
@@ -41,20 +41,19 @@ Calls each subscription's quota endpoint (where one exists) and a liveness probe
 that any process can read. Output is plain JSON, also pretty-printed to stdout
 in `--human` mode.
 
-### The 4 providers
+### The 3 providers
 
 | Provider | Mechanism | Output |
 |---|---|---|
 | OpenRouter | `GET /api/v1/auth/key` (Bearer) | `usage`, `usage_monthly`, `limit_remaining` |
 | opencode-go Go | `GET /workspace/{id}/go` (session cookie, HTML scrape) | `5h`, `weekly`, `monthly` windows with `consumedPercent` + `resetEtaMs` |
 | MiniMax | `GET /v1/token_plan/remains` (Bearer) | `5h` + `weekly` windows with `consumedPercent` + `resetEtaMs` |
-| Google AI Pro | liveness probe via the `agy` CLI (cheapest model, 1-token prompt) | liveness only (v1); full quota in v1.1 via OAuth |
 
 ### Unified threshold scheme (per window, not per provider)
 
 Thresholds apply **uniformly across all providers** for the same window name.
-So `5h` window has the same warn/danger for OG, Minimax, and AGY; `weekly`
-has the same warn/danger for OG and Minimax; etc.
+So `5h` window has the same warn/danger for OG and MiniMax; `weekly` the
+same for both; etc.
 
 | Window | warn | danger | Rationale |
 |---|---|---|---|
@@ -67,14 +66,13 @@ Override per window via the config file.
 ## HOW TO INVOKE
 
 ```bash
-# Probe all 4 providers, write state, print summary
+# Probe all 3 providers, write state, print summary
 check-subs probe
 
 # Probe a single provider
 check-subs probe openrouter
 check-subs probe opencode-go
 check-subs probe minimax
-check-subs probe agy
 
 # Read the current state (no probe — just shows the cached file)
 check-subs status
@@ -108,7 +106,7 @@ Minimal config to start:
 }
 ```
 
-`agy` needs no config — it reads its own auth.
+
 
 ## STATE FILE
 
@@ -153,6 +151,5 @@ skill-loading mechanism; the bash entry point is also directly callable.
 - `references/endpoints.md` — full endpoint table with auth + response shapes
 - `references/config.md` — config schema and env-var fallbacks
 - `references/state.md` — state file schema and field reference
-- `references/agy-quota.md` — v1.1 plan for full AGY quota via OAuth
 - `scripts/` — executable entry points and per-provider probe implementations
 - `examples/usage.md` — concrete invocation examples

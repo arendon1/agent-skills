@@ -1,7 +1,7 @@
 ---
 name: gestionar-cursos
 description: |
-  Extrae y sincroniza cursos Moodle Uniremington (Aula Virtual): inicializa desde URLs, organiza la estructura local y verifica estado vs Moodle. Reutiliza la sesión persistente en `.browserdata/` — NO pidas re-login si hay sesión válida. Usa cuando necesites iniciar un curso (init), sincronizar contenido o calificaciones con ClickUp, revisar foros evaluables, consultar calificaciones, verificar cambios (estado), o el usuario diga que ya inició sesión.
+  Extrae y sincroniza cursos Moodle Uniremington (Aula Virtual): inicializa desde URLs, organiza la estructura local y verifica estado vs Moodle. Reutiliza la sesión persistente en `~/.agents/.browserdata/` — NO pidas re-login si hay sesión válida. Usa cuando necesites iniciar un curso (init), sincronizar contenido o calificaciones con ClickUp, revisar foros evaluables, consultar calificaciones, verificar cambios (estado), o el usuario diga que ya inició sesión.
 invocation: user
 layer: domain
 loop: gestionar-cursos
@@ -20,7 +20,7 @@ Moodle de Uniremington (aulavirtual.uniremington.edu.co).
 Antes de cualquier navegación:
 
 0. **REVISAR SESIÓN PERSISTENTE antes de pedir login**:
-   - `.browserdata/` (perfil Chrome con cookies de la sesión del Aula
+   - `~/.agents/.browserdata/` (perfil Chrome ÚNICO de agentes, con cookies de la sesión del Aula
      Virtual) existe en la raíz del workspace? → la sesión puede persistir;
      reusar el perfil (via `navegador_cdp`) o leer cookies exportadas.
    - `.moodle_session.json` válido (`expires_at` > ahora, TTL 7 días)? →
@@ -28,7 +28,7 @@ Antes de cualquier navegación:
      navegador.
    - Solo si NO hay sesión válida → ir al paso 1. No pedir login cuando ya
      existe persistencia (el usuario inició sesión manualmente en el Aula
-     Virtual y las cookies quedaron en `.browserdata/`).
+     Virtual y las cookies quedaron en `~/.agents/.browserdata/`).
 1. Navegar a `https://aulavirtual.uniremington.edu.co/my/`
 2. Verificar estado:
    - **NO AUTENTICADO**: URL contiene `login/index.php` o texto "Usted no se ha identificado"

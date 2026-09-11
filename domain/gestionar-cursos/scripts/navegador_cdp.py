@@ -52,8 +52,8 @@ def get_profile_dir() -> str:
     global _profile_dir
     if _profile_dir:
         return _profile_dir
-    # Default: .browserdata en el directorio de trabajo actual
-    return os.path.join(os.getcwd(), ".browserdata")
+    # Default canónico: perfil único de navegador para agentes
+    return os.path.expanduser("~/.agents/.browserdata")
 
 
 def _find_chrome() -> str | None:

@@ -156,7 +156,7 @@ def procesar_curso(ruta_curso: str, dry_run: bool = False) -> None:
     ))
 
     # Configurar Chrome
-    profile = os.path.join(os.getcwd(), ".browserdata")
+    profile = os.path.expanduser("~/.agents/.browserdata")
     set_profile_dir(profile)
     if not esta_usando_selenium():
         console.print("[bold red]ERROR:[/bold red] No se detectó modo CDP/Selenium.")

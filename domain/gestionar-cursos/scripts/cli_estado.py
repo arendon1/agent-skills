@@ -345,7 +345,7 @@ def main():
     ))
 
     # Configurar Chrome
-    profile = args.profile_dir or os.path.join(os.getcwd(), ".browserdata")
+    profile = args.profile_dir or os.path.expanduser("~/.agents/.browserdata")
     set_profile_dir(profile)
 
     if not esta_usando_selenium():

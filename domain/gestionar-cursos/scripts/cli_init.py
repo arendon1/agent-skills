@@ -428,7 +428,7 @@ def _init_curso(url: str, destino: str, profile_dir: str | None = None,
     Args:
         url: URL del curso en Moodle.
         destino: Directorio destino.
-        profile_dir: Directorio de perfil Chrome (None = default .browserdata).
+        profile_dir: Directorio de perfil Chrome (None = default ~/.agents/.browserdata).
         reset_profile: Borrar perfil antes de iniciar.
         no_browser: No lanzar Chrome, asumir CDP en localhost:9222.
         use_requests: Usar requests.Session en vez de Selenium/CDP.
@@ -448,7 +448,7 @@ def _init_curso(url: str, destino: str, profile_dir: str | None = None,
         set_request_mode(session)
         console.print("[dim]Modo requests activado (sin navegador)[/dim]")
     elif not no_browser:
-        profile = profile_dir or os.path.join(os.getcwd(), ".browserdata")
+        profile = profile_dir or os.path.expanduser("~/.agents/.browserdata")
         if reset_profile and os.path.isdir(profile):
             import shutil
             shutil.rmtree(profile, ignore_errors=True)
@@ -840,7 +840,7 @@ def main():
         console.print("[bold red]ERROR:[/bold red] No se detectó modo CDP/Selenium.")
         sys.exit(1)
 
-    profile = args.profile_dir or os.path.join(os.getcwd(), ".browserdata")
+    profile = args.profile_dir or os.path.expanduser("~/.agents/.browserdata")
     import shutil
     if args.reset_profile and os.path.isdir(profile):
         shutil.rmtree(profile, ignore_errors=True)

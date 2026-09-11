@@ -293,8 +293,8 @@ def _sync_curso(url: str, ruta_curso: str):
                 # Foros evaluables (>0% en título) → flujo nuevo:
                 # metadata + hilos principales de compañeros → Unidad-X/Foros/<slug>.md
                 # Foros introductorios (Avisos, Consultas, Presentación) → flujo viejo (COMUNICACION/).
-                from extractor_foro_evaluable import es_evaluable
                 from _procesar_foro_evaluable import procesar_foro_en_unidad
+                from extractor_foro_evaluable import es_evaluable
                 evaluable, _pct = es_evaluable(act.get("nombre", ""))
                 if evaluable:
                     result_path = procesar_foro_en_unidad(act, ruta_curso, console)
@@ -631,6 +631,10 @@ def _init_curso(url: str, destino: str, profile_dir: str | None = None,
     # Escribir/actualizar clickup.json en la raíz del período
     _escribir_clickup_json(destino, datos_curso["codigo"], datos_curso["nombre"],
                            periodo, bloque, url)
+
+    # Auto-registrar el perfil del curso en cursos.json → cablearlo al orquestador
+    # (así los workflows lo reciben vía args.cursos sin registro manual).
+    _escribir_cursos_json(destino, ruta_curso, datos_curso, url, periodo, bloque)
 
     # 11. Resumen
     console.print(f"\n[bold green]Inicialización completa:[/bold green] {datos_curso['nombre']}")
@@ -980,6 +984,90 @@ def _escribir_clickup_json(destino: str, codigo: str, nombre_curso: str,
 
     with open(ruta_clickup, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def _escribir_cursos_json(destino: str, ruta_curso: str, datos_curso: dict,
+                          url: str, periodo: str = "", bloque: str = "") -> None:
+    """Auto-registra el perfil del curso en cursos.json (raíz del período).
+
+    Así un curso nuevo (creado/sincronizado con cli_init) queda cableado de
+    inmediato al orquestador: los workflows lo reciben vía args.cursos compuestos
+    desde este archivo. Campos no auto-detectables (profesor, tipo_materia,
+    convenciones) se preservan si ya existían; si no, quedan vacíos (no se pisan
+    ediciones manuales posteriores).
+    """
+    import json
+
+    key = os.path.basename(os.path.normpath(ruta_curso))
+    curso_dir = os.path.abspath(ruta_curso)
+    codigo = datos_curso.get("codigo", "")
+    nombre = datos_curso.get("nombre", "")
+
+    m = re.search(r"[?&]id=(\d+)", url)
+    moodle_id = m.group(1) if m else ""
+
+    # Profesor / código materia desde AGENTS.md (si existen)
+    profesor, codigo_materia = "", ""
+    agents_path = os.path.join(curso_dir, "AGENTS.md")
+    if os.path.isfile(agents_path):
+        with open(agents_path, encoding="utf-8") as f:
+            contenido = f.read()
+        mprof = re.search(r"\*\*PROFESOR/TUTORA\*\*\s*:\s*([^(\n]+)", contenido)
+        if mprof:
+            profesor = mprof.group(1).strip()
+        mcod = re.search(r"\*\*CODIGO_MATERIA_REPORTE\*\*\s*:\s*([^\n]+)", contenido)
+        if mcod:
+            codigo_materia = mcod.group(1).strip()
+
+    # list_id_clickup desde clickup.json (puede ser null hasta crear la lista)
+    list_id = None
+    clickup_path = os.path.join(destino, "clickup.json")
+    if os.path.isfile(clickup_path):
+        with open(clickup_path, encoding="utf-8") as f:
+            clickup_data = json.load(f)
+        courses = clickup_data.get("courses", {})
+        if key in courses:
+            list_id = courses[key].get("list_id")
+
+    ruta_cursos = os.path.join(destino, "cursos.json")
+    if os.path.isfile(ruta_cursos):
+        with open(ruta_cursos, encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = {
+            "_meta": {
+                "periodo": f"{periodo}-{bloque}" if bloque else (periodo or ""),
+                "proposito": ("Registro de perfiles de curso para el ORQUESTADOR: al despachar "
+                               "un workflow, lee este archivo y compone los args. Los workflows "
+                               "NO leen este archivo ni conocen cursos: reciben args compuestos."),
+                "convencion_acceso": ("Desde un curso, usar SubagentWorkflow({ scriptPath: "
+                                      "'../.pi/workflows/<name>.js', args }) — name SOLO resuelve "
+                                      "contra el cwd."),
+                "generado": datetime.now().strftime("%Y-%m-%d"),
+            },
+            "cursos": {},
+        }
+
+    data.setdefault("cursos", {})
+    previo = data["cursos"].get(key, {})
+    data["cursos"][key] = {
+        "dir": curso_dir,
+        "nombre": previo.get("nombre") or nombre,
+        "codigo": codigo,
+        "codigo_materia": previo.get("codigo_materia") or codigo_materia,
+        "cohorte": previo.get("cohorte", codigo),
+        "list_id_clickup": previo.get("list_id_clickup") or list_id,
+        "moodle_course_id": previo.get("moodle_course_id") or moodle_id,
+        "moodle_url": previo.get("moodle_url") or url,
+        "profesor": previo.get("profesor") or profesor or "",
+        "periodo": previo.get("periodo") or (f"{periodo}-{bloque}" if bloque else (periodo or "")),
+        "activo": True,
+        "tipo_materia": previo.get("tipo_materia", ""),
+        "convenciones": previo.get("convenciones", {}),
+    }
+    with open(ruta_cursos, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    console.print(f"    [green]Perfil auto-registrado en cursos.json[/green] ({key})")
 
 
 def _init_parallel(urls: list[str], destino: str, profile_dir: str,

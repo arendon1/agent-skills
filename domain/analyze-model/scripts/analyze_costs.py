@@ -84,11 +84,17 @@ def load_aliases() -> dict[str, str]:
     return data.get("mappings", {})
 
 
-def _provider_for_model(model_id: str) -> str:
+def _provider_for_model(model_id: str, entry_provider: str | None = None) -> str:
+    """Resolve the subscription provider for a usage record.
+
+    Resolution order:
+    1. Explicit `provider` field on the entry (set by Pi/OpenCode bridges).
+    2. Legacy model_id prefix (`opencode-go/X`).
+    """
+    if entry_provider in ("opencode-go", "minimax"):
+        return entry_provider
     if model_id.startswith("opencode-go/"):
         return "opencode-go"
-    if model_id.startswith("github-copilot/"):
-        return "github-copilot"
     return ""
 
 
@@ -111,7 +117,7 @@ def _monthly_efficiency(usage: list[dict], catalog: dict[str, dict], aliases: di
 
     for entry in usage:
         model_id = entry.get("model_id", "")
-        provider = _provider_for_model(model_id)
+        provider = _provider_for_model(model_id, entry.get("provider"))
         if not provider or provider not in providers:
             continue
         if providers[provider].get("type") == "api_only":
@@ -169,15 +175,6 @@ def _monthly_efficiency(usage: list[dict], catalog: dict[str, dict], aliases: di
                     cap_used_pct = round((or_cost / cap) * 100, 1) if cap > 0 else 0.0
                     subscription_cost_usd = monthly_price
 
-                elif prov_id == "github-copilot":
-                    credit_usd_rate = prov_info.get("credit_usd_rate", 0.01)
-                    credits_used = or_cost / credit_usd_rate if credit_usd_rate > 0 else 0
-                    credit_allowance = tier.get("credits_monthly", 0)
-                    sub_value = min(or_cost, credit_allowance * credit_usd_rate)
-                    cap = credit_allowance * credit_usd_rate
-                    cap_used_pct = round((or_cost / cap) * 100, 1) if cap > 0 else 0.0
-                    overage = max(0.0, or_cost - cap)
-                    subscription_cost_usd = monthly_price
 
                 else:
                     cap = monthly_price
@@ -318,8 +315,8 @@ def analyze(usage: list[dict], catalog: dict[str, dict]) -> dict:
         stats["resolved_id"] = resolved_id
 
         if sid:
-            provider = _provider_for_model(model_id)
-            if provider in ("opencode-go", "github-copilot"):
+            provider = _provider_for_model(model_id, entry.get("provider"))
+            if provider == "opencode-go":
                 session_ids.add(sid)
                 model_sessions[model_id].add(sid)
 

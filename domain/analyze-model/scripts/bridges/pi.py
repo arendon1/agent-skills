@@ -9,7 +9,7 @@ Pi stores sessions at:
 Each session has a header followed by entries. Assistant messages carry:
   message.usage = {input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost{...}}
   message.provider = e.g. "openrouter"
-  message.model = e.g. "openai/gpt-5.6-luna-pro"
+  message.model = e.g. "openrouter/deepseek/deepseek-v4-flash-0731"
 
 We emit one record per assistant message in the standard usage log format.
 """

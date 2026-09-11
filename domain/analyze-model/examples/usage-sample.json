@@ -1,14 +1,14 @@
 [
   {
     "timestamp": "2026-05-01T09:15:00Z",
-    "model_id": "anthropic/claude-sonnet-4-5",
+    "model_id": "deepseek/deepseek-v4-flash-0731",
     "input_tokens": 1850,
     "output_tokens": 720,
     "session_id": "session-001"
   },
   {
     "timestamp": "2026-05-01T10:30:00Z",
-    "model_id": "anthropic/claude-sonnet-4-5",
+    "model_id": "deepseek/deepseek-v4-flash-0731",
     "input_tokens": 3200,
     "output_tokens": 1100,
     "session_id": "session-001"
@@ -22,21 +22,21 @@
   },
   {
     "timestamp": "2026-05-02T14:00:00Z",
-    "model_id": "anthropic/claude-sonnet-4-5",
+    "model_id": "deepseek/deepseek-v4-flash-0731",
     "input_tokens": 1200,
     "output_tokens": 600,
     "session_id": "session-003"
   },
   {
     "timestamp": "2026-05-03T11:20:00Z",
-    "model_id": "openai/gpt-4o",
+    "model_id": "moonshotai/kimi-k3",
     "input_tokens": 900,
     "output_tokens": 400,
     "session_id": "session-004"
   },
   {
     "timestamp": "2026-05-03T15:45:00Z",
-    "model_id": "anthropic/claude-sonnet-4-5",
+    "model_id": "deepseek/deepseek-v4-flash-0731",
     "input_tokens": 4100,
     "output_tokens": 1800,
     "session_id": "session-004"
@@ -50,7 +50,7 @@
   },
   {
     "timestamp": "2026-05-05T10:15:00Z",
-    "model_id": "anthropic/claude-sonnet-4-5",
+    "model_id": "deepseek/deepseek-v4-flash-0731",
     "input_tokens": 1600,
     "output_tokens": 850,
     "session_id": "session-006"
@@ -64,7 +64,7 @@
   },
   {
     "timestamp": "2026-05-06T09:30:00Z",
-    "model_id": "anthropic/claude-sonnet-4-5",
+    "model_id": "deepseek/deepseek-v4-flash-0731",
     "input_tokens": 2200,
     "output_tokens": 980,
     "session_id": "session-008"

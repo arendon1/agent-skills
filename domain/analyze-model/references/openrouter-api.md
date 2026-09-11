@@ -68,17 +68,17 @@ All values are **USD per token**.
 cost = input_tokens * pricing.prompt + output_tokens * pricing.completion
 ```
 
-**Example (claude-sonnet):**
+**Example (deepseek-v4-flash-0731, $0.1399/M in · $0.2677/M out · $0.0024/M cached_read):**
 ```json
 {
-  "prompt": "0.000003",
-  "completion": "0.000015",
+  "prompt": "0.0000001399",
+  "completion": "0.0000002677",
   "request": "0",
-  "image": "0.0048",
+  "image": "0",
   "web_search": "0",
   "internal_reasoning": "0",
-  "input_cache_read": "0.0000003",
-  "input_cache_write": "0.00000375"
+  "input_cache_read": "0.0000000024",
+  "input_cache_write": "0.0000001399"
 }
 ```
 

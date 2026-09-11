@@ -37,7 +37,7 @@ def _build_aa_lookup(aa_models: list[dict]) -> dict:
         for key in [m.get("name", ""), m.get("slug", "")]:
             if key:
                 lookup[_normalize(key)] = m
-        # Also index by model_creator+name combo (e.g. "openai/o3-mini" -> "o3-mini")
+        # Also index by model_creator+name combo (e.g. "deepseek/deepseek-v4-flash-0731" -> "deepseek-v4-flash-0731")
         slug = m.get("slug", "")
         if "-" in slug:
             parts = slug.split("-")

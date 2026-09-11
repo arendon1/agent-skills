@@ -12,7 +12,7 @@ An array of call records:
 [
   {
     "timestamp": "2026-05-15T10:30:00Z",
-    "model_id": "anthropic/claude-sonnet-4-5",
+    "model_id": "deepseek/deepseek-v4-flash-0731",
     "input_tokens": 1500,
     "output_tokens": 800,
     "session_id": "optional-session-id",
@@ -58,9 +58,9 @@ Headers must include: `timestamp`, `model_id`, `input_tokens`, `output_tokens`.
 
 ```csv
 timestamp,model_id,input_tokens,output_tokens,session_id
-2026-05-15T10:30:00Z,anthropic/claude-sonnet-4-5,1500,800,session-001
+2026-05-15T10:30:00Z,deepseek/deepseek-v4-flash-0731,1500,800,session-001
 2026-05-15T11:00:00Z,google/gemini-2.5-pro,2200,1200,session-002
-2026-05-15T14:20:00Z,openai/gpt-4o,900,450,session-003
+2026-05-15T14:20:00Z,moonshotai/kimi-k3,900,450,session-003
 ```
 
 ---
@@ -100,7 +100,7 @@ for OpenCode Go subscription routes), fall back to the aliases in
 2. Use the date range filter
 3. Download CSV or copy the table
 
-Match exported `model` column values to OpenRouter model IDs (e.g., `claude-sonnet-4-5` -> `anthropic/claude-sonnet-4-5`).
+Match exported `model` column values to OpenRouter model IDs (e.g., `kimi-k3` -> `moonshotai/kimi-k3`).
 
 ### Custom Logging Snippet (Python)
 
@@ -132,12 +132,12 @@ Common examples:
 
 | Model | OpenRouter model_id |
 | ----- | ------------------- |
-| Claude Sonnet 4.5 | `anthropic/claude-sonnet-4-5` |
-| Claude 3.5 Sonnet | `anthropic/claude-3-5-sonnet` |
-| GPT-4o | `openai/gpt-4o` |
+| DeepSeek V4 Flash | `deepseek/deepseek-v4-flash-0731` |
+| DeepSeek V4 Pro | `deepseek/deepseek-v4-pro` |
+| Kimi K3 | `moonshotai/kimi-k3` |
+| GLM 5.3 Flash | `z-ai/glm-5.3-flash` |
+| MiniMax M3 | `minimax/minimax-m3` |
 | Gemini 2.5 Pro | `google/gemini-2.5-pro-preview` |
-| Llama 3.3 70B | `meta-llama/llama-3.3-70b-instruct` |
-| Deepseek R1 | `deepseek/deepseek-r1` |
 
 To verify IDs, run:
 ```bash

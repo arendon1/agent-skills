@@ -81,8 +81,6 @@ def _load_aliases() -> dict[str, str]:
 def _provider_for_model(model_id: str) -> str:
     if model_id.startswith("opencode-go/"):
         return "opencode-go"
-    if model_id.startswith("github-copilot/"):
-        return "github-copilot"
     return ""
 
 

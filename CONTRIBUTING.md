@@ -236,3 +236,52 @@ npx skills add <this-repo>
 That's the install path documented in `README.md`. This doc is for adding
 skills to the repo. See `AGENTS.md` for the rules, `skill-forge` for the
 enforcer, and `README.md` for the user-facing install.
+
+---
+
+## Source of truth — edit here, never in the deployed copy
+
+The skills your agent actually loads live in the harness directory (for pi:
+`~/.agents/skills/<skill>/`). **Those are deploys, not sources.** They are
+written by `npx skills add`, and the next deploy overwrites them wholesale — so
+any edit made there is one `npx skills add` away from being lost.
+
+```
+~/Documents/Projects/agent-skills/<layer>/<skill>/   ← SOURCE. Edit here.
+        │
+        │  npx skills add <this-repo> -g
+        ▼
+~/.agents/skills/<skill>/                            ← DEPLOY. Never edit.
+```
+
+The loop is always the same, in this order:
+
+1. Edit in the repo: `<layer>/<skill>/` where layer is `domain`, `process`,
+   `utility`, `adapters`, or `ops`.
+2. `git add` + commit (conventional commit).
+3. Deploy: `npx skills add <this-repo> -g`.
+4. Verify the deploy matches the source:
+
+   ```bash
+   diff -rq -x node_modules -x __pycache__ -x .venv \
+     ~/.agents/skills/<skill> <layer>/<skill>
+   ```
+
+**Why it matters — it already cost us.** Editing the deploy leaves work that is
+invisible to `git`. On 2026-09-11 an audit found three skills carrying
+uncommitted work that existed *only* in their deployed copies:
+
+| Skill | Work stranded in the deploy |
+|---|---|
+| `use-agy` | the v13.6 Claude veto (2026-09-02) — the repo still documented `claude-sonnet-4-6` as a normal path |
+| `check-subs` | the v13.10.3 `weekly`-window fix — the repo still carried the buggy version |
+| `analyze-model` | the github-copilot scope cut + alias updates |
+
+Three more (`research-literature`, `use-clickup`, `agents-pm`) had the opposite
+problem — stale deploys, with `agents-pm` still carrying a `scripts/watcher/`
+tree that the v2 rebuild had already dropped from the repo. Neither copy was a
+superset of the other, so recovery was a per-file merge with the direction
+decided file by file (deploy mtime vs the skill's last commit here).
+
+None of that would have been needed if the work had been committed where it
+belongs. **When in doubt, diff the deploy against the repo before any install.**

@@ -410,6 +410,7 @@ def main():
         if item["tipo"] in ("quiz", "assign", "forum", "lesson", "workshop") and fechas:
             item["fecha_apertura"] = fechas.get("fecha_apertura", "")
             item["fecha_cierre"] = fechas.get("fecha_cierre", "")
+            item["estado_entrega"] = fechas.get("estado_entrega", "Sin verificar")
 
     nueva_snapshot = {
         "actividades": {
@@ -419,6 +420,7 @@ def main():
                 "seccion": item["seccion"],
                 "fecha_apertura": item.get("fecha_apertura", ""),
                 "fecha_cierre": item.get("fecha_cierre", ""),
+                "estado_entrega": item.get("estado_entrega", "Sin verificar"),
             }
             for item in sidebar_actual
         }

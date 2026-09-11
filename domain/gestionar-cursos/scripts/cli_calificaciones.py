@@ -58,6 +58,46 @@ _CHROMEDRIVER = (
 )
 
 
+def _a_float(s) -> float | None:
+    """Convierte '4,80' / '4.80' / '80 %' → float. None si no es número."""
+    if s is None:
+        return None
+    if isinstance(s, (int, float)):
+        return float(s)
+    t = (
+        str(s)
+        .strip()
+        .replace(",", ".")
+        .replace("\u2013", "-")
+        .replace("\u2212", "-")
+        .replace("%", "")
+    ).strip()
+    # Si llegara un rango "0–5", nos quedamos con el tope.
+    t = t.split("-")[-1].strip()
+    if not t:
+        return None
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def _es_nota_aprobada(nota_str: str, rango_str: str) -> bool | None:
+    """Umbral de aprobación: nota/rango >= 60% (3/5).
+
+    Devuelve True/False si la nota es interpretable; None si no.
+    La fuente es la propia nota (NO el icono, que puede faltar si la
+    categoría no define umbral de aprobación).
+    """
+    nota = _a_float(nota_str)
+    if nota is None:
+        return None
+    rango = _a_float(rango_str)
+    if rango and rango > 0:
+        return nota / rango >= 0.6
+    return nota >= 3.0
+
+
 def _abrir_driver_cdp() -> "webdriver.Chrome":
     """Conecta Selenium a Chrome vía CDP localhost:9222.
 
@@ -183,18 +223,32 @@ def _parsear_gradebook(html: str) -> list[dict]:
                     .replace("Reprobado", "")
                     .strip()
                 )
-        if not grade_num or grade_num == "-":
-            grade_num = ""
-            estado = "Pendiente"
-        elif aprobado:
-            estado = "Aprobado"
-        elif reprobado:
-            estado = "Reprobado"
-        else:
-            estado = "Calificado"
+            else:
+                # Celda sin menú de acciones: la nota está como texto directo.
+                grade_num = grade_td.get_text(strip=True).strip()
 
         range_td = tr.find("td", class_="column-range")
         rango = range_td.get_text(strip=True) if range_td else ""
+
+        # --- Eje CALIFICACIÓN (estado_grado) ---
+        # Regla de aprobación: icono de Moodle (fa-check) O nota/rango >= 60% (3/5).
+        # Sin nota => "Sin nota" (nunca "Pendiente") — no se mezcla con la entrega.
+        if not grade_num or grade_num == "-":
+            grade_num = ""
+            estado_grado = "Sin nota"
+        else:
+            aprob_por_nota = _es_nota_aprobada(grade_num, rango)
+            if aprobado or aprob_por_nota is True:
+                estado_grado = "Aprobado"
+            elif reprobado or aprob_por_nota is False:
+                estado_grado = "Reprobado"
+            else:
+                estado_grado = "Calificado"
+
+        # --- Eje ENTREGA (estado_entrega) ---
+        # Nunca se infiere de la nota. Por defecto "Sin verificar"; la fase de
+        # SNAPSHOT (visita la página de la actividad) lo rellena con el real.
+        estado_entrega = "Sin verificar"
 
         pct_td = tr.find("td", class_="column-percentage")
         porcentaje = pct_td.get_text(strip=True) if pct_td else ""
@@ -223,7 +277,9 @@ def _parsear_gradebook(html: str) -> list[dict]:
             "rango": rango,
             "porcentaje": porcentaje,
             "aporte_curso": aporte_curso,
-            "estado": estado,
+            "estado": estado_grado,          # alias legado (estado de grado)
+            "estado_grado": estado_grado,     # eje calificación
+            "estado_entrega": estado_entrega, # eje entrega (nunca inferido de la nota)
             "feedback": feedback,
         })
     return items
@@ -234,7 +290,7 @@ def _seccion_md_calificacion(item: dict, courseid: str) -> str:
     if item["calificacion"]:
         nota_str = f'{item["calificacion"]} / {item["rango"]}'
     else:
-        nota_str = "— (sin entregar)"
+        nota_str = "— (sin nota)"
 
     lineas = [
         "",
@@ -243,7 +299,8 @@ def _seccion_md_calificacion(item: dict, courseid: str) -> str:
         "| Campo | Valor |",
         "|-------|-------|",
         f"| Nota | {nota_str} |",
-        f"| Estado | {item['estado']} |",
+        f"| Estado (grado) | {item.get('estado_grado', item.get('estado', 'Sin nota'))} |",
+        f"| Entrega | {item.get('estado_entrega', 'Sin verificar')} |",
         f"| Ponderación (categoría) | {item['ponderacion_pct'] or '—'} |",
         f"| Porcentaje sobre rango | {item['porcentaje'] or '—'} |",
         f"| Aporte al total del curso | {item['aporte_curso'] or '0,00 %'} |",
@@ -388,9 +445,21 @@ def _actualizar_snapshot(snapshot_path: str, items: list[dict]):
                 break
         if matched is None:
             continue
+        # Preferir la entrega REAL ya capturada por la fase snapshot, sobre el
+        # default "Sin verificar" del gradebook. Solo usar "Sin verificar" si no hay dato.
+        entrega_prev = actividades[matched].get("estado_entrega", "") or ""
+        entrega_item = item.get("estado_entrega", "") or ""
+        estado_entrega_final = (
+            entrega_item
+            if entrega_item and entrega_item != "Sin verificar"
+            else (entrega_prev or "Sin verificar")
+        )
+        actividades[matched]["estado_entrega"] = estado_entrega_final
         actividades[matched]["calificacion"] = {
             "nota": item["calificacion"] or None,
             "estado": item["estado"],
+            "estado_grado": item.get("estado_grado", item["estado"]),
+            "estado_entrega": estado_entrega_final,
             "rango": item["rango"],
             "porcentaje": item["porcentaje"],
             "aporte_curso": item["aporte_curso"],

@@ -129,6 +129,80 @@ def extraer_fechas_pagina(html: str) -> dict[str, str]:
     return fechas
 
 
+# Estados semánticos de la celda de estado del mod_assign (Moodle):
+#   submissionstatussubmitted / submissionstatusnotsubmitted /
+#   submissionstatusdraft / submissionstatusgraded / submissionstatusreopened
+_SUBMISSION_CLASS_SUBMITTED = ("submitted", "graded", "reopened")
+_SUBMISSION_TXT_SIN = ("sin entrega", "no entregado", "no ha entregado", "no enviado",
+                       "todavía no se han realizado envíos", "todavía no se ha entregado",
+                       "aún no se ha enviado", "aun no se ha enviado",
+                       "no se han realizado envíos", "no se ha entregado", "aún no se ha entregado")
+_SUBMISSION_TXT_ENTREGADO = ("enviado para calificar", "entregado", "calificado", "aceptado", "enviado")
+_QUIZ_TXT_SIN = ("sin intentos", "no hay intentos", "aún no has realizado", "aun no has realizado")
+_QUIZ_TXT_ENTREGADO = ("revisar intento", "continuar el último intento", "resultado del intento",
+                       "intento finalizado", "intento terminado", "intentos utilizados")
+
+
+def extraer_estado_entrega(html: str) -> str:
+    """Determina el estado de ENTREGA leyendo la PÁGINA de la actividad (assign/quiz).
+
+    NO se infiere desde la nota: lee la página. Devuelve:
+        "Entregado" | "Sin entrega" | "Borrador" | "Sin intentos" | "Sin verificar"
+
+    Prioridad:
+      1. mod_assign: la celda del estado lleva una clase semántica
+         (`submissionstatussubmitted`, `submissionstatusnotsubmitted`, `submissionstatusdraft`).
+      2. mod_quiz: región de intentos.
+      3. Contenedores de estado reconocidos (sin caer al texto plano, para no
+         disparar falsos positivos con "borrador"/"entregar" de la navegación).
+    """
+    soup = BeautifulSoup(html, "lxml")
+
+    def txt(node) -> str:
+        return (node.get_text(" ", strip=True) or "").lower()
+
+    # 1) mod_assign — celda semántica del estado
+    cell = soup.select_one("td[class*='submissionstatus']")
+    if cell is not None:
+        cls = " ".join(cell.get("class", []))
+        t = txt(cell)
+        if "notsubmitted" in cls or any(k in t for k in _SUBMISSION_TXT_SIN):
+            return "Sin entrega"
+        if "draft" in cls or "borrador" in t:
+            return "Borrador"
+        if any(k in cls for k in _SUBMISSION_CLASS_SUBMITTED) or any(k in t for k in _SUBMISSION_TXT_ENTREGADO):
+            return "Entregado"
+
+    # 2) mod_quiz — estado del intento en el contenido principal
+    #    (el quizinfo solo trae config: "Intentos permitidos", no el estado).
+    quiz = (
+        soup.select_one("#region-main, div[role='main'], .generalbox")
+        or soup.select_one("div[data-region='quizinfo'], table.quizinfo, div[class*='quizinfo']")
+    )
+    if quiz is not None:
+        t = txt(quiz)
+        if any(k in t for k in _QUIZ_TXT_SIN) or "sin intentos" in t or "no ha realizado" in t:
+            return "Sin intentos"
+        # AND protege de "Intentos permitidos" (contiene "intento" como subcadena).
+        if any(k in t for k in _QUIZ_TXT_ENTREGADO) or "sus intentos" in t or ("intento" in t and "finalizado" in t):
+            return "Entregado"
+
+    # 3) contenedores de estado de entrega reconocidos
+    for sel in ("div.submissionstatustable", "table.submissionstatustable",
+                "div[data-region='submissionstatus']", "#fitem_id_submissionstatussubmissionstatustbl"):
+        node = soup.select_one(sel)
+        if node is not None:
+            t = txt(node)
+            if any(k in t for k in _SUBMISSION_TXT_SIN):
+                return "Sin entrega"
+            if "borrador" in t:
+                return "Borrador"
+            if any(k in t for k in _SUBMISSION_TXT_ENTREGADO):
+                return "Entregado"
+
+    return "Sin verificar"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile-dir", "-p", default=None,
@@ -160,6 +234,7 @@ def main():
             navegador(url)
             html = get_page_content()
             fechas = extraer_fechas_pagina(html)
+            fechas["estado_entrega"] = extraer_estado_entrega(html)
             # Extraer key de URL
             from urllib.parse import urlparse
             parsed = urlparse(url)

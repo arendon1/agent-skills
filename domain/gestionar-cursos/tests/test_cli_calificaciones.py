@@ -236,3 +236,101 @@ def test_orden_persistencia_antes_de_resumen_b2(mock_rich_console, tmp_path, mon
     # El snapshot.json quedo actualizado
     snap = json.loads(snap_path.read_text(encoding="utf-8"))
     assert "calificaciones_capturadas" in snap
+
+
+def _html_gradebook_item(nombre, nota="", rango="0\u20135", icono="", url_id=9999):
+    """Construye una fila minimalista del gradebook de Moodle para tests de parseo."""
+    nota_cell = f'<div class="d-flex">{nota}</div>' if nota else ""
+    icono_cls = (
+        "fa-check text-success" if icono == "aprobado"
+        else "fa-remove text-danger" if icono == "reprobado"
+        else ""
+    )
+    icono_span = f'<span class="{icono_cls}"></span>' if icono_cls else ""
+    return (
+        "<tr>"
+        f'<th class="level3 item column-itemname" id="mod_quiz_{url_id}_row">'
+        f'<a class="gradeitemheader" href="https://moodle/mod/quiz/view.php?id={url_id}">{nombre}</a>'
+        '<span class="dimmed_text" title="Quiz">Quiz</span></th>'
+        '<td class="column-weight">10,00 %</td>'
+        f'<td class="column-grade">{icono_span}{nota_cell}</td>'
+        f'<td class="column-range">{rango}</td>'
+        '<td class="column-percentage"></td>'
+        '<td class="column-contributiontocoursetotal"></td>'
+        '<td class="column-feedback"></td>'
+        "</tr>"
+    )
+
+
+def test_parsear_gradebook_estado_aprobado_por_nota(mock_rich_console):
+    """Nota >= umbral (60% del rango) -> estado_grado Aprobado, aunque no haya icono."""
+    import cli_calificaciones
+
+    html = f'<table>{_html_gradebook_item("Quiz 1", nota="4,80", rango="0\u20135")}</table>'
+    items = cli_calificaciones._parsear_gradebook(html)
+    assert len(items) == 1
+    assert items[0]["estado_grado"] == "Aprobado"
+    assert items[0]["estado_entrega"] == "Sin verificar"
+
+
+def test_parsear_gradebook_estado_reprobado_por_nota(mock_rich_console):
+    """Nota < 60% del rango -> estado_grado Reprobado."""
+    import cli_calificaciones
+
+    html = f'<table>{_html_gradebook_item("Quiz 1", nota="2,00", rango="0\u20135")}</table>'
+    items = cli_calificaciones._parsear_gradebook(html)
+    assert items[0]["estado_grado"] == "Reprobado"
+
+
+def test_parsear_gradebook_estado_sin_nota(mock_rich_console):
+    """Sin nota -> estado_grado 'Sin nota' (no 'Pendiente' ni 'no entregado')."""
+    import cli_calificaciones
+
+    html = f'<table>{_html_gradebook_item("Tarea 1", nota="")}</table>'
+    items = cli_calificaciones._parsear_gradebook(html)
+    assert items[0]["estado_grado"] == "Sin nota"
+    assert items[0]["estado_entrega"] == "Sin verificar"
+
+
+def test_es_nota_aprobada_threshold(mock_rich_console):
+    """Umbral de aprobación: nota/rango >= 60%; sin rango -> nota >= 3.0."""
+    import cli_calificaciones
+
+    assert cli_calificaciones._es_nota_aprobada("4,80", "0\u20135") is True
+    assert cli_calificaciones._es_nota_aprobada("2,00", "0\u20135") is False
+    assert cli_calificaciones._es_nota_aprobada("3,00", "0\u20135") is True
+    assert cli_calificaciones._es_nota_aprobada("4,80", "") is True
+    assert cli_calificaciones._es_nota_aprobada("2,50", "") is False
+    assert cli_calificaciones._es_nota_aprobada("", "0\u20135") is None
+
+
+def test_actualizar_snapshot_mergea_estado_entrega(mock_rich_console, tmp_path):
+    """La fase snapshot (estado_entrega en la actividad) es preferida sobre
+    'Sin verificar' del gradebook."""
+    import cli_calificaciones
+
+    cache = tmp_path / "_cache"
+    cache.mkdir()
+    snap_path = cache / "snapshot.json"
+    snap_path.write_text(
+        json.dumps(
+            {
+                "actividades": {
+                    "Quiz 1 (https://moodle/mod/quiz/view.php?id=9999)": {
+                        "nombre": "Quiz 1",
+                        "estado_entrega": "Entregado",  # ya leído en la página
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    item = _make_item_pga("Quiz 1", mod_id="9999", estado="Sin nota")
+    cli_calificaciones._actualizar_snapshot(str(snap_path), [item])
+
+    snap = json.loads(snap_path.read_text(encoding="utf-8"))
+    act = next(iter(snap["actividades"].values()))
+    # Mantiene la entrega real de la fase snapshot, no la sobreescribe con Sin verificar.
+    assert act["calificacion"]["estado_entrega"] == "Entregado"
+    assert act["estado_entrega"] == "Entregado"

@@ -274,3 +274,140 @@ def test_sync_plan_to_create_tiene_due_date_ms(mock_rich_console, tmp_path):
     assert nueva["due_date_ms"] is not None
     assert isinstance(nueva["due_date_ms"], int)
     assert nueva["due_date_ms"] > 0
+
+
+# ---------------------------------------------------------------------------
+# _parsear_pga_md: cierre de in_table + fechas ISO 8601 (bugs de la semana
+# 2026-09-08: 15 to_create fantasma desde la tabla 'Tracking ClickUp' y
+# fecha_fin vacia por regex que exigia parentesis obligatorio).
+# ---------------------------------------------------------------------------
+
+def _pga_con_tracking(tmp_path) -> str:
+    """PGA.md estilo Humanidades 3: seccion Actividades + Tracking + Sesiones."""
+    pga = tmp_path / "PGA.md"
+    pga.write_text(
+        "# Plan de Gestión Académica\n"
+        "\n"
+        "## Actividades Evaluables\n"
+        "\n"
+        "| Semana | Unidad | Actividad | Valor | Fecha Inicio | Fecha Fin | Fuente |\n"
+        "|--------|--------|-----------|-------|--------------|-----------|--------|\n"
+        "| 1 | Unidad 1 | Prueba inicial | 0% | 2026-08-25T00:00 | 2026-08-30T23:59 | snapshot |\n"
+        "| 1 | Unidad 1 | Hablemos de comunicación (10%) | 10% | — | 2026-09-06T23:59 | snapshot |\n"
+        "| 2 | Unidad 2 | Registro de lectura (5%) | 5% | 2026-08-24 00:00 | (2026-09-13) | snapshot |\n"
+        "\n"
+        "## Tracking ClickUp — tareas evaluables\n"
+        "\n"
+        "| ClickUp ID | Tarea | Peso | Cierre (real) | Prioridad | Moodle ID |\n"
+        "|---|---|---|---|---|---|\n"
+        "| `wdqp10mgxf` | Prueba inicial (U1) | 0% (diag) | 2026-08-30T23:59 | — | 776105 |\n"
+        "| `wdqp10n52h` | **Ejercicio de Oralidad (U1)** | **5%** | **2026-09-06T23:59** | **urgent** | 776292 |\n"
+        "\n"
+        "## Sesiones Sincrónicas\n"
+        "\n"
+        "| Semana | Fecha | Hora | Enlace Teams |\n"
+        "|--------|------|------|--------------|\n"
+        "| 1 | 2026-08-27 | 07:30 PM | https://teams/1 |\n",
+        encoding="utf-8",
+    )
+    return str(pga)
+
+
+def test_parsear_pga_md_no_ingiere_tabla_tracking_clickup(tmp_path):
+    """Fix B1: in_table se cierra al salir de la seccion 'Actividades Evaluables'.
+
+    La tabla 'Tracking ClickUp' (y 'Sesiones Sincronicas') NO deben consumirse
+    como actividades: antes generaban 15 to_create fantasma con nombres de la
+    columna Peso ('Peso', '0% (diag)', '**5%**', ...).
+    """
+    from cli_clickup import _parsear_pga_md
+
+    acts = _parsear_pga_md(_pga_con_tracking(tmp_path))
+
+    nombres = [a["actividad"] for a in acts]
+    assert nombres == [
+        "Prueba inicial",
+        "Hablemos de comunicación (10%)",
+        "Registro de lectura (5%)",
+    ]
+    # Cero fantasmas de la tabla Tracking ni de Sesiones
+    for ghost in ("Peso", "0% (diag)", "**5%**", "ClickUp ID", "Tarea", "Fecha"):
+        assert ghost not in nombres, f"Fantasmas de Tracking/Sesiones: {ghost}"
+    # La tabla de Sesiones tiene header '| Semana | ...' pero 4 columnas:
+    # NO debe abrir captura nueva.
+    assert len(acts) == 3
+
+
+def test_parsear_pga_md_parsea_fechas_iso_8601(tmp_path):
+    """Fix B2: fechas ISO 8601 con/sin tiempo y con/sin parentesis.
+
+    El regex viejo exigia '(YYYY-MM-DD)' con parentesis -> fecha_fin quedaba
+    vacia en filas con '2026-08-30T23:59' (ISO 8601 crudo).
+    """
+    from cli_clickup import _extraer_fecha_iso, _parsear_pga_md
+
+    # Formato directo de la celda -> valor ISO extraido
+    assert _extraer_fecha_iso("2026-08-30T23:59") == "2026-08-30T23:59"
+    assert _extraer_fecha_iso("2026-08-24 00:00") == "2026-08-24 00:00"
+    assert _extraer_fecha_iso("(2026-09-13)") == "2026-09-13"
+    assert _extraer_fecha_iso("2026-08-25") == "2026-08-25"
+    assert _extraer_fecha_iso("2026-08-30T23:59 (2026-08-30)") == "2026-08-30T23:59"
+    # Legacy del generador viejo: 'raw (iso)'
+    assert _extraer_fecha_iso("06/07/2026 (2026-07-06)") == "2026-07-06"
+    # Vacio / sentinelas
+    assert _extraer_fecha_iso("") == ""
+    assert _extraer_fecha_iso("—") == ""
+    assert _extraer_fecha_iso("-") == ""
+
+    # Integracion: filas del PGA regenerado -> fechas pobladas
+    acts = _parsear_pga_md(_pga_con_tracking(tmp_path))
+    assert acts[0]["fecha_inicio"] == "2026-08-25T00:00"
+    assert acts[0]["fecha_fin"] == "2026-08-30T23:59"
+    assert acts[1]["fecha_inicio"] == ""  # '—'
+    assert acts[1]["fecha_fin"] == "2026-09-06T23:59"
+    assert acts[2]["fecha_inicio"] == "2026-08-24 00:00"
+    assert acts[2]["fecha_fin"] == "2026-09-13"
+
+
+def test_parsear_pga_md_pga_legado_sin_secciones(tmp_path):
+    """PGAs legados (tabla directa bajo el titulo, sin '##') siguen parseando."""
+    from cli_clickup import _parsear_pga_md
+
+    pga = tmp_path / "PGA.md"
+    pga.write_text(
+        "# Plan de Gestión Académica\n"
+        "\n"
+        "| Semana | Unidad | Actividad | Valor | Fecha Inicio | Fecha Fin |\n"
+        "|--------|--------|-----------|-------|--------------|-----------|\n"
+        "| 1 | 1 | Quiz 1 | 5% | (2026-07-01) | (2026-07-15) |\n",
+        encoding="utf-8",
+    )
+    acts = _parsear_pga_md(str(pga))
+    assert [a["actividad"] for a in acts] == ["Quiz 1"]
+    assert acts[0]["fecha_inicio"] == "2026-07-01"
+    assert acts[0]["fecha_fin"] == "2026-07-15"
+
+
+def test_sync_plan_no_crea_ghosts_desde_tracking_clickup(mock_rich_console, tmp_path):
+    """Regresion de extremo a extremo: sync_clickup NO emite to_create fantasma."""
+    from cli_clickup import sync_clickup
+
+    periodo = _build_periodo_fake(tmp_path)
+    # Reemplazar PGA generico por uno con tracking/sesiones (estilo Humanidades)
+    pga_con_tracking = _pga_con_tracking(tmp_path)
+    with open(pga_con_tracking, encoding="utf-8") as f:
+        pga_content = f.read()
+    _write(str(periodo / "2607B04G1-fake" / "PGA.md"), pga_content)
+
+    sync_clickup(str(periodo), dry_run=False)
+    plan = json.loads((periodo / "sync_plan.json").read_text(encoding="utf-8"))
+
+    nombres_create = [c["name"] for c in plan["to_create"]]
+    # Las 3 de la seccion Actividades van a to_create (no existen en tasks)
+    assert "Prueba inicial" in nombres_create
+    assert "Hablemos de comunicación (10%)" in nombres_create
+    assert "Registro de lectura (5%)" in nombres_create
+    # Cero nombres basura de la tabla Tracking / Sesiones
+    for ghost in ("Peso", "0% (diag)", "**5%**", "ClickUp ID", "Ejercicio de Oralidad (U1)"):
+        assert not any(ghost in n for n in nombres_create), f"Ghost en to_create: {ghost}"
+    assert len(nombres_create) == 3

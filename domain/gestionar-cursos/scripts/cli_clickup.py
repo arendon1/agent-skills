@@ -127,8 +127,37 @@ def _normalizar_nombre(nombre: str) -> str:
     return re.sub(r"\s*\([^)]*%[^)]*\)\s*$", "", nombre).strip()
 
 
+_RE_HEADING_ACTIVIDADES = re.compile(r"activid|do-fr-66", re.IGNORECASE)
+# Fechas ISO reales del PGA: '2026-08-30' (sola), '2026-08-30T23:59'
+# (ISO 8601 con tiempo), '2026-08-30 23:59' (con espacio, sin parens) y
+# el legacy '(2026-08-30)' con parentesis obligatorio del generador viejo.
+_RE_FECHA_ISO = re.compile(
+    r"\(?\b(\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?)\b\)?"
+)
+
+
+def _extraer_fecha_iso(celda: str) -> str:
+    """Extrae fecha ISO de una celda de fecha del PGA.
+
+    El PGA regenerado escribe fechas ISO 8601 crudas ('2026-08-30T23:59');
+    el generador viejo escribia '(YYYY-MM-DD)' con parentesis. Devuelve ''
+    si la celda esta vacia ('—' / '-') o no contiene fecha.
+    """
+    if not celda:
+        return ""
+    m = _RE_FECHA_ISO.search(celda)
+    return m.group(1) if m else ""
+
+
 def _parsear_pga_md(pga_path: str) -> list[dict]:
-    """Parse PGA.md table into list of activity dicts."""
+    """Parse PGA.md table into list of activity dicts.
+
+    Solo se consume la tabla DO-FR-66 ('Actividades Evaluables'). Al llegar a
+    una NUEVA seccion markdown ('##') la captura se cierra (in_table=False):
+    las tablas posteriores (Tracking ClickUp, Sesiones Sincronicas, Leyenda)
+    NO se ingieren como actividades fantasmas. PGAs legados sin seccion
+    (tabla directa bajo el titulo '#') se siguen parseando.
+    """
     if not os.path.isfile(pga_path):
         return []
     with open(pga_path, encoding="utf-8") as f:
@@ -136,7 +165,23 @@ def _parsear_pga_md(pga_path: str) -> list[dict]:
 
     actividades = []
     in_table = False
+    # None = sin seccion definida (tabla legada). True = dentro de la seccion
+    # de actividades. False = seccion cerrada, no capturar mas.
+    seccion_actividades = None
     for line in content.split("\n"):
+        if line.startswith("#"):
+            # Nueva seccion: SIEMPRE cierra la tabla en curso.
+            in_table = False
+            if _RE_HEADING_ACTIVIDADES.search(line):
+                seccion_actividades = True
+            elif line.startswith("# "):
+                # Titulo del documento: no cierra captura (PGAs legados).
+                continue
+            else:
+                seccion_actividades = False
+            continue
+        if seccion_actividades is False:
+            continue
         if line.startswith("| Semana |") or line.startswith("| Semana  |"):
             in_table = True
             continue
@@ -145,23 +190,13 @@ def _parsear_pga_md(pga_path: str) -> list[dict]:
         if in_table and line.startswith("|"):
             parts = [p.strip() for p in line.split("|")[1:-1]]
             if len(parts) >= 6:
-                fecha_fin_raw = parts[5]
-                fecha_inicio_iso = ""
-                fecha_fin_iso = ""
-                m = re.search(r"\((\d{4}-\d{2}-\d{2})\)", fecha_fin_raw)
-                if m:
-                    fecha_fin_iso = m.group(1)
-                m = re.search(r"\((\d{4}-\d{2}-\d{2})\)", parts[4])
-                if m:
-                    fecha_inicio_iso = m.group(1)
-
                 actividades.append({
                     "semana": parts[0],
                     "unidad": parts[1],
                     "actividad": parts[2],
                     "valor": parts[3],
-                    "fecha_inicio": fecha_inicio_iso,
-                    "fecha_fin": fecha_fin_iso,
+                    "fecha_inicio": _extraer_fecha_iso(parts[4]),
+                    "fecha_fin": _extraer_fecha_iso(parts[5]),
                 })
     return actividades
 

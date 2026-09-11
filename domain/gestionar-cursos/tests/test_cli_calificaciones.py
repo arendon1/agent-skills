@@ -327,13 +327,16 @@ def test_actualizar_snapshot_mergea_estado_entrega(mock_rich_console, tmp_path):
     )
 
     item = _make_item_pga("Quiz 1", mod_id="9999", estado="Sin nota")
-    cli_calificaciones._actualizar_snapshot(str(snap_path), [item])
+    resumen = cli_calificaciones._actualizar_snapshot(str(snap_path), [item])
 
     snap = json.loads(snap_path.read_text(encoding="utf-8"))
     act = next(iter(snap["actividades"].values()))
     # Mantiene la entrega real de la fase snapshot, no la sobreescribe con Sin verificar.
     assert act["calificacion"]["estado_entrega"] == "Entregado"
     assert act["estado_entrega"] == "Entregado"
+    # Devuelve el estado real por actividad, para que los .md lo reflejen.
+    assert resumen["Quiz 1"]["estado_entrega"] == "Entregado"
+    assert resumen["Quiz 1"]["estado_final"] == "Entregado (sin calificar)"
 
 
 def test_derivar_estado_final_matriz(mock_rich_console):

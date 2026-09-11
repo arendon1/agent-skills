@@ -363,11 +363,29 @@ def _parsear_gradebook(html: str) -> list[dict]:
 
 
 def _seccion_md_calificacion(item: dict, courseid: str) -> str:
-    """Genera la sección markdown '## Calificación' para el .md de la actividad."""
-    if item["calificacion"]:
-        nota_str = f'{item["calificacion"]} / {item["rango"]}'
-    else:
-        nota_str = "— (sin nota)"
+    """Genera la sección markdown '## Calificación' con el ESTADO REAL.
+
+    Muestra el estado de entrega y el estado final (derivado de grado + entrega
+    + fecha de cierre) cuando están disponibles (se mergean desde la fase
+    snapshot). Cuando NO se pudo derivar (falta fecha de cierre o nota que decida),
+    agrega una ACLARACIÓN explícita — nunca inventa el estado.
+    """
+    tiene_nota = bool(item.get("calificacion"))
+    nota_str = (
+        f'{item["calificacion"]} / {item.get("rango")}'
+        if tiene_nota
+        else "— (sin nota)"
+    )
+
+    estado_grado = item.get("estado_grado", item.get("estado", "Sin nota"))
+    estado_entrega = item.get("estado_entrega", "Sin verificar")
+    estado_final = item.get("estado_final")
+    fecha_cierre = item.get("fecha_cierre", "")
+    peso_nombre = item.get("peso_nombre")
+    aporta_nota = item.get("aporta_nota", True)
+
+    # estado_final es fiable solo si hay nota (el grado decide) o fecha de cierre.
+    estado_final_visible = estado_final if (tiene_nota or fecha_cierre) else None
 
     lineas = [
         "",
@@ -376,14 +394,33 @@ def _seccion_md_calificacion(item: dict, courseid: str) -> str:
         "| Campo | Valor |",
         "|-------|-------|",
         f"| Nota | {nota_str} |",
-        f"| Estado (grado) | {item.get('estado_grado', item.get('estado', 'Sin nota'))} |",
-        f"| Entrega | {item.get('estado_entrega', 'Sin verificar')} |",
-        f"| Ponderación (categoría) | {item['ponderacion_pct'] or '—'} |",
-        f"| Porcentaje sobre rango | {item['porcentaje'] or '—'} |",
-        f"| Aporte al total del curso | {item['aporte_curso'] or '0,00 %'} |",
+        f"| Estado (grado) | {estado_grado} |",
+        f"| Entrega | {estado_entrega} |",
     ]
-    if item["feedback"]:
+    if fecha_cierre:
+        lineas.append(f"| Cierre | {fecha_cierre} |")
+    if estado_final_visible:
+        lineas.append(f"| Estado final | {estado_final_visible} |")
+    if peso_nombre is not None:
+        lineas.append(f"| Peso real | {peso_nombre:g}% |")
+    lineas += [
+        f"| Ponderación (categoría) | {item.get('ponderacion_pct') or '—'} |",
+        f"| Porcentaje sobre rango | {item.get('porcentaje') or '—'} |",
+        f"| Aporte al total del curso | {item.get('aporte_curso') or '0,00 %'} |",
+    ]
+    if item.get("feedback"):
         lineas += ["", f"> **Retroalimentación del docente:** {item['feedback']}"]
+
+    # Aclaraciones: cuando no se pudo reflejar el estado real, se dice.
+    if not aporta_nota:
+        lineas += ["", "> ℹ️ **No aporta nota** (ponderación 0% o módulo de contenido)."]
+    if not estado_final_visible and not tiene_nota:
+        lineas += ["", "> ⚠️ **Estado final no derivado:** falta fecha de cierre (o nota que decida)"
+                   " para saber si venció. Revisar la actividad en Moodle."]
+    elif estado_final_visible and not tiene_nota and estado_entrega == "Sin verificar":
+        lineas += ["", "> ⚠️ **Entrega sin verificar:** el gradebook no mide entrega; se lee de la "
+                   "página de la actividad en la fase de snapshot. Si persiste, revisar en Moodle."]
+
     lineas += [
         "",
         f"_Fuente: [Gradebook del curso](https://aulavirtual.uniremington.edu.co/grade/report/user/index.php?id={courseid}) — capturado {datetime.now().strftime('%Y-%m-%d %H:%M')}_",
@@ -509,6 +546,7 @@ def _actualizar_snapshot(snapshot_path: str, items: list[dict]):
 
     actividades = snapshot.get("actividades", {})
     ahora = datetime.now().isoformat()
+    resumen_estados = {}
 
     for item in items:
         mod_id = item["mod_id"]
@@ -560,10 +598,19 @@ def _actualizar_snapshot(snapshot_path: str, items: list[dict]):
         actividades[matched]["peso_nombre"] = item.get("peso_nombre")
         actividades[matched]["calificacion"]["aporta_nota"] = item.get("aporta_nota", True)
         actividades[matched]["calificacion"]["peso_nombre"] = item.get("peso_nombre")
+        # Estado real por actividad (mergeado), para que los .md lo reflejen.
+        resumen_estados[item["nombre"].strip()] = {
+            "estado_entrega": estado_entrega_final,
+            "estado_final": estado_final,
+            "fecha_cierre": fecha_cierre_act,
+            "aporta_nota": item.get("aporta_nota", True),
+            "peso_nombre": item.get("peso_nombre"),
+        }
 
     snapshot["calificaciones_capturadas"] = ahora
     with open(snapshot_path, "w", encoding="utf-8") as f:
         json.dump(snapshot, f, indent=2, ensure_ascii=False)
+    return resumen_estados
 
 
 def _imprimir_resumen(items: list[dict]):
@@ -674,7 +721,17 @@ def main():
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(items, f, indent=2, ensure_ascii=False)
 
-            # Actualizar .md de actividades
+            # Actualizar snapshot PRIMERO: mergea la entrega real (fase snapshot)
+            # y deriva el estado_final. Devuelve el estado real por actividad.
+            snap_path = os.path.join(cache_dir, "snapshot.json")
+            mejores = {}
+            if os.path.isfile(snap_path):
+                mejores = _actualizar_snapshot(snap_path, items)
+                console.print(f"[green]✓[/green] snapshot.json actualizado")
+            else:
+                console.print(f"[yellow]⚠ No se encontró snapshot.json[/yellow]")
+
+            # Actualizar .md de actividades con el ESTADO REAL (entrega + estado_final).
             actualizados = 0
             for item in items:
                 md_path = _encontrar_md_para_item(ruta_curso, item)
@@ -683,17 +740,10 @@ def main():
                         f"  [yellow]⚠ No se encontró .md para:[/yellow] {item['nombre']}"
                     )
                     continue
-                _actualizar_md_actividad(md_path, item, courseid)
+                enriquecido = {**item, **(mejores.get(item["nombre"].strip(), {}))}
+                _actualizar_md_actividad(md_path, enriquecido, courseid)
                 actualizados += 1
             console.print(f"\n[green]✓[/green] {actualizados} archivos .md actualizados")
-
-            # Actualizar snapshot
-            snap_path = os.path.join(cache_dir, "snapshot.json")
-            if os.path.isfile(snap_path):
-                _actualizar_snapshot(snap_path, items)
-                console.print(f"[green]✓[/green] snapshot.json actualizado")
-            else:
-                console.print(f"[yellow]⚠ No se encontró snapshot.json[/yellow]")
 
         try:
             _imprimir_resumen(items)

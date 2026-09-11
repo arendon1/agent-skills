@@ -49,8 +49,13 @@ El skill detecta automáticamente qué herramienta de navegación está disponib
 
 Cuando se ejecuta desde terminal (sin agente IDE):
 
-- Se conecta a Chrome vía **CDP** (`localhost:9222`)
-- Si Chrome no está abierto con `--remote-debugging-port=9222`, se lanza automáticamente una instancia visible
+- Se conecta a Chrome vía **CDP**, resolviendo el puerto **por perfil**: se descubre
+  qué perfil sirve cada endpoint vivo del rango 9222-9239 y se usa el puerto de
+  `~/.agents/.browserdata`. El puerto puede variar; el perfil no.
+- Si el perfil autorizado no está vivo, se lanza Chrome automáticamente con él
+  en el primer puerto libre (instancia visible)
+- **Guard**: nunca se attacha a un endpoint cuyo perfil no esté en la allowlist
+  (`~/.agents/.browserdata`, `~/.agents/.browserdata-globant`)
 - El usuario inicia sesión en Moodle en esa ventana
 - El script espera y continúa la extracción automáticamente
 

@@ -1,10 +1,14 @@
 """
 Navegador via Chrome DevTools Protocol (CDP).
 
-Estrategia:
-1. Intentar conectar a Chrome existente en localhost:9222
-2. Si no disponible, lanzar Chrome nuevo con --remote-debugging-port=9222
-3. Usar Selenium con debuggerAddress para controlar la instancia
+Estrategia (anclada al PERFIL, no al puerto):
+1. Descubrir qué perfil Chrome sirve cada endpoint CDP vivo del rango de
+   puertos — preguntándole al propio endpoint (Browser.getBrowserCommandLine,
+   con fallback al listener del SO).
+2. Si el perfil autorizado ya está vivo, conectarse a SU puerto.
+3. Si no, lanzar Chrome con ese perfil en el primer puerto libre.
+4. Verificar el amarre perfil<->puerto ANTES de attachar: nunca operar un
+   perfil fuera de la allowlist de ~/.agents/.
 
 Ventaja: el usuario puede tener sesión activa en Chrome.
 El script se conecta a esa instancia y navega automáticamente.
@@ -28,7 +32,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 console = Console()
 
-CDP_PORT = 9222
 CHROME_PATHS = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -36,19 +39,102 @@ CHROME_PATHS = [
     r"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ]
 
+# --- Identidad: el PERFIL, no el puerto ----------------------------------
+# El puerto es efímero (puede variar según disponibilidad); el perfil no.
+# Por eso la heurística se ancla SIEMPRE al perfil al que está amarrado cada
+# puerto: se descubren los endpoints CDP, se le pregunta a cada uno qué perfil
+# usa, y se resuelve perfil -> puerto. Nunca se asume que un número de puerto
+# corresponde a un perfil.
+#
+# Política de Andrés (2026-09-11): solo dos perfiles Chrome autorizados para
+# agentes, y ambos viven exclusivamente dentro de ~/.agents/.
+PROFILE_MOODLE = "~/.agents/.browserdata"
+PROFILE_GLOBANT = "~/.agents/.browserdata-globant"
+AUTHORIZED_PROFILES = (PROFILE_MOODLE, PROFILE_GLOBANT)
+CANONICAL_PROFILE_DIR = os.path.expanduser(PROFILE_MOODLE)
+
+# Rango donde se descubren/abren endpoints CDP. NO es un mapa puerto->perfil.
+CDP_PORT_RANGE = range(9222, 9240)
+
+# Perfiles EFÍMEROS de prueba: viven en /tmp, son de un solo uso, NO se
+# persisten ni se adoptan como perfil de agente.
+# OJO: el navegador interno de cmux es una **WKWebView**, no un proceso Chrome:
+# no abre puerto CDP y por eso NUNCA aparece en este inventario. Los
+# /tmp/cmux-chrome-<proyecto>-<epoch> son Chrome de prueba lanzados a través
+# de cmux, no su navegador interno.
+PREFIJOS_EFIMEROS = ("cmux-chrome-",)
+
 _driver = None
 _cdp_launched_by_us = False
 _profile_dir = None  # Se configura antes de _launch_chrome_cdp()
-# Perfil canónico ÚNICO para agentes — una sola sesión de navegación (evita
-# crear un `.browserdata` por directorio/curso y por tanto un login Moodle distinto).
-CANONICAL_PROFILE_DIR = os.path.expanduser("~/.agents/.browserdata")
+_puerto_activo = None  # Puerto resuelto para el perfil actual
+
+
+def _normalize_profile(path: str) -> str:
+    """Ruta absoluta y sin symlinks — la forma estable de comparar perfiles."""
+    return os.path.realpath(os.path.expanduser(str(path)))
+
+
+def _authorized_dirs() -> set:
+    return {_normalize_profile(p) for p in AUTHORIZED_PROFILES}
+
+
+def is_authorized(path: str) -> bool:
+    """True si `path` es uno de los perfiles autorizados."""
+    return _normalize_profile(path) in _authorized_dirs()
+
+
+def clasificar_perfil(path: str) -> str:
+    """Clase de un perfil descubierto: 'autorizado' | 'efimero' | 'desconocido'.
+
+    El navegador interno de cmux no entra en esta clasificación: es una
+    WKWebView, no publica CDP. Un 'efimero' es un Chrome de prueba en /tmp —
+    se ignora y no se persiste.
+    """
+    if is_authorized(path):
+        return "autorizado"
+    base = os.path.basename(_normalize_profile(path))
+    if base.startswith(PREFIJOS_EFIMEROS):
+        return "efimero"
+    return "desconocido"
+
+
+def _sugerencia_perfil(path: str) -> str | None:
+    """Si `path` parece un perfil autorizado mal ubicado, sugiere la buena."""
+    base = os.path.basename(_normalize_profile(path))
+    for autorizado in AUTHORIZED_PROFILES:
+        if os.path.basename(_normalize_profile(autorizado)) == base:
+            return autorizado
+    return None
+
+
+def _assert_authorized(path: str) -> str:
+    """Valida contra la allowlist y devuelve la ruta normalizada.
+
+    El error es accionable a propósito: no solo bloquea, dice dónde vive el
+    perfil que probablemente se quería usar."""
+    norm = _normalize_profile(path)
+    if norm not in _authorized_dirs():
+        sugerencia = _sugerencia_perfil(path)
+        extra = (
+            f"\n¿Querías decir {sugerencia}? Todo perfil de agente vive en ~/.agents/."
+            if sugerencia
+            else ""
+        )
+        raise ValueError(
+            f"Perfil Chrome NO autorizado: {path}\n"
+            "Solo se permite operar por CDP con estos perfiles: "
+            + ", ".join(AUTHORIZED_PROFILES)
+            + extra
+        )
+    return norm
 
 
 def set_profile_dir(path: str):
-    """Establece directorio persistente para perfil de Chrome (cookies, sesiones).
-    Crea el directorio si no existe (canónico o el pasado)."""
+    """Establece el perfil de Chrome (validado contra la allowlist).
+    La ruta debe ser uno de los perfiles autorizados dentro de ~/.agents/."""
     global _profile_dir
-    _profile_dir = os.path.abspath(path)
+    _profile_dir = _assert_authorized(path)
     os.makedirs(_profile_dir, exist_ok=True)
 
 
@@ -77,10 +163,160 @@ def _is_port_open(host: str, port: int) -> bool:
         return False
 
 
-def _launch_chrome_cdp() -> str:
-    """Lanza Chrome con puerto de debugging remoto.
-    Usa perfil persistente en el workspace para mantener sesiones."""
-    global _cdp_launched_by_us
+# --- Descubrimiento: ¿qué perfil está amarrado a este puerto? -------------
+
+def _cdp_version(port: int, timeout: float = 1.0) -> dict:
+    """GET /json/version del endpoint CDP en `port`."""
+    import json as _json
+    import urllib.request
+
+    with urllib.request.urlopen(
+        f"http://127.0.0.1:{port}/json/version", timeout=timeout
+    ) as resp:
+        return _json.loads(resp.read().decode("utf-8", "replace"))
+
+
+def _user_data_dir_de(args) -> str | None:
+    """Extrae --user-data-dir de una lista de argumentos de Chrome."""
+    for arg in args or []:
+        if isinstance(arg, str) and arg.startswith("--user-data-dir="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def _user_data_dir_via_cdp(ws_url: str) -> str | None:
+    """El endpoint se autodescribe: Browser.getBrowserCommandLine."""
+    import json as _json
+
+    import websocket
+
+    conn = websocket.create_connection(ws_url, timeout=3, suppress_origin=True)
+    try:
+        conn.send(_json.dumps({"id": 1, "method": "Browser.getBrowserCommandLine"}))
+        for _ in range(10):
+            msg = _json.loads(conn.recv())
+            if msg.get("id") == 1:
+                return _user_data_dir_de((msg.get("result") or {}).get("arguments"))
+    finally:
+        conn.close()
+    return None
+
+
+def _user_data_dir_del_listener(port: int) -> str | None:
+    """Fallback sin CDP: preguntar al SO qué proceso escucha en el puerto."""
+    try:
+        out = subprocess.run(
+            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fp"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    for line in out.splitlines():
+        if not line.startswith("p"):
+            continue
+        pid = line[1:].strip()
+        try:
+            cmd = subprocess.run(
+                ["ps", "-o", "command=", "-p", pid],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            continue
+        encontrado = _user_data_dir_de(re.findall(r"--user-data-dir=\S+", cmd))
+        if encontrado:
+            return encontrado
+    return None
+
+
+def perfil_de_puerto(port: int) -> str | None:
+    """Perfil Chrome amarrado a `port`, o None si no hay endpoint CDP ahí."""
+    try:
+        version = _cdp_version(port)
+    except Exception:
+        return None
+
+    ws_url = version.get("webSocketDebuggerUrl")
+    if ws_url:
+        try:
+            perfil = _user_data_dir_via_cdp(ws_url)
+            if perfil:
+                return perfil
+        except Exception:
+            pass
+
+    return _user_data_dir_del_listener(port)
+
+
+def inventario_cdp(puertos=None) -> list:
+    """Topología CDP viva: [{'puerto', 'perfil', 'clase'}]. Solo lectura."""
+    filas = []
+    for port in (CDP_PORT_RANGE if puertos is None else puertos):
+        perfil = perfil_de_puerto(port)
+        if perfil:
+            filas.append({
+                "puerto": port,
+                "perfil": _normalize_profile(perfil),
+                "clase": clasificar_perfil(perfil),
+            })
+    return filas
+
+
+def descubrir_perfiles(puertos=None) -> dict:
+    """{perfil_normalizado: puerto} para cada endpoint CDP vivo del rango."""
+    return {fila["perfil"]: fila["puerto"] for fila in inventario_cdp(puertos)}
+
+
+def _reportar_endpoints_ajenos(filas) -> None:
+    """Nombra lo que NO nos pertenece: efímero de prueba vs. desconocido."""
+    for fila in filas:
+        clase = fila["clase"]
+        if clase == "autorizado":
+            continue
+        if clase == "efimero":
+            console.print(
+                f"[dim]· CDP :{fila['puerto']} → perfil efímero de prueba "
+                f"({fila['perfil']}) — ignorado, no se persiste.[/dim]"
+            )
+        else:
+            console.print(
+                f"[yellow]⚠[/yellow] CDP :{fila['puerto']} usa un perfil fuera de la "
+                f"allowlist ({fila['perfil']}) — ignorado."
+            )
+
+
+def puerto_para_perfil(profile: str) -> int | None:
+    """Puerto donde vive ESTE perfil, sea cual sea el número que tenga.
+
+    Nombra lo ajeno sin tocarlo (p. ej. un Chrome de prueba efímero en /tmp)
+    y sigue con el perfil autorizado. El navegador interno de cmux es una
+    WKWebView: no publica CDP, así que no interfiere."""
+    objetivo = _assert_authorized(profile)
+    filas = inventario_cdp()
+    _reportar_endpoints_ajenos(filas)
+
+    for fila in filas:
+        if fila["perfil"] == objetivo:
+            return fila["puerto"]
+    return None
+
+
+def _puerto_libre() -> int:
+    """Primer puerto del rango sin listener."""
+    for port in CDP_PORT_RANGE:
+        if not _is_port_open("localhost", port):
+            return port
+    raise RuntimeError(
+        f"No hay puertos libres para CDP en el rango "
+        f"{CDP_PORT_RANGE.start}-{CDP_PORT_RANGE.stop - 1}."
+    )
+
+
+def _launch_chrome_cdp(puerto: int | None = None) -> int:
+    """Lanza Chrome con CDP usando el perfil autorizado.
+    Devuelve el puerto efectivamente usado (varía según disponibilidad)."""
+    global _cdp_launched_by_us, _puerto_activo
+
     chrome_path = _find_chrome()
     if not chrome_path:
         raise RuntimeError(
@@ -88,15 +324,17 @@ def _launch_chrome_cdp() -> str:
             "Instálalo o define la ruta en CHROME_PATHS."
         )
 
-    user_data_dir = get_profile_dir()
+    user_data_dir = _assert_authorized(get_profile_dir())
     os.makedirs(user_data_dir, exist_ok=True)
 
     # Limpiar lock files de sesiones previas crash/crash
     _cleanup_chrome_locks(user_data_dir)
 
+    port = _puerto_libre() if puerto is None else puerto
+
     cmd = [
         chrome_path,
-        f"--remote-debugging-port={CDP_PORT}",
+        f"--remote-debugging-port={port}",
         f"--user-data-dir={user_data_dir}",
         "--no-first-run",
         "--no-default-browser-check",
@@ -104,11 +342,13 @@ def _launch_chrome_cdp() -> str:
     ]
 
     console.print(f"[dim][CDP] Lanzando Chrome:[/dim] {chrome_path}")
-    console.print(f"[dim][CDP] Perfil persistente:[/dim] {user_data_dir}")
+    console.print(f"[dim][CDP] Perfil autorizado:[/dim] {user_data_dir}")
+    console.print(f"[dim][CDP] Puerto:[/dim] {port}")
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     _cdp_launched_by_us = True
+    _puerto_activo = port
     time.sleep(3)  # Esperar arranque
-    return chrome_path
+    return port
 
 
 def _cleanup_chrome_locks(profile_dir: str):
@@ -123,23 +363,51 @@ def _cleanup_chrome_locks(profile_dir: str):
 
 
 def _conectar_driver():
-    """Conecta Selenium a Chrome via CDP."""
-    global _driver
+    """Conecta Selenium al Chrome que sirve al PERFIL configurado.
+
+    El puerto se resuelve por descubrimiento (perfil -> puerto), nunca al
+    revés: si el perfil ya está vivo en cualquier puerto del rango, se usa
+    ése; si no, se abre uno propio en un puerto libre."""
+    global _driver, _puerto_activo
     if _driver is not None:
         return _driver
 
-    if not _is_port_open("localhost", CDP_PORT):
-        _launch_chrome_cdp()
-        # Esperar a que el puerto esté disponible
+    perfil = _assert_authorized(get_profile_dir())
+
+    # 1) Puerto memorizado, si todavía sirve a ESTE perfil.
+    puerto = _puerto_activo
+    if puerto is not None:
+        vivo = perfil_de_puerto(puerto)
+        if vivo is None or _normalize_profile(vivo) != perfil:
+            puerto = None
+
+    # 2) Descubrimiento: ¿algún endpoint CDP vivo sirve ya a este perfil?
+    if puerto is None:
+        puerto = puerto_para_perfil(perfil)
+
+    # 3) Si no, abrir Chrome propio con ESE perfil, en un puerto libre.
+    if puerto is None:
+        puerto = _launch_chrome_cdp()
         for _ in range(10):
-            if _is_port_open("localhost", CDP_PORT):
+            if _is_port_open("localhost", puerto):
                 break
             time.sleep(1)
         else:
             raise RuntimeError("Chrome no abrió el puerto de debugging.")
 
+    # 4) Verificación final: el puerto elegido debe servir EXACTAMENTE al
+    #    perfil autorizado. Nunca attacharse a un perfil ajeno.
+    real = perfil_de_puerto(puerto)
+    if real is None or _normalize_profile(real) != perfil:
+        raise RuntimeError(
+            f"El endpoint CDP :{puerto} no sirve al perfil autorizado "
+            f"({perfil}); sirve a {real!r}. Abortando para no operar un "
+            "perfil no autorizado."
+        )
+
+    _puerto_activo = puerto
     opts = Options()
-    opts.add_experimental_option("debuggerAddress", "localhost:9222")
+    opts.add_experimental_option("debuggerAddress", f"localhost:{puerto}")
     opts.add_argument("--disable-blink-features=AutomationControlled")
 
     try:
@@ -601,3 +869,37 @@ def extraer_filas_tabla(html_content: str, header_text: str) -> list[dict]:
                     return resultado
 
     return []
+
+
+# --- Diagnóstico por línea de comandos ------------------------------------
+# Uso: python scripts/navegador_cdp.py --inventario
+#      python scripts/navegador_cdp.py --puerto-de '~/.agents/.browserdata'
+
+if __name__ == "__main__":
+    import argparse
+
+    _etiqueta = {
+        "autorizado": "✅ autorizado",
+        "efimero": "· efímero de prueba",
+        "desconocido": "⚠ fuera de allowlist",
+    }
+
+    _parser = argparse.ArgumentParser(
+        description="Diagnóstico CDP anclado al PERFIL, no al puerto."
+    )
+    _parser.add_argument("--inventario", action="store_true",
+                         help="Lista los endpoints CDP vivos con su perfil y clase")
+    _parser.add_argument("--puerto-de", metavar="PERFIL",
+                         help="Resuelve en qué puerto vive un perfil autorizado")
+    _args = _parser.parse_args()
+
+    if _args.puerto_de:
+        _p = puerto_para_perfil(_args.puerto_de)
+        print(_p if _p is not None else "(no está vivo)")
+    else:
+        _filas = inventario_cdp()
+        if not _filas:
+            print(f"(sin endpoints CDP vivos en "
+                  f"{CDP_PORT_RANGE.start}-{CDP_PORT_RANGE.stop - 1})")
+        for _f in _filas:
+            print(f":{_f['puerto']:<6} {_etiqueta[_f['clase']]:<22} {_f['perfil']}")

@@ -98,6 +98,47 @@ def _es_nota_aprobada(nota_str: str, rango_str: str) -> bool | None:
     return nota >= 3.0
 
 
+def _a_fecha(s) -> "datetime.date | None":
+    """Convierte '2026-09-06' o '2026-09-06T23:59' a datetime.date (o None)."""
+    if not s:
+        return None
+    s = str(s).strip()
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def derivar_estado_final(estado_grado, estado_entrega, fecha_cierre, hoy=None) -> str:
+    """Combina calificación + entrega + fecha de cierre en un ESTADO ACCIONABLE.
+
+    Jerarquía:
+      1. Con nota -> el grado decide (Aprobado >= 60%, Reprobado, Calificado).
+      2. Sin nota y Entregado -> 'Entregado (sin calificar)' (solo falta la nota).
+      3. Sin nota y SIN entrega -> 'Perdido (vencido sin entrega)' si el cierre ya pasó;
+         'Pendiente' si la ventana sigue abierta.
+      4. Sin nota y entrega SIN VERIFICAR -> 'Vencido (entrega sin verificar)' si cerró;
+         'Sin calificar (entrega sin verificar)' si sigue abierta.
+    """
+    hoy = hoy or datetime.now().date()
+    if estado_grado == "Aprobado":
+        return "Aprobado"
+    if estado_grado == "Reprobado":
+        return "Reprobado"
+    if estado_grado == "Calificado":
+        return "Calificado"
+    cierre = _a_fecha(fecha_cierre)
+    vencido = bool(cierre and cierre < hoy)
+    if estado_entrega == "Entregado":
+        return "Entregado (sin calificar)"
+    if estado_entrega in ("Sin entrega", "Sin intentos", "Borrador"):
+        return "Perdido (vencido sin entrega)" if vencido else "Pendiente"
+    # estado_entrega == "Sin verificar" (o desconocido)
+    return "Vencido (entrega sin verificar)" if vencido else "Sin calificar (entrega sin verificar)"
+
+
 def _abrir_driver_cdp() -> "webdriver.Chrome":
     """Conecta Selenium a Chrome vía CDP localhost:9222.
 
@@ -466,6 +507,17 @@ def _actualizar_snapshot(snapshot_path: str, items: list[dict]):
             "ponderacion_categoria": item["ponderacion_pct"],
             "actualizado": ahora,
         }
+        # Estado accionable: grado + entrega + FECHA DE CIERRE (el grado decide;
+        # si no hay nota, la entrega y la fecha determinan perdido/pendiente).
+        fecha_cierre_act = actividades[matched].get("fecha_cierre", "") or ""
+        estado_final = derivar_estado_final(
+            item.get("estado_grado", item["estado"]),
+            estado_entrega_final,
+            fecha_cierre_act,
+        )
+        actividades[matched]["estado_final"] = estado_final
+        actividades[matched]["calificacion"]["estado_final"] = estado_final
+        actividades[matched]["calificacion"]["fecha_cierre"] = fecha_cierre_act
 
     snapshot["calificaciones_capturadas"] = ahora
     with open(snapshot_path, "w", encoding="utf-8") as f:

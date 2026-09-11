@@ -334,3 +334,23 @@ def test_actualizar_snapshot_mergea_estado_entrega(mock_rich_console, tmp_path):
     # Mantiene la entrega real de la fase snapshot, no la sobreescribe con Sin verificar.
     assert act["calificacion"]["estado_entrega"] == "Entregado"
     assert act["estado_entrega"] == "Entregado"
+
+
+def test_derivar_estado_final_matriz(mock_rich_console):
+    """El estado accionable combina grado + entrega + fecha de cierre."""
+    from datetime import date
+    import cli_calificaciones as cc
+
+    hoy = date(2026, 9, 10)
+    # Caso Andrés: oralidad — sin nota, sin entrega, cierre ya pasó -> PERDIDO
+    assert cc.derivar_estado_final("Sin nota", "Sin entrega", "2026-09-06T23:59", hoy) == "Perdido (vencido sin entrega)"
+    # Entregado, aunque vencido -> no perdido (solo falta la nota)
+    assert cc.derivar_estado_final("Sin nota", "Entregado", "2026-09-06T23:59", hoy) == "Entregado (sin calificar)"
+    # Sin entrega pero ventana abierta -> Pendiente
+    assert cc.derivar_estado_final("Sin nota", "Sin entrega", "2026-09-20T23:59", hoy) == "Pendiente"
+    # Con nota >= umbral -> Aprobado (domina sobre la entrega)
+    assert cc.derivar_estado_final("Aprobado", "Sin verificar", "2026-09-06T23:59", hoy) == "Aprobado"
+    # Sin nota y entrega sin verificar, vencido -> vencido sin verificar
+    assert cc.derivar_estado_final("Sin nota", "Sin verificar", "2026-09-06T23:59", hoy) == "Vencido (entrega sin verificar)"
+    # Sin nota y entrega sin verificar, abierto
+    assert cc.derivar_estado_final("Sin nota", "Sin verificar", "2026-09-20T23:59", hoy) == "Sin calificar (entrega sin verificar)"

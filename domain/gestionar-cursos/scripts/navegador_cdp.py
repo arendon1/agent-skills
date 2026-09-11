@@ -39,21 +39,27 @@ CHROME_PATHS = [
 _driver = None
 _cdp_launched_by_us = False
 _profile_dir = None  # Se configura antes de _launch_chrome_cdp()
+# Perfil canónico ÚNICO para agentes — una sola sesión de navegación (evita
+# crear un `.browserdata` por directorio/curso y por tanto un login Moodle distinto).
+CANONICAL_PROFILE_DIR = os.path.expanduser("~/.agents/.browserdata")
 
 
 def set_profile_dir(path: str):
-    """Establece directorio persistente para perfil de Chrome (cookies, sesiones)."""
+    """Establece directorio persistente para perfil de Chrome (cookies, sesiones).
+    Crea el directorio si no existe (canónico o el pasado)."""
     global _profile_dir
     _profile_dir = os.path.abspath(path)
+    os.makedirs(_profile_dir, exist_ok=True)
 
 
 def get_profile_dir() -> str:
-    """Retorna el directorio de perfil actual."""
+    """Retorna el directorio de perfil actual (canónico si no se configuró)."""
     global _profile_dir
     if _profile_dir:
         return _profile_dir
     # Default canónico: perfil único de navegador para agentes
-    return os.path.expanduser("~/.agents/.browserdata")
+    os.makedirs(CANONICAL_PROFILE_DIR, exist_ok=True)
+    return CANONICAL_PROFILE_DIR
 
 
 def _find_chrome() -> str | None:

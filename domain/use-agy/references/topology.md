@@ -95,17 +95,24 @@ strings. The names are case- and dash-sensitive — typos fail with
 
 | Display name | Tier | Cost path |
 |--------------|------|-----------|
+| `gemini-3.8-flash-high` | fast/cheap | **Free under Google AI Pro** (default v13.4) |
+| `gemini-3.8-flash-medium` | fast/cheap | **Free under Google AI Pro** (default v13.4) |
+| `gemini-3.8-flash-low` | fast/cheap | **Free under Google AI Pro** (default v13.4 — bulk) |
+| `gemini-3.7-flash-high` | fast/cheap | **Free under Google AI Pro** |
+| `gemini-3.7-flash-medium` | fast/cheap | **Free under Google AI Pro** |
+| `gemini-3.7-flash-low` | fast/cheap | **Free under Google AI Pro** |
 | `gemini-3.6-flash-high` | fast/cheap | **Free under Google AI Pro** |
 | `gemini-3.6-flash-medium` | fast/cheap | **Free under Google AI Pro** |
 | `gemini-3.6-flash-low` | fast/cheap | **Free under Google AI Pro** |
-| `gemini-3.5-flash-high` | fast/cheap | **Free under Google AI Pro** |
-| `gemini-3.5-flash-medium` | fast/cheap | **Free under Google AI Pro** |
-| `gemini-3.5-flash-low` | fast/cheap | **Free under Google AI Pro** |
 | `gemini-3.1-pro-high` | strong/balanced | **Free under Google AI Pro** |
 | `gemini-3.1-pro-low` | strong/balanced | **Free under Google AI Pro** |
-| `claude-sonnet-4-6` | premium | Billed per Google terms (not subscription-free) |
-| `claude-opus-4-6-thinking` | premium | Billed per Google terms (not subscription-free) |
-| `gpt-oss-120b-medium` | open-weight | Billed per Google terms |
+| `claude-sonnet-4-6` ❌ | ~~premium~~ | **VETADO ABSOLUTO v13.6** — todos los providers (agy, OpenRouter, API). Sin lane preautorizado. |
+| `claude-opus-4-6-thinking` ❌ | ~~premium~~ | **VETADO ABSOLUTO v13.6** |
+| `gpt-oss-120b-medium` ❌ | ~~open-weight~~ | **VETADO v13.5** |
+
+**Removed as of agy 1.1.24 (2026-09-02):**
+- `gemini-3.5-flash-*` — Google deprecated; agy auto-corrects to closest available flash model.
+- `gemini-3.1-flash-image` as a *standalone listed model* — but image gen still works as an **embedded capability** in the Gemini (and Claude, until v13.5) models. See "Image generation" below.
 
 **`agy` does not ship the user's preferred models** (Kimi K3, GLM 5.2,
 DeepSeek V4 Pro, MiniMax M3, etc.). For those, route through the host
@@ -230,15 +237,37 @@ difference:
 - **`QUOTA_EXHAUSTED`** = long window (hours, per-model). agy does
   NOT retry this — it's non-transient to the CLI's retry logic.
 
-### Image generation — the hidden model
+### Image generation — WORKS via embedded capability (Gemini-only as of v13.5)
 
-`agy models` lists only reasoning models (Gemini 3.x flash, Claude,
-gpt-oss). **Image generation runs on `gemini-3.1-flash-image`
-under the hood, regardless of which `--model` you pass.** Switching
-`--model` to a different reasoning tier does NOT change the image
-model or its quota — they share one per-model cap. Passing
-`--model gemini-2.5-flash-image` directly is rejected (`invalid model
-selection`); agy's whitelist doesn't expose image models.
+`gemini-3.1-flash-image` is no longer a standalone listed model in agy,
+but the image-generation path still works: the Gemini models (`*` flash
+tiers and Pro) and (until v13.5) Claude Sonnet/Opus expose an embedded
+image-generation capability invoked as a tool/side-effect when the
+prompt asks for an image. Output goes to
+`~/.gemini/antigravity-cli/brain/<uuid>/<file>.jpg`, 1024×1024 JPEG.
+
+**v13.6 update (2026-09-02):** Claude paths están **VETADOS EN TODOS LOS PROVIDERS** — agy, OpenRouter, Anthropic API. Sin lane preautorizado. Imagen solo desde Gemini (agy).
+
+**Quota behavior:** the hidden image model is shared across the WHOLE
+Gemini family — ~10–12 calls per ~5h (verified by probe 2026-09-02:
+12 successful generations in 3 minutes exhausted the quota; the 13th
+call, on `gpt-oss-120b-medium`, returned `image-generation quota
+exhausted` — same pool). Throttle with `sleep 30` between calls. Parse
+the 429 envelope (below) to wait until `quotaResetTimeStamp` + 60s.
+
+**Default model + escape hatch (Gemini-only):**
+- **Bulk:** `gemini-3.7-flash-low` — Kimi K3 blind review 2026-09-02, 8/8.
+- **Escape hatch:** `gemini-3.8-flash-medium` — also 8/8, tier más alto, para cuando la imagen ES el hero.
+- **Hard pass:** `gemini-3.6-flash-medium` (tiling artifact), `gemini-3.7-flash-medium` (tallo bifurcado).
+
+**Forward path when quota is exhausted (user approval required, never silent):**
+1. **OpenRouter** `google/gemini-2.5-flash-image` — pay-per-use, separate billing.
+2. **Gemini API direct** (`GEMINI_API_KEY`, `generativelanguage.googleapis.com`) with `gemini-2.5-flash-image` — same family, separate API key auth. Already used by `motion-graphics/grounding/locate.mjs`.
+3. **Stock photos** (Unsplash / Pexels) if the images don't need to be AI-generated — free, offline-safe.
+
+Probe artifacts: `/tmp/probe-img-agy/` (12 imágenes + MANIFEST.md + JSON logs).
+
+**Until the user picks a path, do not attempt image generation via agy.**
 
 ### The 429 envelope (parse it, don't guess)
 

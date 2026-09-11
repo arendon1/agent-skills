@@ -49,11 +49,14 @@ agy -p "Implement $TASK" \
     --output-format json \
     --print-timeout 30m
 
-# Third-opinion against a Pi-written plan (Claude path)
+# Third-opinion against a Pi-written plan (Gemini path — Claude vetado en agy v13.5)
 agy -p "Read $PLAN. Output hidden assumptions, failure modes, missing ACs." \
-    --model "claude-sonnet-4-6" \
+    --model "gemini-3.1-pro-high" \
     --add-dir "$REPO" \
     --print-timeout 5m
+
+# Si se requiere Claude second-opinion: **NO HAY RUTA**. v13.6 vetó Claude en todos los
+# providers. Usa `k3` (Kimi K3) o `gemini-3.1-pro-high` como second-opinion en su lugar.
 ```
 
 Pi-side considerations:
@@ -153,9 +156,7 @@ Claude Code-side considerations:
 - Claude Code's `--print` is its own non-interactive mode; the
   harness already has its own envelope, so `agy -p --output-format
   text` (default) is the right pairing — do not nest JSON envelopes.
-- For Claude-family work, `agy -p` with `claude-sonnet-4-6` is the
-  same model Claude Code is already calling; the only saving is
-  routing the bill to Google. Not usually worth it.
+- For Claude-family work: **NO HAY RUTA**. v13.6 (2026-09-02) vetó Claude en todos los providers (`agy`, OpenRouter, Anthropic API). The previous default `claude-sonnet-4-6` (and any Claude model) is now forbidden. No second-opinion Claude. Use `gemini-3.1-pro-high` or `k3` (Kimi K3) as alternatives. For Gemini work via `agy`, see [SKILL.md Model selection](../SKILL.md#model-selection).
 
 ## Codex
 
@@ -240,8 +241,8 @@ When the host harness supports multiple model providers (Pi's
 | Task | Cheapest path | Reason |
 |------|---------------|--------|
 | Gemini-family work (review, refactor, code gen) | `agy -p --model gemini-3.1-pro-high` | Free under AI Pro |
-| Claude-family work (without an Anthropic key) | `agy -p --model claude-sonnet-4-6` | Avoids needing an API key |
-| Open-weight work (gpt-oss, etc.) | `agy -p --model gpt-oss-120b-medium` | Free-tier; avoids OR rate limits |
+| ~~Claude-family work (without an Anthropic key)~~ | ~~`agy -p --model claude-sonnet-4-6`~~ | **VETADO ABSOLUTO v13.6.** No existe ruta Claude. Use Gemini Pro / Kimi K3 / GLM 5.3 Flash. |
+| ~~Open-weight work (gpt-oss, etc.)~~ | ~~`agy -p --model gpt-oss-120b-medium`~~ | **VETADO v13.5.** Open-weight via agy is disallowed |
 | Non-agy-supported model (Kimi K3, GLM 5.2, DeepSeek V4 Pro, MiniMax M3) | Host harness's native model routing | `agy` does not ship these |
 | Heavy orchestration (task graph, retries, cost rollups) | Host harness dispatcher; let workers pick `agy` | `agy` is a worker, not an orchestrator |
 

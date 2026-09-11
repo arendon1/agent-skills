@@ -82,10 +82,10 @@ keyring is empty — see [Authentication](#authentication) below.
 |------|---------------|-----|
 | Gemini-quality code review / refactor / write | **`agy -p` with a Gemini model** | Free under Google AI Pro |
 | Vision / image-input reads (OCR, infographics, screenshots, scanned PDFs) | **`agy -p` with a Gemini model** | Gemini is multimodal by default — free under AI Pro. See **Workflow J** for the 3 gotchas (relative path in prompt, `--dangerously-skip-permissions`, strip boilerplate). For corpus-scale ingestion prefer host subagents on `minimax/MiniMax-M3`. |
-| Claude Sonnet/Opus second opinion on a plan or diff | **`agy -p` with `claude-sonnet-4-6` / `claude-opus-4-6-thinking`** | Avoids loading Claude via another vendor |
+| ~~Claude Sonnet/Opus second opinion on a plan or diff~~ | **VETADO ABSOLUTO v13.6** — Claude no se usa desde ningún provider. Use `gemini-3.1-pro-high` vía `agy -p` o Kimi K3 (`k3`) para second-opinion sin Claude. | Claude paths removed from agy on 2026-09-02 |
 | Multi-turn coding session the user wants to drive interactively | **`agy -i` under PTY + tmux / herdr / cmux** | Native TUI with slash commands |
 | Parallel batch of independent tasks | **One git worktree per task, `agy -p` in each** | Same shape as the `codex` skill's worktree fan-out |
-| Reach a model `agy` does not offer (Kimi K3, GLM 5.2, DeepSeek V4 Pro, MiniMax M3, etc.) | **Use the host harness's native model routing** | `agy` is Gemini/Claude/gpt-oss only — see [Model selection](#model-selection) |
+| Reach a model `agy` does not offer (Kimi K3, GLM 5.2, DeepSeek V4 Pro, MiniMax M3, etc.) | **Use the host harness's native model routing** | `agy` is **Gemini-only** since v13.5 (2026-09-02) — see [Model selection](#model-selection) |
 | Heavy orchestration (task graph, retries, cost reporting) | **Host harness dispatcher; let workers pick `agy`** | `agy` is a worker, not an orchestrator |
 
 ## Delegation patterns
@@ -193,14 +193,17 @@ Cross-check another agent's plan or diff against a different model family
 without leaving the host session:
 
 ```bash
-# Plan review
+# Plan review — Gemini path (Claude vetado en agy v13.5)
 git -C ~/projects/myapp diff main..HEAD > /tmp/diff.txt
 agy -p "Review the diff in /tmp/diff.txt. Output: (1) blocking issues,
 (2) non-blocking issues, (3) suggested follow-ups. Be terse." \
-   --model "claude-sonnet-4-6" \
+   --model "gemini-3.1-pro-high" \
    --add-dir ~/projects/myapp \
    --dangerously-skip-permissions \
    --print-timeout 5m
+
+# Claude: NO HAY RUTA. v13.6 vetó Claude en todos los providers.
+# Second-opinion alternativa: `k3` (Kimi K3 vía OpenCode Go), o `gemini-3.1-pro-high` vía agy.
 ```
 
 Or against Gemini itself for a different-perspective check:
@@ -268,17 +271,30 @@ As of writing:
 
 | Display name | Tier | Cost path |
 |--------------|------|-----------|
+| `gemini-3.8-flash-high` | fast/cheap | **Free under Google AI Pro** (default v13.4 for text) |
+| `gemini-3.8-flash-medium` | fast/cheap | **Free under Google AI Pro** (default v13.4 — image escape hatch) |
+| `gemini-3.8-flash-low` | fast/cheap | **Free under Google AI Pro** (default v13.4 — text bulk) |
+| `gemini-3.7-flash-high` | fast/cheap | **Free under Google AI Pro** |
+| `gemini-3.7-flash-medium` | fast/cheap | **Free under Google AI Pro** |
+| `gemini-3.7-flash-low` | fast/cheap | **Free under Google AI Pro** (default image bulk per Kimi 2026-09-02) |
 | `gemini-3.6-flash-high` | fast/cheap | **Free under Google AI Pro** |
 | `gemini-3.6-flash-medium` | fast/cheap | **Free under Google AI Pro** |
 | `gemini-3.6-flash-low` | fast/cheap | **Free under Google AI Pro** |
-| `gemini-3.5-flash-high` | fast/cheap | **Free under Google AI Pro** |
-| `gemini-3.5-flash-medium` | fast/cheap | **Free under Google AI Pro** |
-| `gemini-3.5-flash-low` | fast/cheap | **Free under Google AI Pro** |
 | `gemini-3.1-pro-high` | strong/balanced | **Free under Google AI Pro** |
 | `gemini-3.1-pro-low` | strong/balanced | **Free under Google AI Pro** |
-| `claude-sonnet-4-6` | premium | Billed per Google terms (not subscription-free) |
-| `claude-opus-4-6-thinking` | premium | Billed per Google terms (not subscription-free) |
-| `gpt-oss-120b-medium` | open-weight | Billed per Google terms |
+
+**Available in agy but VETED (not for this skill's callers, 2026-09-02):**
+- ~~`claude-sonnet-4-6`~~
+- ~~`claude-opus-4-6-thinking`~~
+- ~~`gpt-oss-120b-medium`~~
+
+These are present in `agy models` output but Andrés forbids any non-Gemini model in agy CLI. **v13.6 absolute veto: Claude is forbidden from ALL providers, not just agy.** No second-opinion Claude preauthorized. If a task needs Claude second-opinion, surface the gap and ask Andrés explicitly — do not silently fall back to OpenRouter `anthropic/claude-sonnet-4-6`.
+
+**Removed as of agy 1.1.24 (verified 2026-09-02):**
+- `gemini-3.5-flash-{high,medium,low}` — Google deprecated; agy auto-corrects to the closest available flash model with a warning.
+- `gemini-3.1-flash-image` as a *standalone, listed* model — but image generation as a **capability** still works via the other Gemini/Claude models (see **Image generation** below).
+
+**Image generation as capability (not a separate model):** Verified 2026-09-02 by probe in `/tmp/probe-img-agy/`. The hidden image model is invoked as a tool/side-effect by the visible text models when the prompt asks for an image. 11/12 Gemini models tested generated valid 1024×1024 JPEGs to `~/.gemini/antigravity-cli/brain/<uuid>/<file>.jpg`. Claude Sonnet also generated; Claude Opus-4.6-thinking hallucinated the path. Quota is **shared across the whole Gemini family** (~10–12 calls per ~5h); `gpt-oss-120b-medium` shares the same quota and returned `image-generation quota exhausted` after 12 successful generations in the probe. **Throttle to `sleep 30` between calls.**
 
 **Rule of thumb:** for Gemini work, pick `agy` over the host harness's
 OpenRouter path — same model family, zero marginal cost under AI Pro. For
@@ -413,7 +429,7 @@ is REQUIRED for `-p` worker runs (see Sandbox and permissions).
 - Auto-updater polls every 15 minutes (`Last check was less than 15
   minutes ago, skipping update`); it will restart the binary under you if
   a new version lands mid-run. Run `agy update` deliberately.
-- **Image gen burns a per-model quota, not RPM.** Image gen runs on `gemini-3.1-flash-image` regardless of `--model`; ~10-12 calls/~5h on AI Pro, then `QUOTA_EXHAUSTED (429)` (non-transient, agy won't retry, `--model` switch won't help). Parse `quotaResetTimeStamp` from the log; `sleep 30` between calls. Fallback to OpenRouter (`google/gemini-3.1-flash-image`, same model, pay-per-use) **requires user approval** — never switch silently to a paid path. See `references/topology.md` → **Quota exhaustion** and `references/workflows.md` → **Workflow I**.
+- **Image gen WORKS via agy (2026-09-02 correction).** Earlier today I marked this as broken — that was wrong. Verified via probe: all Gemini models still generate images as an embedded capability; output goes to `~/.gemini/antigravity-cli/brain/<uuid>/<file>.jpg`, 1024×1024 JPEG. The model name `gemini-3.1-flash-image` is no longer in `agy models`, but it is still invoked internally when a text model receives an image-generation prompt. **Claude Opus-4.6-thinking hallucinates the path** (returns a markdown-wrapped fake path). Claude Sonnet does generate. **Quota is shared** across the whole Gemini family plus `gpt-oss-120b-medium` — ~10-12 calls per ~5h, then `image-generation quota exhausted`. Throttle with `sleep 30` between calls. If quota exhausts mid-task, the user-approved fallback is OpenRouter `google/gemini-2.5-flash-image` (pay-per-use) — **never switch silently**. See `references/topology.md` → **Quota exhaustion** and `references/workflows.md` → **Workflow I** (now updated).
 - **Image *input* (vision) needs three things: a relative path in the prompt, `--dangerously-skip-permissions`, and a Gemini model.** `--add-dir <image>` does NOT attach the image as vision input (agent replies it sees no image); `@path` syntax times out. Without `--dangerously-skip-permissions`, headless `-p` auto-denies `read_file` on the image and can still report `status: SUCCESS` with an empty `response` — a silent failure. The JSON `response` also carries background-task boilerplate to strip. Verified `agy 1.1.9`; see `references/workflows.md` → **Workflow J**.
 
 ## Verification
@@ -433,14 +449,14 @@ authenticated:
    successfully`. If the auth-error pattern repeats on every line with
    no recovery, the keyring is empty.
 7. Smoke test with a cheap Gemini one-shot:
-   `agy -p "Reply with: pong" --model gemini-3.5-flash-low --dangerously-skip-permissions --print-timeout 1m`.
+   `agy -p "Reply with: pong" --model gemini-3.8-flash-low --dangerously-skip-permissions --print-timeout 1m`.
    If it returns `pong`, auth + model resolution + `-p` round-trip are
    all good.
 8. If step 7 fails with auth errors, run `agy -i` once to trigger browser
    OAuth, sign in, then `/logout` is **not** what you want — just exit.
    Re-run step 7.
 9. Smoke-test the JSON envelope:
-   `agy -p "Reply with: pong" --model gemini-3.5-flash-low --output-format json`
+   `agy -p "Reply with: pong" --model gemini-3.8-flash-low --output-format json`
    should print a single JSON line with `conversation_id`, `status`,
    `response: "pong"`, and a `usage` block. If it does, the full
    scripted-pipeline surface is verified.
@@ -456,8 +472,10 @@ authenticated:
 
 Adapted from the MIT-licensed Hermes `antigravity-cli` skill by Tony Simons
 (asimons81) — `~/.hermes/hermes-agent/optional-skills/autonomous-ai-agents/antigravity-cli/SKILL.md`.
-Claims verified live against `agy` 1.1.8 (model list, `--output-format json`
+Claims verified live against `agy` 1.1.24 (model list, `--output-format json`
 envelope, flag surface); the Hermes v0.2.0 "no JSON envelope" note is stale.
+The `gemini-3.5-flash-*` rows above were removed in agy 1.1.24 and the
+`gemini-3.1-flash-image` image-generation path is no longer available.
 
 Authoritative external sources (run them, don't paste stale text):
 

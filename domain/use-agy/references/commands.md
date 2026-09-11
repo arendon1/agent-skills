@@ -44,7 +44,7 @@ agy plugin <subcommand>          # see Plugin subcommands below
 
 ```bash
 agy plugin list                  # list imported plugins
-agy plugin import [source]       # import plugins from gemini or claude
+agy plugin import [source]       # import plugins from Gemini ecosystem (claude/agy-side plugins no aplican al veto v13.5)
 agy plugin install <target>      # install (supports plugin@marketplace)
 agy plugin uninstall <name>
 agy plugin enable <name>
@@ -176,10 +176,10 @@ tail -50 "$LOG"
 grep "^E" "$LOG" | tail -20
 
 # Smoke test (text)
-agy -p "Reply with: pong" --model gemini-3.5-flash-low --print-timeout 1m
+agy -p "Reply with: pong" --model gemini-3.8-flash-low --print-timeout 1m
 
 # Smoke test (JSON envelope — capture conversation_id for resume)
-agy -p "Reply with: pong" --model gemini-3.5-flash-low \
+agy -p "Reply with: pong" --model gemini-3.8-flash-low \
     --output-format json --print-timeout 1m \
   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['conversation_id'], d['response'].strip())"
 
@@ -197,8 +197,9 @@ agy plugin list
 - The work needs an orchestrator (task graph, retries, cost rollups).
   `agy` is a worker; route via the host's dispatcher.
 - The user has no Google AI Pro subscription AND wants to stay free —
-  then `agy` with Claude/`gpt-oss` is not free, and Gemini via OpenRouter
-  with the user's own key may be cheaper. Check before recommending.
+  agy is now Gemini-only (v13.5, 2026-09-02); Claude/`gpt-oss` paths were
+  eliminated. For non-AI-Pro subscribers, Gemini via OpenRouter with the
+  user's own key may be cheaper — check before recommending.
 
 ## See also
 

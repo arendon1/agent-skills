@@ -35,10 +35,12 @@ timeout is enough for a single-pass review of a 500-line diff.
 **Verify:** paste the output into the plan folder's `RESEARCH.md` so the
 cross-check is part of the audit trail.
 
-## Workflow B — Claude second-opinion on a plan
+## Workflow B — Second-opinion on a plan (Gemini Pro via agy; Claude vetado v13.6)
 
 Use when: another agent (Pi, codex, etc.) wrote a plan, and you want a
-Claude-family sanity check before merging.
+second-opinion sanity check before merging.
+
+> ⚠️ **VETO TOTAL v13.6 (2026-09-02):** Claude está vetado de **TODOS los providers** — agy, OpenRouter, Anthropic API. NO HAY RUTA de second-opinion Claude preautorizada. Si la tarea la pide, parar y preguntar a Andrés caso por caso. Mientras tanto: usa Gemini Pro / Kimi K3 / GLM 5.3 Flash como second-opinion.
 
 ```bash
 REPO=~/projects/myapp
@@ -47,15 +49,13 @@ PLAN="$REPO/docs/plans/2026-07-29-feature-x/PLAN.md"
 agy -p "Read $PLAN. Output: (1) hidden assumptions the plan makes about
 runtime/dependencies, (2) failure modes not addressed, (3) missing
 acceptance criteria. Be terse. Cite plan section numbers." \
-    --model "claude-sonnet-4-6" \
+    --model "gemini-3.1-pro-high" \
     --add-dir "$REPO" \
     --dangerously-skip-permissions \
     --print-timeout 5m
 ```
 
-**Cost note:** `claude-sonnet-4-6` is billed per Google terms — not
-subscription-free. Check whether the user wants this spend before
-running.
+**Alternativa más fuerte (Kimi K3, recomendada para auditoría real):** Claude era el modelo de second-opinion de máxima calidad; sin él, el replacement más fuerte disponible es Kimi K3 vía `opencode-go/kimi-k3` (caro — `$15/M` out — pero el adversario más exigente del allowlist actual). El orquestador lo despacha via Agent tool con `model: "k3"`, NO a través de agy.
 
 **Save output** to `RESEARCH.md` alongside the plan.
 
@@ -194,7 +194,7 @@ agy -i
 # In the agy TUI: /exit
 
 # 3. Smoke test
-agy -p "Reply with: pong" --model gemini-3.5-flash-low --dangerously-skip-permissions --print-timeout 1m
+agy -p "Reply with: pong" --model gemini-3.8-flash-low --dangerously-skip-permissions --print-timeout 1m
 ```
 
 **If the browser doesn't open (SSH/headless):** `agy -i` will print an
@@ -208,13 +208,16 @@ copy the auth code, paste it back into the TUI.
 Use when: an interactive `agy` session needs a different model (e.g.,
 escalate from Flash to Pro for a hard sub-task).
 
-Inside the TUI:
+Inside the TUI (Gemini models only — v13.5 veto on non-Gemini):
 
 ```
 /model gemini-3.1-pro-high
-/model claude-sonnet-4-6
-/model gpt-oss-120b-medium
+/model gemini-3.8-flash-high
+/model gemini-3.8-flash-medium
+/model gemini-3.7-flash-low
 ```
+
+> ⚠️ `/model claude-sonnet-4-6`, `/model claude-opus-4-6-thinking` y `/model gpt-oss-120b-medium` están vetados — agy los aceptará, pero el orquestador que despacha no debe invocarlos.
 
 The change applies to the current session only; persistent model
 preferences belong in `~/.gemini/config/config.json`.
@@ -255,13 +258,22 @@ needed. For a running session, restart `agy`.
 **Don't confuse** with `~/.gemini/config/config.json` (shared config,
 permissions source when `settings.json` is absent).
 
-## Workflow I — image generation with quota awareness
+## Workflow I — image generation with quota awareness (DEPRECATED 2026-09-02)
 
-`agy` can generate images via `agy -p "<prompt>" --model gemini-3.5-flash-low --dangerously-skip-permissions`,
-but image gen runs on `gemini-3.1-flash-image` under the hood regardless of
-the `--model` you pick, and that model has a **per-model quota** on the
-Google AI Pro consumer tier (~10-12 calls per ~5h window). See
-`topology.md` → **Quota exhaustion** for the full surface.
+> ⚠️ **`gemini-3.1-flash-image` is no longer available in agy 1.1.24.** This
+> workflow is preserved for historical/forensic reference only — it no
+> longer runs as written. For current image-generation options, see
+> `topology.md` → **Image generation** (OpenRouter, Gemini API key, or
+> stock photos). Do not attempt image generation via agy without an
+> approved alternate path.
+
+Historical pattern (worked when `gemini-3.1-flash-image` was live):
+
+> `agy` could generate images via `agy -p "<prompt>" --model gemini-3.8-flash-low --dangerously-skip-permissions`,
+> but image gen ran on `gemini-3.1-flash-image` under the hood regardless of
+> the `--model` you picked, and that model had a **per-model quota** on the
+> Google AI Pro consumer tier (~10-12 calls per ~5h window). See
+> `topology.md` → **Quota exhaustion** for the full surface.
 
 ### Before a bulk run — check if quota is live
 
@@ -280,7 +292,7 @@ for slug in bandeja-paisa sushi-rolls hamburguesa-clasica; do
   for variant in 1 2; do
     agy -p "Professional food photography of ${slug}, studio lighting, \
       1024x1024, on a white plate" \
-      --model gemini-3.5-flash-low \
+      --model gemini-3.8-flash-low \
       --dangerously-skip-permissions \
       --print-timeout 120s \
       > /tmp/ag-productos/logs/${slug}_${variant}.log 2>&1
@@ -301,7 +313,7 @@ without options — present the choice and let them pick:
    above) and tell the user when the free quota resets (~5h).
 2. **Offer the OpenRouter fallback (same model, pay-per-use).**
    `google/gemini-3.1-flash-image` on OpenRouter = ~$0.50/M in,
-   $3.00/M out — the exact model agy uses, no subscription cap. Estimate
+   $3.00/M out — the exact model agy used to use, no subscription cap. Estimate
    the cost for the remaining images and **ask for explicit approval before
    switching** (OR billing is separate from AI Pro; never switch silently).
    Cheaper sibling `google/gemini-2.5-flash-image` (~$0.30/$2.50) also works.

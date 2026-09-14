@@ -383,6 +383,24 @@ cuando se envía el `id` (`p901311224662_MhIABMss`). Hay que enviar el
 esto explícitamente; el bug se manifiesta como "el status se queda en
 pendiente aunque la respuesta sea 200" o como 400 directo.
 
+## Contenidos interactivos H5P (actividades no evaluables)
+
+No otorgan nota (0%), pero su calificación **sí** queda registrada y el criterio esperado es **10/10 en
+todas**. Se descubren y verifican desde `grade/report/user/index.php?id=<course>` → *Actividades no
+evaluables 0%*: la página del curso **omite** contenidos H5P (en un curso real, 6 de 12).
+
+| Recurso | Qué es |
+|---|---|
+| `scripts/h5p_solve.py` | El solver idempotente (ledger por curso, Chrome/CDP, higiene de pestañas) |
+| `references/h5p-playbook.md` | Operativa, reglas duras y errores ya pagados. **Leer antes de tocar H5P** |
+
+```bash
+python3 scripts/h5p_solve.py --course-id <id> --dest <curso> --backend chrome --cdp-port 9224   # resolver pendientes (--report: oportunidades)
+```
+
+Un deck queda `ok` solo si, además de `score == max`, se recorrió hasta el último slide **y** se pulsó
+el chequeo final de su resumen. Reusar la pestaña antes que crear; cerrar las sobrantes.
+
 ## Política de Errores
 
 **Resiliente — nunca falla completamente.**

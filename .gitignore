@@ -20,3 +20,6 @@ tmp/
 .env.*
 !.env.example
 
+# Runtime log del solver H5P: lo regenera cada corrida (--report lo agrega).
+# Es artefacto de runtime, no fuente: no se versiona.
+domain/gestionar-cursos/references/h5p-lessons.jsonl

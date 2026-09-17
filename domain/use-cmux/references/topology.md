@@ -6,14 +6,18 @@ the reference for exact handle syntax, discovery, and lifecycle verbs.
 ## The hierarchy
 
 ```
-window          top-level macOS window (a cmux app window)
-└── workspace     tab-like group within a window
-    │             - has a cwd, a set of env vars, a todo list, a status lane
+window            top-level macOS window (a cmux app window)
+└── group         optional collapsible sidebar section ("workspace group")
+    └── workspace   tab-like unit within a window
+    │               - has a cwd, a set of env vars, a todo list, a status lane
     └── pane        split container in a workspace (vertical/horizontal split)
         └── surface   a tab within a pane
                       types: terminal | browser | agent-session
 ```
 
+- A **group** is an optional sidebar container. It is *not* an addressable
+  process holder — it only nests workspaces under a named, collapsible header.
+  See "Workspace groups" below.
 - A **workspace** is the unit of "a project context" — it has its own cwd,
   env, todos, and status. Humans see workspaces as tabs in the sidebar.
 - A **pane** is a split region. A workspace with one pane is full-screen; split
@@ -23,11 +27,135 @@ window          top-level macOS window (a cmux app window)
 - A **browser surface** is a WKWebView; an **agent-session surface** is a
   first-class agent terminal with session-restore + Feed wiring.
 
+## Workspace groups
+
+A group nests workspaces under one collapsible sidebar row. It is purely a
+human-facing organization layer: no process, no cwd of its own, no I/O verbs.
+Agents use it so the workspaces they spawn do not flood the human's tab list,
+and to re-find everything that belongs to one project.
+
+**Anchor workspace.** Every group is owned by exactly one workspace, the
+**anchor**. The group header in the sidebar *is* the anchor's representation —
+there is no separate row for it, and clicking the header focuses the anchor's
+panels. The anchor is always a **newly created** workspace (never promoted from
+an existing one); its cwd is inherited from the `--cwd` flag, from the first
+`--from` workspace, or from the active workspace. So a group always costs one
+workspace, and its `member_workspace_refs` always includes the anchor first.
+
+**Group identity.** A group carries `name`, `icon_symbol` (an SF Symbol,
+default `folder.fill` when unset), `custom_color` (hex), `is_pinned`,
+`is_collapsed`. These are independent of the anchor workspace's own title,
+color, and icon even though they start seeded from it.
+
+**Group handle.** `workspace_group:N` (or a UUID). `list --json` returns:
+
+```json
+{
+  "window_ref": "window:1",
+  "groups": [
+    {
+      "ref": "workspace_group:2",
+      "name": "Universidad",
+      "anchor_workspace_ref": "workspace:3",
+      "member_workspace_refs": ["workspace:3", "workspace:4", "workspace:5"],
+      "member_count": 3,
+      "is_collapsed": false,
+      "is_pinned": false,
+      "custom_color": null,
+      "icon_symbol": null
+    }
+  ]
+}
+```
+
+**The tree is blind to groups.** `cmux tree --all` shows the
+workspace→pane→surface hierarchy and nothing about grouping; an anchor appears
+as a normal workspace (typically named `Group 1`, `Group 2`, …). Never infer
+membership from the tree — `cmux workspace-group list --json` is the only
+source of truth. When you want "what is in group X", map
+`member_workspace_refs` back through `cmux tree --all` (or
+`cmux list-workspaces`) to get titles, cwds, and surfaces.
+
+**Membership is one group per workspace.** `Workspace.groupId` is a single
+field: `workspace-group add` moves a workspace out of whatever group it was in
+before, silently. There is no nesting (a group cannot contain a group), and
+top-level pinned rows (workspaces *and* groups) sort above unpinned ones; within
+each tier the human's drag order holds.
+
+**Lifecycle.** Verified against cmux 0.64.22 (`cmux workspace-group --help`):
+
+```
+cmux workspace-group list [--json]
+cmux workspace-group create [--name N] [--cwd P] [--from W,W,...]
+                            # omit --from → anchor-only group
+cmux workspace-group add --group G --workspace W     # moves W out of any prior group
+cmux workspace-group remove --workspace W           # no --group needed
+cmux workspace-group set-anchor --group G --workspace W
+cmux workspace-group new-workspace G [--placement afterCurrent|top|end]
+cmux workspace-group rename G --name N
+cmux workspace-group collapse G | expand G
+cmux workspace-group pin G | unpin G
+cmux workspace-group set-color G [--hex '#RRGGBB']
+cmux workspace-group set-icon G [--symbol sf-symbol-name]
+cmux workspace-group move G --to-index n | --before G2 | --after G2
+cmux workspace-group focus G            # focus the anchor workspace
+cmux workspace-group ungroup G          # dissolve, keep all members
+cmux workspace-group delete G           # alias of ungroup in 0.64.x
+cmux workspace-group delete G --close-workspaces   # DESTRUCTIVE
+cmux workspace group <subcommand>       # canonical noun alias, same verbs
+```
+
+`create` returns either the bare handle (`workspace_group:4`) or, with
+`--json`, a `{ "group": { … } }` payload with the same fields as `list`.
+Everything else prints `OK` / `OK workspace:N` / `OK group dissolved (kept N
+workspaces)` — **`--json` is honored only by `list` and `create`**, so parse
+text for the other verbs or re-run `list --json` to confirm.
+
+**Closing the anchor — two conflicting texts.** The installed CLI help
+(0.64.22) says: *"Closing the anchor closes only that workspace and promotes
+the group's next member to be the new anchor, so the group and its other
+members stay intact. When the anchor is the group's only workspace, the group
+is removed."* The public `docs/workspace-groups.md` still says the opposite —
+that closing the anchor **dissolves** the group and leaves members ungrouped,
+with a confirmation dialog in the app. Treat both as untrusted: after any
+anchor close, re-run `cmux workspace-group list --json` and see what actually
+happened rather than assuming.
+
+**Destruction policy for agents.** `ungroup`/`delete` (without flag) are safe:
+they drop the container and keep every member as a normal workspace.
+`delete --close-workspaces` kills every workspace in the group outright,
+including any dev server or peer agent running inside it. Before using it,
+stop each member's foreground process, read its output to confirm, and make
+sure the members are workspaces *you* created.
+
+**Creating a workspace directly into a group** (the normal agent move) uses the
+workspace verb, not the group verb — full `new-workspace` flags are available:
+
+```bash
+cmux new-workspace --group workspace_group:4 --group-placement afterCurrent \
+  --group-reference workspace:9 \
+  --name "dev-server" --cwd ~/projects/myapp --command "npm run dev" --focus false
+```
+
+`--group-placement` defaults to `top` when driven from the CLI/group header
+(there is no active in-group reference, so `afterCurrent` degenerates to `top`).
+Cmd-N inside a group uses the active group workspace as reference, so the
+interactive default stays `afterCurrent`. Per-cwd overrides + global default live
+in `~/.config/cmux/cmux.json` under `workspaceGroups` — see
+`cmux docs settings` and `cmux docs api`.
+
+**Scope.** In 0.64.x, `workspace-group` is the shipped spelling; `cmux
+workspace group …` is the canonical noun alias and the hyphenated form stays
+forever. `newWorkspacePlacement`, `contextMenu` group actions, and the
+iMessage-mode group knobs (`sortInsideGroups`, `floatGroups`) are documented in
+the public doc as *planned/reserved* — do not rely on them.
+
 ## Handle syntax
 
 Output defaults to **short refs**: `window:1`, `workspace:2`, `pane:3`,
-`surface:4`, `tab:15`. UUIDs are accepted as input everywhere a handle is
-taken. Request UUID output only when you need a stable ID to log:
+`surface:4`, `tab:15`, `workspace_group:6`. UUIDs are accepted as input
+everywhere a handle is taken. Request UUID output only when you need a stable
+ID to log:
 
 ```
 cmux <cmd> --id-format refs      # default — short refs

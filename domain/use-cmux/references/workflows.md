@@ -1,6 +1,6 @@
 # Workflows — full worked examples with pitfalls
 
-The `SKILL.md` sketches workflows A–D. This file is the long version: exact
+The `SKILL.md` sketches workflows A–E. This file is the long version: exact
 command sequences, polling loops, error recovery, and the failure modes that
 bite in practice.
 
@@ -14,10 +14,16 @@ command -v cmux >/dev/null 2>&1 || { echo "no cmux"; exit 1; }
 
 # 1. Create an isolated workspace, cd into the project, start the server.
 #    --command sends text+Enter to the first terminal after creation.
-WS=$(cmux --json new-workspace --name "dev-server" --cwd ~/projects/myapp \
+#    Use the canonical noun verb with --json: it returns
+#    {workspace_ref, surface_ref, window_ref, group_ref}.
+WS=$(cmux --json workspace create --name "dev-server" --cwd ~/projects/myapp \
        --command "npm run dev" --focus false \
        | python3 -c 'import sys,json;print(json.load(sys.stdin)["workspace_ref"])')
-#  (or parse the text ref from non-JSON output; --json is more robust)
+#  Gotcha: the legacy `cmux --json new-workspace` prints plain text
+#  ("OK workspace:14") and ignores --json — `json.load` would throw. Either use
+#  `workspace create` (above) or regex the ref:
+#    WS=$(cmux new-workspace --name dev-server --cwd ~/projects/myapp \
+#           --command "npm run dev" --focus false | grep -oE 'workspace:[0-9]+')
 
 # 2. Poll the tail for the ready line. Don't block on a single long wait.
 for i in $(seq 1 30); do
@@ -61,10 +67,29 @@ cmux workspace close "$WS"
    `mvn spring-boot:run`); for ones that daemonize, tail their log file in the
    same surface: `cmux send --workspace "$WS" "tail -f server.log\n"`.
 
-4. **`send-key ctrl+c` sends to the surface's foreground process group.** If
-   the shell is at a prompt (server already exited), it just clears the line —
-   harmless. If a build is running, it interrupts the build. Always
-   `read-screen` first to know what state the surface is in.
+5. **`--json` is per-subcommand, not global — check before you parse.** In cmux
+   0.64.22 `workspace list --json`, `workspace create --json`,
+   `workspace-group list --json`, `workspace-group create --json`, `identify
+   --json`, and the `browser` verbs return JSON; the legacy `new-workspace`,
+   `list-workspaces`, and every other `workspace-group` verb print text (`OK
+   workspace:N`). A parse that assumes JSON on a text verb throws before the
+   command's work is undone — the workspace is still created. Regex the handle
+   or re-run `list --json` to resync.
+
+6. **`workspace list --json` includes `listening_ports`.** Before scraping
+   `read-screen` for a port, try:
+
+   ```bash
+   cmux --json workspace list \
+     | python3 -c 'import json,sys;[print(w["ref"], w["listening_ports"]) for w in json.load(sys.stdin)["workspaces"]]'
+   ```
+
+   It reports what cmux has observed the workspace listening on — a fast,
+   grep-free way to answer "did the server come up, and on which port".
+   It does **not** say the process is healthy, so still `read-screen` the ready
+   line before declaring victory. Note `workspace list --json` also exposes
+   `group_ref`, but in 0.64.22 it is `null` even for grouped workspaces — read
+   membership from `workspace-group list --json` instead.
 
 5. **Don't lose the handle.** If you didn't capture `WS` from `new-workspace`,
    recover it: `cmux list-workspaces` (match by name) or `cmux tree --all`.
@@ -242,6 +267,95 @@ harness — they install the hooks that make session-restore and Feed work.
    permissions are pre-configured. An agent driving cmux should not auto-approve
    on behalf of a peer; surface the request to the human via `cmux notify` if
    urgent, and let the human use Feed.
+
+## Workflow E — a group per project (keep the sidebar sane)
+
+Use when a session spawns more than ~2 workspaces for one effort, or when you
+find yourself in someone else's window with an unrelated group already there.
+The goal: the human's sidebar gains one collapsible row, not N tabs, and you can
+re-find your own workspaces later.
+
+### Full sequence
+
+```bash
+# 0. Inventory first. Groups are invisible in `cmux tree`, so this is the only
+#    way to know what already exists and what is free to reuse.
+cmux --json workspace-group list \
+  | python3 -c 'import json,sys;[print(g["ref"], repr(g["name"]), g["member_workspace_refs"]) for g in json.load(sys.stdin)["groups"]]'
+
+# 1. Create or reuse. Reuse the existing group if the project already has one —
+#    do not stack a second group on top of a project.
+GRP=$(cmux --json workspace-group create --name "feature-x" --cwd ~/projects/myapp \
+        | python3 -c 'import sys,json;print(json.load(sys.stdin)["group"]["ref"])')
+
+# 2. Spawn each new workspace directly into it (no separate `add` needed).
+WS=$(cmux --json workspace create --name "dev-server" --cwd ~/projects/myapp \
+       --command "npm run dev" --focus false \
+       | python3 -c 'import sys,json;print(json.load(sys.stdin)["workspace_ref"])')
+cmux workspace-group add --group "$GRP" --workspace "$WS"
+#    ^ two steps because `workspace create --json` reports group_ref only when
+#    it was created with --group. The single-call form is:
+#      cmux new-workspace --group "$GRP" --group-placement top --name dev-server \
+#        --cwd ~/projects/myapp --command "npm run dev" --focus false
+#    (prints "OK workspace:N" — regex the ref, --json is ignored by the legacy verb)
+
+# 3. Adopt workspaces you created before deciding to group them.
+cmux workspace-group add --group "$GRP" --workspace workspace:9
+
+# 4. Do the work; poll each member with read-screen as usual.
+cmux read-screen --workspace "$WS" --scrollback --lines 40
+
+# 5. Leave the sidebar tidy. Stop processes FIRST, then ungroup (safe: members
+#    survive as ordinary workspaces), then close only the workspaces you own.
+cmux send-key --workspace "$WS" ctrl+c
+cmux workspace-group remove --workspace "$WS"   # out of the group…
+cmux workspace close workspace:9                 # …then gone entirely
+cmux workspace-group list --json                 # verify
+```
+
+### When the human's own groups exist
+
+Never delete, rename, recolor, unpin, or re-anchor a group you did not create.
+`workspace-group list --json` gives you `name`/`member_count`, but **no
+created-by marker** — so the tell is provenance: a group whose name you did not
+choose, or whose members include workspaces with cwds like a human's project,
+is not yours. Treat it read-only and ask if you think it should change.
+
+### Pitfalls
+
+1. **`add` moves silently.** `workspace-group add` sets `Workspace.groupId`,
+   which is a single field — a workspace already in another group is removed
+   from it with no warning. Before `add`, check
+   `workspace-group list --json` for the workspace ref you are about to move.
+
+2. **`remove` takes no `--group`.** It is a property of the workspace, not of
+   the group: `cmux workspace-group remove --workspace W`. Passing `--group` is
+   not the documented form; passing a group as the positional arg expects a
+   workspace handle.
+
+3. **The anchor is a real workspace and can be closed.** The header row *is*
+   the anchor workspace; there is no separate row. Closing that workspace may
+   either promote the next member (installed CLI help, 0.64.22) or dissolve the
+   group (public docs page) — the two texts disagree. Never close an anchor to
+   "tidy up": reset the group with `remove`/`ungroup`, which have defined
+   semantics. If you must, re-read `workspace-group list --json` afterwards to
+   see what the app actually did.
+
+4. **`delete --close-workspaces` is a kill switch.** It closes the anchor and
+   every member — Ctrl-C'ing nothing, just closing terminals, so a dev server
+   dies and a peer agent's session ends. This is the one group verb that
+   destroys work. Reserve it for groups you created whose processes you already
+   stopped.
+
+5. **Groups do not nest and are not visible in the tree.** No group inside a
+   group, and `cmux tree --all` renders a grouped workspace as a flat top-level
+   row. Any script that infers structure from the tree will be wrong about
+   grouping — always cross-check `workspace-group list --json`.
+
+6. **Pin tiers reorder the sidebar.** Pinned top-level rows (workspaces *and*
+   groups) sort above unpinned rows; within each tier the human's drag order
+   holds. Unpinning or pinning a group therefore moves the whole section — do
+   not do it as a side effect of an unrelated task.
 
 ## Cross-workflow: live docs while you work
 

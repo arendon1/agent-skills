@@ -37,18 +37,33 @@ this skill's references are insufficient.
 ## The model
 
 ```
-window        top-level macOS window
-└── workspace   tab-like group within a window (has a cwd, env, todos, status)
-    └── pane      split container in a workspace
-        └── surface   a tab within a pane: terminal | browser | agent-session
+window            top-level macOS window
+└── group         optional collapsible sidebar section (workspace group)
+    └── workspace   tab-like unit within a window (has a cwd, env, todos, status)
+        └── pane      split container in a workspace
+            └── surface   a tab within a pane: terminal | browser | agent-session
 ```
 
-- **Window → workspace → pane → surface.** A surface is the addressable unit:
-  it holds a terminal, a browser webview, or an agent session. Commands that
-  "send text" or "read output" target a surface.
+- **Window → group → workspace → pane → surface.** A surface is the addressable
+  unit: it holds a terminal, a browser webview, or an agent session. Commands
+  that "send text" or "read output" target a surface.
+- **A workspace *group*** is an optional sidebar-only container that nests
+  workspaces under a collapsible named header. It is a human-facing
+  organization layer — agents use it to keep their spawned work from polluting
+  the human's tab list, and to find the workspaces that belong to one project.
+  Every group is owned by one **anchor workspace**: the header *is* that
+  workspace's sidebar representation, so a group always costs one workspace.
+  A group has a `name`, an SF Symbol `icon_symbol`, an optional `custom_color`,
+  and independent `is_pinned` / `is_collapsed` state. Its handle is
+  `workspace_group:N`.
+- **`cmux tree` does not render groups.** The tree is the workspace→pane→surface
+  hierarchy only, so a grouped workspace looks ungrouped there and an anchor
+  looks like an ordinary workspace (usually titled `Group 1`, `Group 2`, …).
+  The only authoritative view of group structure is
+  `cmux workspace-group list --json` (which also reports the `window_ref`).
 - **Handles.** Output defaults to short refs: `window:1`, `workspace:2`,
-  `pane:3`, `surface:4`. UUIDs are accepted as input; request them with
-  `--id-format uuids|both` only when you must log a stable ID.
+  `pane:3`, `surface:4`, `workspace_group:5`. UUIDs are accepted as input;
+  request them with `--id-format uuids|both` only when you must log a stable ID.
 - **Caller context.** Every cmux terminal exports `CMUX_WORKSPACE_ID`,
   `CMUX_SURFACE_ID`, `CMUX_WINDOW_ID`(?), `CMUX_TAB_ID`. Most commands default
   to the caller's workspace/surface, so "the current pane" needs no flag.
@@ -57,10 +72,11 @@ Discover where you are and what exists:
 
 ```bash
 cmux identify --json          # caller context: pane/surface/workspace/window refs
-cmux tree --all               # full window>workspace>pane>surface tree
+cmux tree --all               # full window>workspace>pane>surface tree (no groups)
 cmux list-workspaces          # workspaces in the caller's window
 cmux list-panes               # panes in the caller's workspace
 cmux list-pane-surfaces       # surfaces in the caller's (or --pane's) pane
+cmux workspace-group list --json   # sidebar groups: name, anchor, members, pin
 cmux capabilities             # server capabilities as JSON
 ```
 
@@ -258,6 +274,71 @@ surface's process stays alive.** Make your commands re-runnable (a dev server
 should restart cleanly; an agent session resumes via its saved session ID).
 Visible terminals are never hibernated. See `references/agent-launchers.md`.
 
+## Workflow E — group workspaces instead of leaving orphan tabs
+
+Every agent-spawned workspace lands as a new top-level tab in the human's
+sidebar. That is fine for one dev server; it is noise for a six-workspace
+project (server, logs, tests, two peer agents, a preview). Put them in a
+**group** so the sidebar stays one collapsible row.
+
+```bash
+# 0. Look before you group — groups are invisible in `cmux tree`.
+cmux workspace-group list --json
+
+# 1. Create a group. Without --from it is anchor-only (one workspace that IS
+#    the header) — the right default for an agent that is about to spawn its
+#    own workspaces. --cwd seeds the anchor's directory.
+cmux workspace-group create --name "feature-x" --cwd ~/projects/myapp
+# -> workspace_group:4   (pass --json for name/anchor/member refs)
+
+# 2. Spawn new work *inside* the group in one call (name/cwd/command/env all
+#    work, exactly like `new-workspace`).
+cmux new-workspace --group workspace_group:4 --group-placement top \
+  --name "dev-server" --cwd ~/projects/myapp --command "npm run dev" \
+  --focus false
+
+# 3. Or adopt workspaces that already exist (e.g. the peer agent you launched
+#    before deciding to group). NOTE: `add` silently removes the workspace from
+#    any group it was in before.
+cmux workspace-group add --group workspace_group:4 --workspace workspace:9
+
+# 4. Tidy: rename / collapse / pin / icon / color.
+cmux workspace-group rename workspace_group:4 --name "feature-x (shipping)"
+cmux workspace-group collapse workspace_group:4      # expand to re-open
+cmux workspace-group pin workspace_group:4
+cmux workspace-group set-icon workspace_group:4 --symbol leaf.fill
+cmux workspace-group set-color workspace_group:4 --hex "#7A4FD8"
+
+# 5. Take one workspace back out (the group, and everything else, survives).
+cmux workspace-group remove --workspace workspace:9
+
+# 6. End of work — see the destruction note below before you pick a verb.
+cmux workspace-group ungroup workspace_group:4   # keeps members, drops header
+cmux workspace-group list --json                 # verify the end state
+```
+
+**Closing the anchor.** The group header is a workspace, so "close the header"
+is a real destroy/reshape operation. The CLI help of cmux 0.64.x says closing
+the anchor **promotes the group's next member to be the new anchor**, keeping
+the group and its other members intact (and removing the group only when the
+anchor was its sole member). The public `docs/workspace-groups.md` page still
+describes the older behavior — closing the anchor **dissolves the group** and
+ungroups every member. Do not reason from either text: after touching an
+anchor, re-read `cmux workspace-group list --json` and confirm the structure.
+
+**Destructive verbs — never fire these blindly:**
+
+```bash
+cmux workspace-group ungroup <group>                    # keep members, drop container
+cmux workspace-group delete  <group>                    # alias of ungroup in 0.64.x
+cmux workspace-group delete  <group> --close-workspaces  # closes every member
+```
+
+`--close-workspaces` is the destructive one: it closes the anchor *and* every
+member, killing any dev server or peer agent in the group. Use it only when
+the group's members are yours and you already stopped their processes
+(`send-key ctrl+c` / `read-screen` first), or when the human asked for it.
+
 ## Read & control any surface
 
 The send/keys/read trio — the tmux `send-keys` / `capture-pane` equivalents:
@@ -332,9 +413,14 @@ cmux new-workspace --name "dev" --cwd ~/projects/myapp --layout '{
 Layout surfaces define their own `command` (sent on creation). Per-workspace
 environment variables: `--env KEY=VALUE` (repeatable) or `--env-file <path>`.
 
-Workspace lifecycle verbs: `cmux workspace list|create|close|rename|select|
-status|reconnect|disconnect`. `workspace status` reads/pins the todo lane
-(`todo|working|needs-attention|review|done|auto`).
+Workspace lifecycle verbs: `cmux workspace
+list|create|close|rename|select|status|env|reconnect|disconnect|group` — the
+canonical noun form. The legacy verbs (`new-workspace`, `list-workspaces`,
+`close-workspace`, `rename-workspace`, `select-workspace`) keep working and
+print a one-time deprecation notice pointing here. `workspace env [ws] --mask`
+prints a workspace's configured env vars; `workspace status [set <lane|auto>]`
+reads/pins the todo lane (`todo|working|needs-attention|review|done|auto`);
+`workspace group` is the group namespace (see Workflow E).
 
 ## When to stop
 
@@ -362,6 +448,11 @@ status|reconnect|disconnect`. `workspace status` reads/pins the todo lane
   its ready line; a test "passed" only when `read-screen` shows the summary.
 
 **MUST NOT**
+- Do not use `workspace-group delete <g> --close-workspaces` as a cleanup
+  shortcut — it closes every workspace in the group. Prefer stopping each
+  process, then `ungroup` (which preserves the members).
+- Do not assume `cmux tree` reflects groups, and do not assume a workspace is
+  ungrouped because the tree shows it flat. Read `workspace-group list --json`.
 - Do not block the session on a long-lived foreground command. Start it in a
   surface and poll. If a command genuinely must run to completion inline, cap
   the timeout and fall back to a surface on timeout.
@@ -381,8 +472,8 @@ status|reconnect|disconnect`. `workspace status` reads/pins the todo lane
 
 | File | When to load |
 |------|--------------|
-| `references/topology.md` | Handle model depth, identify/tree/list, focus/move/reorder/split-off, workspace lifecycle |
-| `references/workflows.md` | Full worked workflows A–D with pitfalls, polling loops, and error recovery |
+| `references/topology.md` | Handle model depth, identify/tree/list, focus/move/reorder/split-off, workspace lifecycle, workspace groups (anchor, membership, pin/collapse/color/icon) |
+| `references/workflows.md` | Full worked workflows A–E with pitfalls, polling loops, and error recovery |
 | `references/commands.md` | Quick-reference command tables: topology, send/read, browser, notify, todo, markdown, layout |
 | `references/agent-launchers.md` | Harness-specific: first-class launchers, the hook matrix, Feed, Agent Hibernation config |
 

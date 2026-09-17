@@ -59,6 +59,37 @@ cmux new-surface [--type terminal|browser|agent-session] [--pane P]
 cmux close-surface ... 
 ```
 
+## Workspace groups (sidebar sections)
+
+`G` = `workspace_group:N` or UUID. Only `list` and `create` honor `--json`;
+all other verbs print `OK…` text. Groups never appear in `cmux tree`.
+
+```bash
+cmux workspace-group list [--json]        # ref, name, anchor, members, pin,
+                                          # collapse, color, icon (+ window_ref)
+cmux workspace-group create [--name N] [--cwd P] [--from W,W,...]
+                                          # no --from → anchor-only group
+cmux workspace-group add --group G --workspace W    # moves W out of prior group
+cmux workspace-group remove --workspace W           # no --group needed
+cmux workspace-group set-anchor --group G --workspace W
+cmux workspace-group new-workspace G [--placement afterCurrent|top|end]
+cmux workspace-group rename G --name N
+cmux workspace-group collapse G | cmux workspace-group expand G
+cmux workspace-group pin G | cmux workspace-group unpin G
+cmux workspace-group set-color G [--hex '#RRGGBB']
+cmux workspace-group set-icon G [--symbol sf-symbol-name]
+cmux workspace-group move G [--to-index N | --before G2 | --after G2]
+cmux workspace-group focus G              # focus the anchor workspace
+cmux workspace-group ungroup G            # dissolve, keep members (safe)
+cmux workspace-group delete G             # alias of ungroup in 0.64.x (safe)
+cmux workspace-group delete G --close-workspaces    # DESTRUCTIVE: closes members
+cmux workspace group <sub>                # canonical noun alias, same verbs
+
+# Spawn straight into a group (all new-workspace flags still apply):
+cmux new-workspace --group G [--group-placement afterCurrent|top|end]
+                   [--group-reference W] [--name T] [--cwd P] [--command CMD]
+```
+
 ## Move / reorder / split-off
 
 ```bash

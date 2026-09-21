@@ -157,7 +157,7 @@ def main() -> int:
     ap.add_argument("--stdin", action="store_true", help="Read the document from stdin.")
     ap.add_argument("--json", action="store_true", help="Emit JSON object (default).")
     ap.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
-    ap.add_argument("--backend", choices=["auto", "vercel", "typesafe", "laya", "fallback"],
+    ap.add_argument("--backend", choices=["auto", "openrouter", "vercel", "typesafe", "laya", "fallback"],
                     default="auto")
     args = ap.parse_args()
 

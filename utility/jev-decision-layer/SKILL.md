@@ -1,14 +1,15 @@
 ---
 name: jev-decision-layer
 description: |
-  Add a typed-decision classifier (System One model pattern, JEV-compatible) to any workflow
-  that needs to gate, classify, route, or score **before** paying for an LLM judgment. Wraps
-  the JEV API (TypeSafe AI, $0.042/1M input tokens) with graceful fallback when no API key is
-  set; supports Vercel AI Gateway as an alternative access route and Laya (Apache 2.0, 421M)
-  as a self-hosted open-source alternative. Use when an agent makes a *binary or bounded*
-  judgment about a state (slide done?, drag safe?, course closed?, render good?, AI-tell
-  present?, research output acceptable?), when the same decision is repeated many times per
-  run, or when a heuristic gate is fragile and needs calibrated probabilities.
+  Add a typed-decision classifier to any workflow that needs to gate, classify, route, or score
+  **before** paying for an LLM judgment. Returns Choice/Score/Noul answers with probabilities.
+  Four interchangeable backends: OpenRouter (default — already-authorized egress, JSON-schema
+  constrained, ~1.6s, ~$0.00001/call), JEV via Vercel Gateway or TypeSafe direct (200-300ms,
+  calibrated, new egress), and Laya (Apache 2.0, 421M, self-hosted, ~30ms). Degrades to a
+  deterministic fallback when no credentials are set. Use when an agent makes a *binary or
+  bounded* judgment about a state — slide done?, drag safe?, course closed?, render good?,
+  AI-tell present?, research output acceptable? — when the same decision repeats many times
+  per run, or when a heuristic gate is fragile and needs a probability behind it.
 invocation: auto
 layer: utility
 provides: [decision-layer-classification, calibrated-probability-scoring, jev-client, laya-client]
@@ -40,20 +41,36 @@ Use when ANY of these hold:
 ## When NOT to use
 
 - You need free-form generation, code, chat, or open-ended reasoning. Use the
-  chat fleet for that — JEV does not generate.
+  chat fleet for that — no System One model generates text.
 - The decision space is open-ended (e.g. "describe what you see"). Out of scope.
-- The decision is irreversible and high-stakes — JEV's own accuracy
-  benchmark is ~67.8%, with no independent reproduction. Use as a guardrail,
-  not the final word.
+- **The decision runs inside a tight per-item loop and latency is the point.**
+  The OpenRouter route is ~1.6-2s; × 60 slides that is 2 minutes of added
+  wall-clock. For those loops use Laya (30ms), JEV with an approved key
+  (250ms), or skip the layer and keep the heuristic.
+- The decision is irreversible and high-stakes. JEV's own accuracy benchmark is
+  ~67.8% with no independent reproduction; the OpenRouter route has no
+  calibration guarantee at all. Use as a guardrail, never as the final word.
 
 ## Access
 
-| Route | Setup | Cost | Notes |
-|---|---|---|---|
-| **Vercel AI Gateway** | Set `VERCEL_API_KEY` | $0.04/1M input | Recommended. No waitlist. |
-| TypeSafe direct | Set `TYPESAFE_API_KEY` (join waitlist first) | $0.042/1M input | Direct. May rate-limit. |
-| **Laya (self-host)** | Run `laya serve`, set `JEV_BACKEND=laya` + `JEV_BASE_URL=http://localhost:8000` | $0 (compute only) | Apache 2.0, 421M params |
-| **Fallback (heuristic)** | None — automatic when no key set | Free, instant | Returns deterministic mock. Logs `mode: "fallback"`. |
+| Route | Setup | Cost / call\* | Latency | Calibrated? | Egress |
+|---|---|---|---|---|---|
+| **OpenRouter** (default) | `OPENROUTER_API_KEY` — already configured fleet-wide | ~$0.00001 | ~1.6-2s | No | **Authorized (Tier 1)** |
+| JEV via Vercel Gateway | `VERCEL_API_KEY` | ~$0.00002 | 200-300ms | Claimed, unverified | **New host — needs approval** |
+| JEV via TypeSafe | `TYPESAFE_API_KEY` (waitlist) | ~$0.00002 | 200-300ms | Claimed, unverified | **New host — needs approval** |
+| Laya (self-host) | `JEV_BACKEND=laya` + `JEV_BASE_URL=http://localhost:8000` | $0 (compute) | ~30-40ms | Yes (open) | None |
+| Fallback (heuristic) | none — automatic | $0 | <1ms | No | None |
+
+\*At our real state size (~200-500 tokens). JEV's advertised "40-400x cheaper" is measured
+against **frontier** models (GPT-5.6 Sol at ~$0.084/case), not against our own cheap fleet.
+Against `v4-text` at our state size the difference is ~$0.00001 per call.
+
+**Auto-detection order**: local Laya > OpenRouter > Vercel > TypeSafe > fallback. The
+authorized host wins over new egress, and a local server wins over both.
+
+**Reasoning is off by default** on the OpenRouter route (`"reasoning": {"enabled": false}`).
+Measured: 5.9s -> 1.6s, output tokens 108 -> 11. A classifier needs a bounded decision, not
+a chain of thought. Set `JEV_OPENROUTER_REASONING=1` to re-enable (and pay the latency).
 
 The client auto-detects: `JEV_BACKEND` env var wins; if unset, Vercel > TypeSafe
 > Laya (in that order, by availability).

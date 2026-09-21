@@ -52,8 +52,36 @@ por las directivas de seguridad de la máquina. **Invariante**: todo plan que a�
 host de salida debe incluir la decisión de autorización en su lista de "decisiones
 humanas", con el mismo peso que las decisiones de arquitectura.
 
+### L9 — Una variable de entorno ambiente se coló en los tests (y los hizo lentos, no rojos)
+Al añadir el backend `openrouter` con auto-detección, 8 tests que esperaban `mode="fallback"`
+comenzaron a elegir `openrouter` — porque `OPENROUTER_API_KEY` está configurada de verdad en
+esta máquina. El fixture limpiaba `JEV_/TYPESAFE_/VERCEL_/AI_GATEWAY_/LAYA_` pero no
+`OPENROUTER_`. Síntoma revelador: la suite pasó de 1.3s a **111s** (llamadas de red reales),
+no a rojo inmediato. **Invariante**: al ampliar la superficie de auto-detección, hay que
+ampliar la lista de prefijos que el fixture neutraliza en el MISMO commit. Y un salto de
+runtime de dos órdenes es señal de red, no de lógica.
+
+### L10 — El costo publicitado se mide contra el baseline equivocado
+TypeSafe anuncia "40-400x más barato". Medido contra modelos frontera (GPT-5.6 Sol a
+$0.084/caso), es cierto. Medido contra nuestro propio carril barato (`v4-text`), JEV es
+**1.6x** — y a nuestro tamaño real de estado la diferencia absoluta es $0.00001/llamada
+(18 centavos al mes). **Invariante**: un multiplicador de costo sin baseline declarado no
+es un dato; es marketing. Siempre recalcular contra el carril que realmente se usaría.
+
+### L11 — El razonamiento de un LLM es el costo oculto del camino estructurado
+En el backend OpenRouter, el mismo prompt con `response_format: json_schema` tardó 5.9s con
+108 tokens de salida por defecto, y **1.6s con 11 tokens** al apagar el razonamiento
+(`reasoning: {"enabled": false}`). Un clasificador no necesita cadena de pensamiento; el
+pensamiento era el 90% de la latencia y del gasto. **Invariante**: cuando el output está
+restringido a un esquema, apagar el razonamiento es la optimización de mayor rendimiento.
+
 ## Decisiones de diseño registradas
 
+- **El backend por defecto es el host ya autorizado.** El orden de auto-detección pone
+  OpenRouter antes que Vercel/TypeSafe a propósito: consolidar egreso es una propiedad de
+  seguridad, no una preferencia. Un host nuevo solo entra con key explícita.
+- **`reasoning: off` es default en la ruta OpenRouter**, con `JEV_OPENROUTER_REASONING=1`
+  para revertir cuando la calidad importe más que la latencia.
 - **§12 se honra por subprocess, no por import**: el `jev_shim.py` de `gestionar-cursos`
   invoca el CLI de `jev-decision-layer` como subprocess. El `ai_score_jev.py` de
   `ai-check` hace sys.path a la utility porque ambos viven en el mismo repo, pero el

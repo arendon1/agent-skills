@@ -43,7 +43,7 @@ def _clear_real_cost_log():
 def clean_env(monkeypatch):
     """Strip all JEV-related env vars and use a tmp cost log."""
     for k in list(os.environ):
-        if k.startswith(("JEV_", "TYPESAFE_", "VERCEL_", "AI_GATEWAY_", "LAYA_")):
+        if k.startswith(("JEV_", "TYPESAFE_", "VERCEL_", "AI_GATEWAY_", "LAYA_", "OPENROUTER_")):
             monkeypatch.delenv(k, raising=False)
     tmp_log = SKILL_DIR / "references" / "cost-log.test.jsonl"
     monkeypatch.setattr(jev_client, "COST_LOG", tmp_log)
@@ -171,6 +171,135 @@ def test_detect_typesafe_with_key(clean_env):
 def test_detect_laya_with_base_url(clean_env):
     os.environ["JEV_BASE_URL"] = "http://localhost:9999"
     assert JEV()._auto_detect() == "laya"
+
+
+# --------------------------------------------------------------------------- #
+# OpenRouter backend (authorized egress host)
+# --------------------------------------------------------------------------- #
+def test_detect_openrouter_with_key(clean_env):
+    os.environ["OPENROUTER_API_KEY"] = "test"
+    assert JEV()._auto_detect() == "openrouter"
+
+
+def test_openrouter_wins_over_new_egress_hosts(clean_env):
+    """OpenRouter is Tier-1 allowlisted; Vercel/TypeSafe are new egress."""
+    os.environ["OPENROUTER_API_KEY"] = "test"
+    os.environ["VERCEL_API_KEY"] = "test"
+    os.environ["TYPESAFE_API_KEY"] = "test"
+    assert JEV()._auto_detect() == "openrouter"
+
+
+def test_local_laya_wins_over_openrouter(clean_env):
+    """No egress at all beats an authorized host."""
+    os.environ["JEV_BASE_URL"] = "http://localhost:8000"
+    os.environ["OPENROUTER_API_KEY"] = "test"
+    assert JEV()._auto_detect() == "laya"
+
+
+def test_openrouter_backend_constructed(clean_env):
+    os.environ["OPENROUTER_API_KEY"] = "test-key"
+    c = JEV()
+    assert c.mode == "openrouter"
+    assert c.model == "deepseek/deepseek-v4-flash-0731"
+    assert c.price_per_1m == 0.065
+    assert c.price_out_per_1m == 0.18
+
+
+def test_openrouter_parses_response(clean_env, monkeypatch):
+    os.environ["OPENROUTER_API_KEY"] = "test"
+    c = JEV()
+
+    class FakeResp:
+        status_code = 200
+
+        def json(self):
+            return {
+                "choices": [{"message": {"content": json.dumps({
+                    "urgent": 0.93, "route": "billing", "quality": 4,
+                })}}],
+                "usage": {"prompt_tokens": 800, "completion_tokens": 20},
+            }
+
+    import jev_client
+    monkeypatch.setattr(jev_client.requests, "post", lambda *a, **kw: FakeResp())
+
+    v = c.classify("state", {
+        "urgent": ("noul", "is it urgent?"),
+        "route": ("choice", "which?", ["billing", "tech", "other"]),
+        "quality": ("score", "rate", 5),
+    })
+    assert v.mode == "openrouter"
+    assert v.answers["urgent"].value == 0.93
+    assert v.answers["route"].value == "billing"
+    assert v.answers["quality"].value == 4
+    assert v.tokens_in == 800
+    assert v.cost_usd > 0  # charged both input and output
+
+
+def test_openrouter_clamps_out_of_range(clean_env, monkeypatch):
+    """An uncalibrated model may emit nonsense; the client must bound it."""
+    os.environ["OPENROUTER_API_KEY"] = "test"
+    c = JEV()
+
+    class FakeResp:
+        status_code = 200
+
+        def json(self):
+            return {
+                "choices": [{"message": {"content": json.dumps({
+                    "urgent": 7.5, "route": "nope", "quality": 99,
+                })}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+            }
+
+    import jev_client
+    monkeypatch.setattr(jev_client.requests, "post", lambda *a, **kw: FakeResp())
+
+    v = c.classify("state", {
+        "urgent": ("noul", "q"),
+        "route": ("choice", "q", ["a", "b"]),
+        "quality": ("score", "q", 5),
+    })
+    assert v.answers["urgent"].value == 1.0        # clamped from 7.5
+    assert v.answers["route"].value == "a"         # rejected → first option
+    assert v.answers["quality"].value == 5         # clamped from 99
+
+
+def test_openrouter_http_error_falls_back(clean_env, monkeypatch):
+    os.environ["OPENROUTER_API_KEY"] = "test"
+    c = JEV()
+
+    class FakeResp:
+        status_code = 429
+        text = "rate limited"
+
+        def json(self):
+            return {}
+
+    import jev_client
+    monkeypatch.setattr(jev_client.requests, "post", lambda *a, **kw: FakeResp())
+
+    v = c.classify("state", {"ok": ("noul", "q")})
+    assert v.mode == "fallback"
+    assert "429" in (v.error or "")
+
+
+def test_openrouter_malformed_falls_back(clean_env, monkeypatch):
+    os.environ["OPENROUTER_API_KEY"] = "test"
+    c = JEV()
+
+    class FakeResp:
+        status_code = 200
+
+        def json(self):
+            return {"choices": [{"message": {"content": "not json at all"}}]}
+
+    import jev_client
+    monkeypatch.setattr(jev_client.requests, "post", lambda *a, **kw: FakeResp())
+
+    v = c.classify("state", {"ok": ("noul", "q")})
+    assert v.mode == "fallback"
+    assert "malformed" in (v.error or "")
 
 
 def test_explicit_backend_overrides_env(clean_env):

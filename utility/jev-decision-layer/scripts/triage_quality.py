@@ -100,7 +100,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Triage a research-output text via JEV.")
     ap.add_argument("--input", help="Path to the research output ('-' for stdin).")
     ap.add_argument("--question", help="Original question (for follow-up prompt context).")
-    ap.add_argument("--backend", choices=["auto", "vercel", "typesafe", "laya", "fallback"],
+    ap.add_argument("--backend", choices=["auto", "openrouter", "vercel", "typesafe", "laya", "fallback"],
                     default="auto")
     ap.add_argument("--pretty", action="store_true")
     args = ap.parse_args()

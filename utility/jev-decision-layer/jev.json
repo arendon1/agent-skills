@@ -1,19 +1,30 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "_nota": "Mirror of openrouter.json. Pick a backend via JEV_BACKEND env var; if unset, auto-detect (Vercel > TypeSafe > Laya > fallback).",
+  "_nota": "Mirror of openrouter.json. Backend via JEV_BACKEND; if unset, auto-detect (localhost Laya > OpenRouter > Vercel > TypeSafe > fallback). OpenRouter is the already-authorized egress host for this box; Vercel/TypeSafe are new egress and require explicit approval before use.",
   "api": {
     "timeout": 12,
     "default_cardinality_2stage": 50
   },
   "default_model": "jev-latest",
+  "openrouter_model": "deepseek/deepseek-v4-flash-0731",
+  "openrouter_reasoning": false,
   "endpoints": {
+    "openrouter": "https://openrouter.ai/api/v1/chat/completions",
     "vercel": "https://ai-gateway.vercel.sh/v1/evaluate",
     "typesafe": "https://api.typesafe.ai/v1/systemone",
     "laya": "http://localhost:8000"
   },
   "pricing_per_1m_input_usd": {
+    "openrouter": 0.065,
     "vercel": 0.04,
     "typesafe": 0.042,
+    "laya": 0.0,
+    "fallback": 0.0
+  },
+  "pricing_per_1m_output_usd": {
+    "openrouter": 0.18,
+    "vercel": 0.0,
+    "typesafe": 0.0,
     "laya": 0.0,
     "fallback": 0.0
   },

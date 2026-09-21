@@ -104,7 +104,7 @@ def main() -> int:
     ap.add_argument("--report-json", help="Path to render report JSON ('-' for stdin).")
     ap.add_argument("--metrics", help="Inline JSON object with render metrics.")
     ap.add_argument("--composition-id", help="If passed with --metrics, attach to the state.")
-    ap.add_argument("--backend", choices=["auto", "vercel", "typesafe", "laya", "fallback"],
+    ap.add_argument("--backend", choices=["auto", "openrouter", "vercel", "typesafe", "laya", "fallback"],
                     default="auto")
     ap.add_argument("--pretty", action="store_true")
     args = ap.parse_args()

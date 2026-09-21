@@ -16,7 +16,7 @@ CLI = SKILL_DIR / "scripts" / "jev_cli.py"
 ENV_CLEAN = {
     k: v
     for k, v in os.environ.items()
-    if not k.startswith(("JEV_", "TYPESAFE_", "VERCEL_", "AI_GATEWAY_", "LAYA_"))
+    if not k.startswith(("JEV_", "TYPESAFE_", "VERCEL_", "AI_GATEWAY_", "LAYA_", "OPENROUTER_"))
 }
 
 

@@ -125,7 +125,7 @@ def main(argv: list[str]) -> int:
     pc = sub.add_parser("classify", help="Run a decision call.")
     pc.add_argument("--state", help="Text/JSON state to evaluate. Required unless --stdin.")
     pc.add_argument("--preset", help="Use a named schema preset (e.g. slide_done_v1).")
-    pc.add_argument("--backend", choices=["vercel", "typesafe", "laya", "fallback"],
+    pc.add_argument("--backend", choices=["openrouter", "vercel", "typesafe", "laya", "fallback"],
                     help="Force a specific backend.")
     pc.add_argument("--question", action="append", default=[],
                     help='Inline: key="type:instructions". Repeatable.')

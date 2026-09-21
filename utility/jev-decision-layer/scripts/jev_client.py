@@ -43,10 +43,15 @@ CONFIG_PATH = SKILL_DIR / "jev.json"
 # Default endpoints
 TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone"
 VERCEL_AIGATEWAY_URL = "https://ai-gateway.vercel.sh/v1/evaluate"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Pricing ($/1M tokens). Output is FREE for all known System One models.
 PRICE_INPUT_USD_PER_1M = 0.042  # TypeSafe direct
 PRICE_VERCEL_USD_PER_1M = 0.04  # Vercel AIGateway (may vary slightly)
+# OpenRouter is an LLM with a JSON-schema response format — billed both ways.
+# Defaults match deepseek-v4-flash-0731 ("v4-text"), our cheapest authorized lane.
+PRICE_OPENROUTER_IN_PER_1M = 0.065
+PRICE_OPENROUTER_OUT_PER_1M = 0.18
 # Laya is self-hosted; compute cost is operator's problem.
 
 # Per-question cap (TypeSafe). Below this, single pass; above, 2-stage scoring.
@@ -83,7 +88,7 @@ class Answer:
 @dataclass
 class Verdict:
     answers: dict[str, Answer] = field(default_factory=dict)
-    mode: Literal["live", "vercel", "laya", "fallback", "error"] = "fallback"
+    mode: Literal["live", "vercel", "laya", "openrouter", "fallback", "error"] = "fallback"
     cost_usd: float = 0.0
     latency_ms: int = 0
     tokens_in: int = 0
@@ -183,8 +188,20 @@ class JEV:
             )
 
         # Per-backend credentials and endpoint
-        if chosen == "vercel":
-            self.mode: Literal["live", "vercel", "laya", "fallback", "error"] = "vercel"
+        if chosen == "openrouter":
+            self.mode: Literal["live", "vercel", "laya", "openrouter", "fallback", "error"] = "openrouter"
+            self.base_url = base_url or os.environ.get(
+                "JEV_BASE_URL", cfg.get("endpoints", {}).get("openrouter", OPENROUTER_URL)
+            )
+            self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+            self.model = cfg.get("openrouter_model", "deepseek/deepseek-v4-flash-0731")
+            self.price_per_1m = PRICE_OPENROUTER_IN_PER_1M
+            self.price_out_per_1m = PRICE_OPENROUTER_OUT_PER_1M
+            self.reasoning_enabled = bool(
+                int(os.environ.get("JEV_OPENROUTER_REASONING", "0"))
+            )
+        elif chosen == "vercel":
+            self.mode = "vercel"
             self.base_url = base_url or os.environ.get(
                 "JEV_BASE_URL", cfg.get("endpoints", {}).get("vercel", VERCEL_AIGATEWAY_URL)
             )
@@ -193,6 +210,7 @@ class JEV:
             )
             self.model = cfg.get("default_model", "typesafe-ai/jev")
             self.price_per_1m = PRICE_VERCEL_USD_PER_1M
+            self.price_out_per_1m = 0.0
         elif chosen == "typesafe":
             self.mode = "live"
             self.base_url = base_url or os.environ.get(
@@ -201,6 +219,7 @@ class JEV:
             self.api_key = api_key or os.environ.get("TYPESAFE_API_KEY")
             self.model = cfg.get("default_model", "jev-latest")
             self.price_per_1m = PRICE_INPUT_USD_PER_1M
+            self.price_out_per_1m = 0.0
         elif chosen == "laya":
             self.mode = "laya"
             self.base_url = base_url or os.environ.get(
@@ -209,12 +228,14 @@ class JEV:
             self.api_key = api_key or os.environ.get("LAYA_API_KEY", "")
             self.model = cfg.get("default_model", "laya-decision")
             self.price_per_1m = 0.0
+            self.price_out_per_1m = 0.0
         elif chosen == "fallback":
             self.mode = "fallback"
             self.base_url = ""
             self.api_key = ""
             self.model = "fallback-heuristic"
             self.price_per_1m = 0.0
+            self.price_out_per_1m = 0.0
         else:
             # Unknown → safe fallback
             if self.strict:
@@ -224,6 +245,7 @@ class JEV:
             self.api_key = ""
             self.model = "fallback-heuristic"
             self.price_per_1m = 0.0
+            self.price_out_per_1m = 0.0
 
         # Auto-degrade fallback if creds missing in non-fallback mode
         if self.mode != "fallback" and not self.api_key and not self.base_url.startswith("http"):
@@ -239,9 +261,15 @@ class JEV:
     # Detection
     # ------------------------------------------------------------------ #
     def _auto_detect(self, api_key: str | None = None, base_url: str | None = None) -> str:
-        # Laya first (no API key needed if running locally)
-        if os.environ.get("JEV_BASE_URL") or os.environ.get("LAYA_API_KEY") or base_url:
+        # Local Laya first (no egress at all if it's running)
+        if os.environ.get("JEV_BASE_URL", "").startswith("http://localhost") or base_url:
             return "laya"
+        if os.environ.get("LAYA_API_KEY"):
+            return "laya"
+        # Then the already-authorized egress host (OpenRouter is Tier-1 allowlisted).
+        if os.environ.get("OPENROUTER_API_KEY"):
+            return "openrouter"
+        # New-egress routes: only when explicitly keyed.
         if os.environ.get("VERCEL_API_KEY") or os.environ.get("AI_GATEWAY_API_KEY") or api_key:
             return "vercel"
         if os.environ.get("TYPESAFE_API_KEY"):
@@ -276,6 +304,8 @@ class JEV:
             return self._fallback_call(state, normalized)
         if self.mode == "laya":
             return self._http_call_laya(state, normalized)
+        if self.mode == "openrouter":
+            return self._http_call_openrouter(state, normalized)
         if self.mode in ("live", "vercel"):
             return self._http_call(state, normalized)
 
@@ -427,6 +457,142 @@ class JEV:
         verdict.mode = "laya"
         verdict.tokens_in = tokens_in
         verdict.cost_usd = 0.0  # self-hosted compute is out-of-band
+        verdict.latency_ms = latency_ms
+        verdict.raw = data
+        self._log(verdict)
+        return verdict
+
+    def _http_call_openrouter(self, state, questions) -> Verdict:
+        """Route decisions through an OpenRouter chat model with a JSON-schema
+        response format.
+
+        IMPORTANT — this is NOT a System One model. It is an ordinary LLM
+        constrained to emit a typed object. Consequences versus JEV/Laya:
+
+          * `noul` probabilities are heuristic, NOT calibrated. Treat them as
+            a soft signal, not a probability you can threshold on.
+          * The schema shape is guaranteed by `response_format` (strict), but
+            the model can still be *wrong* about the substance.
+          * Cost is per input AND output token (unlike JEV, whose output is free).
+
+        What it buys: it rides an egress host already authorized for this box,
+        on a lane already paid for — no new vendor, no new host.
+        """
+        if isinstance(state, (dict, list)):
+            state = json.dumps(state, ensure_ascii=False, default=str)
+
+        # Build the response JSON schema from the questions
+        props: dict[str, Any] = {}
+        specs: list[str] = []
+        for k, q in questions.items():
+            if q["type"] == "noul":
+                props[k] = {"type": "number", "minimum": 0, "maximum": 1}
+                specs.append(f'- "{k}": {q["instructions"]} → a probability in [0,1]')
+            elif q["type"] == "choice":
+                props[k] = {"type": "string", "enum": q["options"]}
+                specs.append(f'- "{k}": {q["instructions"]} → one of: {", ".join(q["options"])}')
+            elif q["type"] == "score":
+                props[k] = {"type": "integer", "minimum": 1, "maximum": q["range_max"]}
+                specs.append(f'- "{k}": {q["instructions"]} → an integer from 1 to {q["range_max"]}')
+
+        schema = {
+            "name": "typed_decisions",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": props,
+                "required": list(props),
+                "additionalProperties": False,
+            },
+        }
+
+        system = (
+            "You are a strict decision classifier. Given a STATE and typed QUESTIONS, "
+            "answer each question about the state. Output ONLY JSON matching the schema. "
+            "For yes/no questions output a probability: near 0.5 when the state is "
+            "ambiguous, near 0 or 1 when unambiguous. Pick exactly one allowed option. "
+            "Never explain."
+        )
+        user = "STATE:\n" + str(state)[:20000] + "\n\nQUESTIONS:\n" + "\n".join(specs)
+
+        body = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {"type": "json_schema", "json_schema": schema},
+            "temperature": 0,
+            # Reasoning off is load-bearing: measured 5.9s -> 1.6s and output
+            # tokens 108 -> 11 on v4-text. A classifier does not need a chain
+            # of thought; it needs a bounded decision.
+            "reasoning": {"enabled": self.reasoning_enabled},
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+
+        t0 = time.time()
+        try:
+            r = requests.post(self.base_url, json=body, headers=headers, timeout=self.timeout)
+            latency_ms = int((time.time() - t0) * 1000)
+            if r.status_code != 200:
+                if self.strict:
+                    raise RuntimeError(f"OpenRouter HTTP {r.status_code}: {r.text[:300]}")
+                v = self._fallback_call(state, questions, reason=f"http {r.status_code}")
+                v.latency_ms = latency_ms
+                return v
+            data = r.json()
+        except requests.RequestException as e:
+            if self.strict:
+                raise RuntimeError(f"OpenRouter unreachable: {e}") from e
+            v = self._fallback_call(state, questions, reason=str(e)[:200])
+            v.latency_ms = int((time.time() - t0) * 1000)
+            return v
+
+        try:
+            content = data["choices"][0]["message"]["content"]
+            raw = json.loads(content)
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as e:
+            if self.strict:
+                raise RuntimeError(f"OpenRouter malformed response: {e}") from e
+            v = self._fallback_call(state, questions, reason="malformed")
+            v.latency_ms = latency_ms
+            return v
+
+        ans: dict[str, Answer] = {}
+        for k, q in questions.items():
+            val = raw.get(k)
+            if q["type"] == "noul":
+                try:
+                    fval = max(0.0, min(1.0, float(val)))
+                except (TypeError, ValueError):
+                    fval = 0.5
+                ans[k] = Answer(key=k, type="noul", value=fval, probability=fval)
+            elif q["type"] == "choice":
+                sval = str(val)
+                if sval not in q["options"]:
+                    sval = q["options"][0]
+                ans[k] = Answer(key=k, type="choice", value=sval, probability=None)
+            elif q["type"] == "score":
+                try:
+                    ival = int(val)
+                except (TypeError, ValueError):
+                    ival = 1
+                ival = max(1, min(q["range_max"], ival))
+                ans[k] = Answer(key=k, type="score", value=ival, probability=None)
+
+        usage = data.get("usage") or {}
+        tokens_in = usage.get("prompt_tokens") or self._estimate_tokens(state)
+        tokens_out = usage.get("completion_tokens") or 30
+
+        verdict = Verdict(answers=ans, mode="openrouter")
+        verdict.tokens_in = tokens_in
+        verdict.cost_usd = (
+            tokens_in / 1_000_000 * self.price_per_1m
+            + tokens_out / 1_000_000 * getattr(self, "price_out_per_1m", 0.0)
+        )
         verdict.latency_ms = latency_ms
         verdict.raw = data
         self._log(verdict)

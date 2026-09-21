@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -39,6 +40,26 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+
+# Optional decision-layer guard. The shim is graceful: if absent, every call
+# returns GuardVerdict(uncertain=True) and the orchestrator downgrades to the
+# existing heuristic. Never raises; never breaks a run.
+_JEV_SHIM = None
+try:
+    _HERE_PY = Path(__file__).resolve().parent
+    sys.path.insert(0, str(_HERE_PY))
+    from jev_shim import jev_slide_done, jev_drag_safe, is_available as _is_jev_available  # type: ignore[import-not-found]
+    _JEV_SHIM = {"available": _is_jev_available(), "slide_done": jev_slide_done, "drag_safe": jev_drag_safe}
+except Exception:  # noqa: BLE001 — guardrailing the optional dep is the whole point
+    def jev_slide_done(*_a, **_kw):
+        return {"confident": False, "confident_done": False, "uncertain": True,
+                "error_reason": "jev_shim_not_loaded", "mode": "fallback", "preset": None,
+                "answers": {}, "cost_usd": 0.0, "latency_ms": 0, "raw": None}
+    def jev_drag_safe(*_a, **_kw):
+        return {"confident": False, "confident_done": False, "uncertain": True,
+                "error_reason": "jev_shim_not_loaded", "mode": "fallback", "preset": None,
+                "answers": {}, "cost_usd": 0.0, "latency_ms": 0, "raw": None}
+    _JEV_SHIM = {"available": False, "slide_done": jev_slide_done, "drag_safe": jev_drag_safe}
 
 CMUX = "/Applications/cmux.app/Contents/Resources/bin/cmux"
 BASE = "https://aulavirtual.uniremington.edu.co"
@@ -970,7 +991,8 @@ def verificar_resumen(cierre: dict) -> dict:
             "detalle": detalle}
 
 
-def walk_deck(b: Browser, plan: list, n_slides: int, m: dict, dry_run: bool) -> dict:
+def walk_deck(b: Browser, plan: list, n_slides: int, m: dict, dry_run: bool,
+              use_jev_guard: bool = False) -> dict:
     """
     Recorre TODO el deck slide por slide y resuelve la tarea que aparezca en cada uno.
 
@@ -1011,6 +1033,29 @@ def walk_deck(b: Browser, plan: list, n_slides: int, m: dict, dry_run: bool) -> 
                 m["opportunities"].append("slide_no_renderizo:" + machine)
             r = SOLVERS[machine](b, si, t["child"], m)
             r["slide"] = r.get("slide", si)
+            # Optional JEV guardarraíl: only fires when the orchestrator requested it
+            # AND the shim is reachable. The verdict is metadata — the existing
+            # done-detection logic keeps working; the guard just records uncertainty.
+            if use_jev_guard and _JEV_SHIM["available"]:
+                try:
+                    slide_state = b.ev(js(JS_SLIDE_TASKS, si=si)) or {}
+                    guard = _JEV_SHIM["slide_done"](
+                        json.dumps(slide_state, separators=(",", ":"), default=str)
+                    )
+                    if guard.get("uncertain"):
+                        m["opportunities"].append(f"jev_guard_uncertain:{machine}:slide{si}")
+                    elif not guard.get("confident_done"):
+                        m["opportunities"].append(f"jev_guard_disagrees:{machine}:slide{si}")
+                    r["jev_guard"] = {
+                        "mode": guard.get("mode"),
+                        "confident_done": guard.get("confident_done"),
+                        "uncertain": guard.get("uncertain"),
+                        "reason": guard.get("error_reason"),
+                        "cost_usd": guard.get("cost_usd"),
+                        "latency_ms": guard.get("latency_ms"),
+                    }
+                except Exception as e:
+                    m["opportunities"].append(f"jev_guard_exception:{type(e).__name__}")
             tareas.append(r)
     if unknowns:
         m["opportunities"].append("nodos_no_clasificados:" + str(len(unknowns)))
@@ -1272,7 +1317,7 @@ def solve_findthewords(b, si, ci, m: dict) -> dict:
             g2 = b.ev(JS_FTW_GEO) or {}
             _drag_ftw(b, g2.get("canvas") or cvs, g2.get("es") or es,
                       x0, y0, x0 + dx * (n - 1), y0 + dy * (n - 1),
-                      pasos=max(n, 6))
+                      pasos=max(n, 6), m=m, use_jev_guard=use_jev_guard)
             m["clicks"] += 1
             st = b.ev(JS_FTW_STATE) or {}
             if w in (st.get("found") or []):
@@ -1343,7 +1388,8 @@ def solve_activity(b: Browser, hvp_id: str, m: dict, dry_run: bool) -> dict:
     full_walk = bool(m.get("full_walk"))
     plan = plan_deck(n_slides, prescan, full_walk)
     if n_slides:
-        walk = walk_deck(b, plan, n_slides, m, dry_run)
+        walk = walk_deck(b, plan, n_slides, m, dry_run,
+                         use_jev_guard=use_jev_guard)
     else:
         # Contenido que no es un contenedor: una sola tarea suelta.
         walk = {"tareas": [], "slides_visitados": 0, "ultimo_slide": None, "plan": [],
@@ -1394,7 +1440,8 @@ def solve_activity(b: Browser, hvp_id: str, m: dict, dry_run: bool) -> dict:
         # El resumen conoce más actividades de las que el plan cubrió => el atajo perdió algo.
         # Se cae a recorrido completo UNA vez (nunca en bucle) y se vuelve a cerrar el deck.
         m["opportunities"].append("plan_incompleto_fallback_full_walk")
-        walk = walk_deck(b, list(range(n_slides)), n_slides, m, dry_run)
+        walk = walk_deck(b, list(range(n_slides)), n_slides, m, dry_run,
+                         use_jev_guard=use_jev_guard)
         rec["tasks"] = walk["tareas"]
         rec["slides"]["visitados"] = walk["slides_visitados"]
         rec["slides"]["plan"] = walk.get("plan")

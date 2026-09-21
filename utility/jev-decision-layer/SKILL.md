@@ -94,12 +94,60 @@ verdict = client.classify(
 ## Usage (subprocess — for cross-skill consumption, §12)
 
 ```bash
+# Raw answers (no decision applied):
 python jev_cli.py classify \
   --state "the slide says: 2+2 = 5" \
   --question score_at_max="noul:Did this slide achieve its maximum possible score?"
+
+# Decision applied with the backend's threshold (exit 0=pass, 1=fail, 3=uncertain):
+python jev_cli.py decide --state "..." --preset slide_done_v1
 ```
 
-Returns JSON: `{"answers": {...}, "mode": "...", "cost_usd": 0.0001, "latency_ms": 230}`.
+`classify` returns `{"answers": {...}, "mode": "...", "cost_usd": ..., "latency_ms": ...}`.
+`decide` adds `{"decision": "pass"|"fail"|"uncertain", "confident", "threshold", "reasons"}`.
+
+**Prefer `decide` in guardrails.** It resolves the threshold from the backend
+that actually served the call.
+
+## The decision contract
+
+| Verdict | Meaning | Caller must |
+|---|---|---|
+| `pass` | The state satisfies the preset's rule | May act |
+| `fail` | It does not | Retry, flag, or surface to a human |
+| `uncertain` | **No signal** (fallback, error, no threshold) | Keep the existing heuristic |
+
+`uncertain` is never a pass. It is the channel that lets this layer be added to a
+working flow without changing its behaviour while credentials are missing.
+
+### Thresholds belong to the BACKEND
+
+The same answers score differently per backend. Measured on one H5P state:
+
+| Backend | `score_at_max` | Scale |
+|---|---|---|
+| JEV (claimed) | ~0.99 | assertive |
+| Laya (measured) | 0.81 | conservative |
+| OpenRouter (LLM) | ~0.9 | uncalibrated |
+
+A single fixed threshold across backends produces systematic false negatives.
+`jev.json → thresholds_by_backend` resolves them per backend, and `decide`
+applies the right one automatically. Override per call with `--threshold`.
+
+## Laya on-demand (the no-egress lane)
+
+Laya is a library, not a server. Two scripts turn it into an ephemeral service
+for latency-sensitive loops:
+
+```bash
+# Start, run, kill. No daemon, no persistence, no egress.
+python jev_cli.py laya up                              # start + print env
+python jev_cli.py laya status
+python jev_cli.py laya down
+```
+
+See `references/laya-on-demand.md`. Measured: 23-27s cold start, 25-76ms per
+decision, 1.5 GB on disk, 0 bytes at rest, $0 per call.
 
 ## Schemas (presets)
 
@@ -107,12 +155,15 @@ Returns JSON: `{"answers": {...}, "mode": "...", "cost_usd": 0.0001, "latency_ms
 
 | Preset | Use case | Question types |
 |---|---|---|
-| `slide_done_v1` | H5P slide "did this score max?" | 2 Noul |
-| `find_words_drag_v1` | FindTheWords drag safety | 3 Noul |
-| `course_closed_v1` | Course completion check | 3 Noul + 1 Score |
-| `render_gate_v1` | Video render quality | 1 Choice + 2 Noul |
-| `ai_dimensions_v1` | AI-tell multi-dimension | 6 Noul + 1 Score + 1 Choice |
-| `triage_quality_v1` | Research output triage | 1 Choice + 2 Noul + 1 Score |
+| `slide_done_v1` | H5P slide "did this score max?" | 2 Noul → `pass`/`fail` |
+| `find_words_drag_v1` | FindTheWords drag safety | 3 Noul → `pass`/`fail` |
+| `course_closed_v1` | Course completion check | 3 Noul + 1 Score → `pass`/`fail` |
+| `render_gate_v1` | Video render quality | 1 Choice + 2 Noul → `pass`/`fail` |
+| `ai_dimensions_v1` | AI-tell multi-dimension | 6 Noul + 1 Score + 1 Choice → score |
+| `triage_quality_v1` | Research output triage | 1 Choice + 2 Noul + 1 Score → `pass`/`fail` |
+
+`ai_dimensions_v1` has no binary rule (it is a composite score, not a gate);
+`decide` returns `uncertain` for it by design. Use `classify` + your own weighting.
 
 ## Cost & ledger
 
@@ -140,19 +191,25 @@ To force fallback-off (so a missing key raises instead), set `JEV_STRICT=1`.
 ```
 utility/jev-decision-layer/
 ├── SKILL.md                  ← this file
-├── jev.json                  ← client config (mirror openrouter.json pattern)
+├── jev.json                  ← config (endpoints, pricing, thresholds_by_backend)
 ├── scripts/
-│   ├── jev_client.py         ← Python API
-│   ├── jev_schemas.py        ← preset question templates
-│   └── jev_cli.py            ← subprocess entry (for §12 cross-skill)
+│   ├── jev_client.py         ← Python API (4 backends + fallback)
+│   ├── jev_schemas.py        ← presets + decision rules
+│   ├── jev_cli.py            ← subprocess entry (classify | decide | laya)
+│   ├── laya_server.py        ← HTTP wrapper so Laya looks like a JEV endpoint
+│   ├── laya_on_demand.py     ← start → run → kill (the ephemeral pattern)
+│   ├── render_gate.py        ← Scenario 4 helper
+│   └── triage_quality.py     ← Scenario 6 helper
 ├── references/
 │   ├── cost-log.jsonl        ← auto-created on first call
-│   ├── recipes.md            ← usage recipes per scenario
-│   └── comparison.md         ← JEV vs Laya vs fallback (decision aid)
+│   ├── recipes.md            ← usage per scenario
+│   ├── comparison.md         ← backend decision aid (measured numbers)
+│   └── laya-on-demand.md     ← the no-egress lane, end to end
 └── tests/
     ├── test_jev_client.py
     ├── test_jev_schemas.py
-    └── test_jev_cli.py
+    ├── test_jev_cli.py
+    └── test_jev_decide.py    ← locks down the per-backend threshold bug
 ```
 
 ## Integration notes

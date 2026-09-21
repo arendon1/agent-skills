@@ -638,6 +638,10 @@ class JEV:
         # Expected: {"question_key": {"type": ..., "noul"|"choice"|"score": value, "probabilities"?: {...}}}
         if not isinstance(data, dict):
             return Verdict(error=f"non-dict response: {type(data)}")
+        # El wrapper HTTP de Laya anida las respuestas bajo "answers"; la API de
+        # TypeSafe las trae al nivel raiz. Aceptamos ambas formas.
+        if isinstance(data.get("answers"), dict):
+            data = data["answers"]
         for k, v in questions.items():
             payload = data.get(k) or {}
             if not isinstance(payload, dict):

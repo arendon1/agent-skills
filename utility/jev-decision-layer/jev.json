@@ -28,6 +28,24 @@
     "laya": 0.0,
     "fallback": 0.0
   },
+  "thresholds_by_backend": {
+    "_nota": "El umbral es propiedad del BACKEND, no del preset: la escala de probabilidad difiere entre un System One calibrado y un LLM restringido por esquema. PROVISIONAL — calibrar contra etiquetas reales antes de confiar en producción. Medición 2026-09-21: Laya dio 0.5546 en un slide inequivocamente completo y 0.0011 en uno parcial.",
+    "vercel": {
+      "noul_default": 0.95
+    },
+    "typesafe": {
+      "noul_default": 0.95
+    },
+    "laya": {
+      "noul_default": 0.4
+    },
+    "openrouter": {
+      "noul_default": 0.75
+    },
+    "fallback": {
+      "noul_default": 0.95
+    }
+  },
   "profiles": {
     "h5p_guardarrail": {
       "description": "H5P slide 'did this score max?' classifier (Scenario 1).",

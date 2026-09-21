@@ -365,3 +365,40 @@ def test_verdict_as_dict_roundtrip(clean_env):
     d = v.as_dict()
     assert d["mode"] == "fallback"
     assert d["answers"]["a"]["value"] == v.answers["a"].value
+
+
+# --------------------------------------------------------------------------- #
+# Response shape tolerance
+# --------------------------------------------------------------------------- #
+def test_parse_response_accepts_flat_answers(clean_env):
+    """TypeSafe/Vercel shape: answers at the top level."""
+    c = JEV()
+    flat = {"a": {"type": "noul", "noul": 0.75}}
+    v = c._parse_response({"a": {"type": "noul", "instructions": "q"}}, flat)
+    assert v.answers["a"].value == 0.75
+
+
+def test_parse_response_accepts_nested_answers(clean_env):
+    """Regression: the Laya HTTP wrapper nests answers under "answers".
+
+    Missing this made every Laya decision read as 0.0 (a silent false negative
+    on every guardrail). Caught by the end-to-end test, not by the unit tests.
+    """
+    c = JEV()
+    nested = {"answers": {"a": {"type": "noul", "noul": 0.75}}, "usage": {}}
+    v = c._parse_response({"a": {"type": "noul", "instructions": "q"}}, nested)
+    assert v.answers["a"].value == 0.75
+
+
+def test_parse_response_nested_choice_and_score(clean_env):
+    c = JEV()
+    nested = {"answers": {
+        "c": {"type": "choice", "choice": "beta", "probabilities": {"beta": 0.8}},
+        "s": {"type": "score", "score": 4},
+    }}
+    v = c._parse_response({
+        "c": {"type": "choice", "instructions": "q", "options": ["alpha", "beta"]},
+        "s": {"type": "score", "instructions": "q", "range_max": 5},
+    }, nested)
+    assert v.answers["c"].value == "beta"
+    assert v.answers["s"].value == 4

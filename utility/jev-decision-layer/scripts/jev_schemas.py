@@ -164,3 +164,144 @@ def get_preset(name: str) -> dict[str, dict[str, Any]]:
 
 def list_presets() -> list[str]:
     return list(PRESETS)
+
+
+# --------------------------------------------------------------------------- #
+# Decision rules
+# --------------------------------------------------------------------------- #
+# A decision rule turns a dict of raw answers into a pass/fail/uncertain verdict,
+# given a threshold. The threshold is NOT part of the rule: it is a property of
+# the BACKEND. A calibrated System One model and a schema-constrained LLM report
+# probabilities on very different scales (measured: Laya 0.55 on a state where
+# JEV would say 0.99). See jev.json -> thresholds_by_backend.
+# --------------------------------------------------------------------------- #
+def _num(answers: dict, key: str, default: float = 0.0) -> float:
+    a = answers.get(key) or {}
+    v = a.get("noul", a.get("value"))
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _val(answers: dict, key: str, default: Any = None) -> Any:
+    a = answers.get(key) or {}
+    for k in ("choice", "score", "noul", "value"):
+        if k in a:
+            return a[k]
+    return default
+
+
+def _rule_slide_done(answers: dict, th: float) -> tuple[bool, list[str]]:
+    sa = _num(answers, "score_at_max")
+    aa = _num(answers, "all_answers_committed")
+    ok = sa >= th and aa >= th
+    why = []
+    if sa < th:
+        why.append("score_at_max")
+    if aa < th:
+        why.append("all_answers_committed")
+    return ok, why
+
+
+def _rule_drag_safe(answers: dict, th: float) -> tuple[bool, list[str]]:
+    s = _num(answers, "start_in_viewport")
+    e = _num(answers, "end_in_viewport")
+    p = _num(answers, "path_uninterrupted")
+    path_th = max(0.0, th - 0.05)
+    ok = s >= th and e >= th and p >= path_th
+    why = []
+    if s < th:
+        why.append("start_in_viewport")
+    if e < th:
+        why.append("end_in_viewport")
+    if p < path_th:
+        why.append("path_uninterrupted")
+    return ok, why
+
+
+def _rule_course_closed(answers: dict, th: float) -> tuple[bool, list[str]]:
+    todos = _num(answers, "todos_al_100")
+    faltan = _num(answers, "faltan_intentados", 1.0)
+    bajas = _num(answers, "hay_nota_baja", 1.0)
+    rumbo = _val(answers, "rumbo_coherente", 0)
+    try:
+        rumbo = float(rumbo)
+    except (TypeError, ValueError):
+        rumbo = 0.0
+    # `rumbo_coherente` es un score 1..5, no una probabilidad: va contra 4 fijo.
+    fails = 1 - th
+    ok = todos >= th and faltan <= fails and bajas <= fails and rumbo >= 4
+    why = []
+    if todos < th:
+        why.append("todos_al_100")
+    if faltan > fails:
+        why.append("faltan_intentados")
+    if bajas > fails:
+        why.append("hay_nota_baja")
+    if rumbo < 4:
+        why.append("rumbo_coherente")
+    return ok, why
+
+
+def _rule_render_gate(answers: dict, th: float) -> tuple[bool, list[str]]:
+    choice = _val(answers, "render_succeeded")
+    glitch = _num(answers, "no_visual_glitches")
+    glitch_th = max(0.0, th - 0.05)
+    ok = choice == "pass" and glitch >= glitch_th
+    why = []
+    if choice != "pass":
+        why.append(f"choice={choice}")
+    if glitch < glitch_th:
+        why.append("no_visual_glitches")
+    return ok, why
+
+
+def _rule_triage_quality(answers: dict, th: float) -> tuple[bool, list[str]]:
+    addr = _num(answers, "answer_addresses_question")
+    needs = _val(answers, "needs_followup", "no")
+    addr_th = max(0.0, th - 0.15)
+    ok = addr >= addr_th and needs != "yes_urgent"
+    why = []
+    if addr < addr_th:
+        why.append("answer_addresses_question")
+    if needs == "yes_urgent":
+        why.append("needs_followup=yes_urgent")
+    return ok, why
+
+
+DECISION_RULES = {
+    "slide_done_v1": _rule_slide_done,
+    "find_words_drag_v1": _rule_drag_safe,
+    "course_closed_v1": _rule_course_closed,
+    "render_gate_v1": _rule_render_gate,
+    "triage_quality_v1": _rule_triage_quality,
+    # ai_dimensions_v1 tiene un scoring multi-dimension, no un verdict binario.
+}
+
+
+def decide(preset: str, answers: dict, mode: str, threshold: float | None = None) -> dict:
+    """Apply the preset's decision rule with a backend-appropriate threshold.
+
+    Returns {"decision": "pass"|"fail"|"uncertain", "confident": bool,
+             "threshold": float|None, "reasons": [...], "mode": str}.
+
+    `uncertain` se devuelve siempre que el backend sirvio un fallback (sin senal
+    real) o no hay umbral para ese backend. Los consumidores NUNCA deben tratar
+    `uncertain` como un pass.
+    """
+    if mode in ("fallback", "error") or mode is None:
+        return {"decision": "uncertain", "confident": False,
+                "threshold": threshold, "reasons": [f"mode={mode}"], "mode": mode}
+    rule = DECISION_RULES.get(preset)
+    if rule is None:
+        return {"decision": "uncertain", "confident": False,
+                "threshold": threshold, "reasons": [f"no_binary_rule:{preset}"],
+                "mode": mode}
+    if threshold is None:
+        return {"decision": "uncertain", "confident": False,
+                "threshold": None, "reasons": ["no_threshold_for_backend"],
+                "mode": mode}
+    ok, why = rule(answers, float(threshold))
+    return {"decision": "pass" if ok else "fail", "confident": bool(ok),
+            "threshold": float(threshold), "reasons": why, "mode": mode}

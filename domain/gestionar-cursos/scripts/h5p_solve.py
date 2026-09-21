@@ -45,6 +45,7 @@ from pathlib import Path
 # returns GuardVerdict(uncertain=True) and the orchestrator downgrades to the
 # existing heuristic. Never raises; never breaks a run.
 _JEV_SHIM = None
+_USE_JEV_GUARD = False   # lo enciende main() con --use-jev-guard
 try:
     _HERE_PY = Path(__file__).resolve().parent
     sys.path.insert(0, str(_HERE_PY))
@@ -1207,7 +1208,8 @@ def _hallar_palabra(word: str, grid: list, rows: int, cols: int):
     return None
 
 
-def _drag_ftw(b, cvs: dict, es: int, x0: int, y0: int, x1: int, y1: int, pasos: int = 6) -> None:
+def _drag_ftw(b, cvs: dict, es: int, x0: int, y0: int, x1: int, y1: int, pasos: int = 6,
+              m: dict | None = None, use_jev_guard: bool | None = None) -> None:
     """
     Arrastra de la celda (x0,y0) a (x1,y1) con eventos de mouse reales.
 
@@ -1218,6 +1220,31 @@ def _drag_ftw(b, cvs: dict, es: int, x0: int, y0: int, x1: int, y1: int, pasos: 
     `mouseMoved` por celda: con pasos fijos el puntero salta celdas intermedias y la librería
     reconstruye una palabra más corta (PUNTODEREORDEN, 15 letras, fallaba con 6 pasos).
     """
+    if use_jev_guard is None:
+        use_jev_guard = _USE_JEV_GUARD
+
+    # Guardarraíl de drag (escenario 2). Corre UNA vez por drag. Nunca bloquea:
+    # en fallback/error el veredicto es `uncertain` y el cálculo de viewport de
+    # abajo corre igual. Solo registra la decisión en `opportunities`.
+    if use_jev_guard and m is not None:
+        try:
+            off0 = b.ev(JS_FTW_OFFSET) or {}
+            geo0 = {
+                "canvas": cvs,
+                "start_xy": [x0 * es + es / 2, y0 * es + es / 2],
+                "end_xy": [x1 * es + es / 2, y1 * es + es / 2],
+                "viewport_inner": [off0.get("innerW"), off0.get("innerH")],
+                "iframe_offset": [off0.get("x"), off0.get("y")],
+                "element_size": es,
+            }
+            guard = _JEV_SHIM["drag_safe"](geo0)
+            if guard.uncertain:
+                m["opportunities"].append("jev_drag_uncertain")
+            elif guard.decision == "fail":
+                m["opportunities"].append("jev_drag_disagrees")
+        except Exception as e:
+            m["opportunities"].append(f"jev_drag_exception:{type(e).__name__}")
+
     for intento in range(2):
         off = b.ev(JS_FTW_OFFSET) or {}
         oy, ox = off.get("y", 0), off.get("x", 0)
@@ -1317,7 +1344,7 @@ def solve_findthewords(b, si, ci, m: dict) -> dict:
             g2 = b.ev(JS_FTW_GEO) or {}
             _drag_ftw(b, g2.get("canvas") or cvs, g2.get("es") or es,
                       x0, y0, x0 + dx * (n - 1), y0 + dy * (n - 1),
-                      pasos=max(n, 6), m=m, use_jev_guard=use_jev_guard)
+                      pasos=max(n, 6), m=m, use_jev_guard=_USE_JEV_GUARD)
             m["clicks"] += 1
             st = b.ev(JS_FTW_STATE) or {}
             if w in (st.get("found") or []):
@@ -1577,6 +1604,9 @@ def main() -> int:
                          "new = abrir la propia (OBLIGATORIO en fan-out paralelo, si no los agentes se pisan la pestaña)")
     ap.add_argument("--force", action="store_true", help="re-resolver aunque el ledger diga OK")
     args = ap.parse_args()
+
+    global _USE_JEV_GUARD
+    _USE_JEV_GUARD = bool(args.use_jev_guard)
 
     if args.cleanup_tabs:
         print(json.dumps(cerrar_pestanas_huerfanas(args.cdp_port, args.keep_tabs_n),

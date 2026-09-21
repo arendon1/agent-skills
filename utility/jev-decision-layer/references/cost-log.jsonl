@@ -1,1 +1,2 @@
-{"ts":"2026-09-21T15:19:27","request_id":"bb9badc6976f","mode":"openrouter","model":"deepseek/deepseek-v4-flash-0731","tokens_in":149,"cost_usd":1.3644999999999999e-05,"latency_ms":2011,"questions":2,"error":null}
+{"ts":"2026-09-21T17:19:45","request_id":"5cb3ce14c309","mode":"fallback","model":"fallback-heuristic","tokens_in":0,"cost_usd":0.0,"latency_ms":0,"questions":2,"error":null}
+{"ts":"2026-09-21T17:19:45","request_id":"0f03a20eeea2","mode":"fallback","model":"fallback-heuristic","tokens_in":0,"cost_usd":0.0,"latency_ms":0,"questions":2,"error":null}

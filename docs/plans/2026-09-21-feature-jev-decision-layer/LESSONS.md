@@ -75,6 +75,38 @@ En el backend OpenRouter, el mismo prompt con `response_format: json_schema` tar
 pensamiento era el 90% de la latencia y del gasto. **Invariante**: cuando el output está
 restringido a un esquema, apagar el razonamiento es la optimización de mayor rendimiento.
 
+### L12 — El shim devolvía un dataclass; el llamador usaba `.get()`
+La integración del guardarraíl de slides hacía `guard.get("uncertain")` sobre un
+`GuardVerdict`, que es un dataclass: `AttributeError`. Estaba dentro de un
+`try/except` que solo anotaba `jev_guard_exception`, así que **el guardarraíl nunca
+registró un veredicto y nada falló visiblemente**. **Invariante**: cuando el
+consumidor de una API nueva vive dentro de un `try/except` que degrada, agregar un
+test que compruebe que la ruta DE ÉXITO se ejecutó — no basta con que no crashee.
+
+### L13 — El wrapper anidaba las respuestas y el parser las esperaba planas
+`laya_server.py` devolvía `{"answers": {...}}`; `_parse_response` buscaba las claves
+al nivel raíz (forma de TypeSafe). Resultado: **toda decisión vía Laya leía 0.0** —
+un falso negativo silencioso en cada guardarraíl. Lo cazó el test end-to-end real,
+no los unitarios (que usaban la forma plana porque yo la asumí). **Invariante**: un
+parser entre dos implementaciones propias debe testearse contra LA SALIDA REAL de
+la otra, no contra la forma que uno recuerda. Y aceptar ambas formas cuando el
+contrato no está fijado.
+
+### L14 — Un edit atómico que falla no deja NADA aplicado
+Un lote de 4 edits falló en el índice 3; los tres anteriores tampoco se aplicaron.
+Yo asumí que sí, y construí encima: la firma de `_drag_ftw` quedó vieja mientras el
+call site ya pasaba los argumentos nuevos → `TypeError` esperando en runtime.
+**Invariante**: tras un lote de edits que reporta fallo, verificar el estado REAL
+del archivo (grep de la firma, del cuerpo) antes de seguir construyendo.
+
+### L15 — El umbral de confianza es propiedad del backend, no del preset
+El mismo estado de slide dio `score_at_max` = 0.81 con Laya y ~0.99 (reportado) con
+JEV. Con un umbral fijo de 0.95, Laya producía **falso negativo en un slide
+correcto**. **Invariante**: cuando dos implementaciones del mismo contrato devuelven
+probabilidades, sus ESCALAS no son comparables sin verificación. El umbral va en la
+config por backend, y el veredicto `uncertain` cubre el caso "no hay umbral para
+este backend".
+
 ## Decisiones de diseño registradas
 
 - **El backend por defecto es el host ya autorizado.** El orden de auto-detección pone
@@ -82,6 +114,12 @@ restringido a un esquema, apagar el razonamiento es la optimización de mayor re
   seguridad, no una preferencia. Un host nuevo solo entra con key explícita.
 - **`reasoning: off` es default en la ruta OpenRouter**, con `JEV_OPENROUTER_REASONING=1`
   para revertir cuando la calidad importe más que la latencia.
+- **`decide` es el verbo de los guardarraíles, no `classify`.** `decide` aplica la
+  regla del preset con el umbral del backend que sirvió la llamada, y devuelve
+  `pass`/`fail`/`uncertain`. `classify` solo devuelve números crudos.
+- **Laya se consume como servicio efímero, no como daemon.** El patrón
+  arranca-corro-mato vive en `laya_on_demand.py` y respeta la directiva de
+  listeners locales y procesos que mueren.
 - **§12 se honra por subprocess, no por import**: el `jev_shim.py` de `gestionar-cursos`
   invoca el CLI de `jev-decision-layer` como subprocess. El `ai_score_jev.py` de
   `ai-check` hace sys.path a la utility porque ambos viven en el mismo repo, pero el

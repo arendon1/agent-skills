@@ -166,3 +166,48 @@ Tag for tasks that need the operator's decision or input; the highest-value
 query at session start.
 
 _Avoid_: "blocked-on-human", "needs-input", "ping-andres"
+
+## decision layer
+
+A typed-decision classifier that sits BEFORE an LLM judgment on bounded questions
+(yes/no, choose-from-list, score-1-to-N). Returns **calibrated probabilities** so
+callers can apply thresholds explicitly. Implemented in this repo by the
+`utility/jev-decision-layer/` utility skill, which wraps JEV (TypeSafe AI System
+One model) with a graceful fallback when no API key is set.
+
+_NOTE_: a decision layer is NOT a model you chat with. It cannot generate text.
+Use it to gate, classify, route, or score — never to write.
+
+_Avoid_: "AI judge", "AI filter", "JEV classifier" (jargon too narrow; the term
+is generic on purpose, so the same glossary entry covers JEV/Laya/any future
+implementation)
+
+## guardarraíl
+
+A thin post-solve check that asks the decision layer "did this state actually
+achieve its expected outcome?" and downgrades the result from confident to
+`uncertain` when the answer is "no" or "I can't tell". Always:
+
+  * run AFTER the existing implementation (never replaces it),
+  * log its verdict under `opportunities:` in the run JSONL, never modify the
+    primary result silently,
+  * fail open (fallback mode = silent continue, NOT crash),
+  * its input/output schema is small, JSON-serializable, and loss-tolerant (a
+    blob of state + 2-3 typed questions).
+
+The `gestionar-cursos` H5P solver uses two guardarraíles: one per slide
+(`slide_done_v1`) and one per FindTheWords drag (`find_words_drag_v1`).
+
+_Avoid_: "guard", "safety check", "post-validation"
+
+## jev-shim
+
+Cross-skill bridge module that lives in the CONSUMING skill's `scripts/`
+directory. Calls the `jev-decision-layer` CLI as a subprocess (NEVER as a
+code import — §12). Exposes typed helpers like `jev_slide_done(state)` and
+`jev_drag_safe(geometry)` that return a `GuardVerdict` dataclass with
+explicit `uncertain` channel. A shim that's broken or missing must NEVER
+crash its host skill — degrade to `uncertain=True` and let the existing
+heuristic run.
+
+_Avoid_: "JEV wrapper", "JEV client", "JEV adapter"

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_nota": "Mirror of openrouter.json. Pick a backend via JEV_BACKEND env var; if unset, auto-detect (Vercel > TypeSafe > Laya > fallback).",
+  "api": {
+    "timeout": 12,
+    "default_cardinality_2stage": 50
+  },
+  "default_model": "jev-latest",
+  "endpoints": {
+    "vercel": "https://ai-gateway.vercel.sh/v1/evaluate",
+    "typesafe": "https://api.typesafe.ai/v1/systemone",
+    "laya": "http://localhost:8000"
+  },
+  "pricing_per_1m_input_usd": {
+    "vercel": 0.04,
+    "typesafe": 0.042,
+    "laya": 0.0,
+    "fallback": 0.0
+  },
+  "profiles": {
+    "h5p_guardarrail": {
+      "description": "H5P slide 'did this score max?' classifier (Scenario 1).",
+      "preset": "slide_done_v1",
+      "thresholds": {
+        "score_at_max": 0.95,
+        "all_answers_committed": 0.95
+      }
+    },
+    "findthewords_drag": {
+      "description": "FindTheWords canvas drag safety (Scenario 2).",
+      "preset": "find_words_drag_v1",
+      "thresholds": {
+        "start_in_viewport": 0.95,
+        "end_in_viewport": 0.95,
+        "path_uninterrupted": 0.90
+      }
+    },
+    "course_closed": {
+      "description": "Course completion auto-check (Scenario 3).",
+      "preset": "course_closed_v1",
+      "thresholds": {
+        "todos_al_100": 0.95,
+        "faltan_intentados_reject_at": 0.50,
+        "hay_nota_baja_reject_at": 0.50,
+        "rumbo_coherente_min": 4
+      }
+    },
+    "render_gate": {
+      "description": "Video render quality gate (Scenario 4).",
+      "preset": "render_gate_v1",
+      "thresholds": {
+        "render_succeeded_pass": 0.90,
+        "no_visual_glitches": 0.90
+      }
+    },
+    "ai_dimensions": {
+      "description": "AI-tell multi-dimension scoring (Scenario 5).",
+      "preset": "ai_dimensions_v1"
+    },
+    "triage_quality": {
+      "description": "Research output triage (Scenario 6).",
+      "preset": "triage_quality_v1",
+      "thresholds": {
+        "answer_addresses_question_min": 0.6,
+        "needs_followup": "yes_urgent"
+      }
+    }
+  }
+}

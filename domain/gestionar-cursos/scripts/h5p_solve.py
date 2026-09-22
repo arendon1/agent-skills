@@ -52,14 +52,36 @@ try:
     from jev_shim import jev_slide_done, jev_drag_safe, is_available as _is_jev_available  # type: ignore[import-not-found]
     _JEV_SHIM = {"available": _is_jev_available(), "slide_done": jev_slide_done, "drag_safe": jev_drag_safe}
 except Exception:  # noqa: BLE001 — guardrailing the optional dep is the whole point
+    class _NoGuard:
+        """Veredicto de reemplazo cuando jev_shim no está disponible: siempre uncertain.
+
+        Debe exponer los MISMOS ATRIBUTOS que GuardVerdict — si devuelve un dict,
+        el consumidor que usa acceso por atributo explota dentro de un except que
+        solo loguea, y el guardarraíl falla en silencio.
+        """
+
+        decision = "uncertain"
+        confident = False
+        uncertain = True
+        confident_done = False
+        mode = "fallback"
+        threshold = None
+        reasons = ["jev_shim_not_loaded"]
+        answers: dict = {}
+        cost_usd = 0.0
+        latency_ms = 0
+        preset = None
+        error_reason = "jev_shim_not_loaded"
+        backend_trace: list = []
+        backend_warning = None
+        raw = None
+
     def jev_slide_done(*_a, **_kw):
-        return {"confident": False, "confident_done": False, "uncertain": True,
-                "error_reason": "jev_shim_not_loaded", "mode": "fallback", "preset": None,
-                "answers": {}, "cost_usd": 0.0, "latency_ms": 0, "raw": None}
+        return _NoGuard()
+
     def jev_drag_safe(*_a, **_kw):
-        return {"confident": False, "confident_done": False, "uncertain": True,
-                "error_reason": "jev_shim_not_loaded", "mode": "fallback", "preset": None,
-                "answers": {}, "cost_usd": 0.0, "latency_ms": 0, "raw": None}
+        return _NoGuard()
+
     _JEV_SHIM = {"available": False, "slide_done": jev_slide_done, "drag_safe": jev_drag_safe}
 
 CMUX = "/Applications/cmux.app/Contents/Resources/bin/cmux"
@@ -1043,17 +1065,21 @@ def walk_deck(b: Browser, plan: list, n_slides: int, m: dict, dry_run: bool,
                     guard = _JEV_SHIM["slide_done"](
                         json.dumps(slide_state, separators=(",", ":"), default=str)
                     )
-                    if guard.get("uncertain"):
+                    if guard.uncertain:
                         m["opportunities"].append(f"jev_guard_uncertain:{machine}:slide{si}")
-                    elif not guard.get("confident_done"):
+                    elif guard.decision == "fail":
                         m["opportunities"].append(f"jev_guard_disagrees:{machine}:slide{si}")
+                    if guard.backend_warning:
+                        m["opportunities"].append(f"jev_backend:{guard.backend_warning}")
                     r["jev_guard"] = {
-                        "mode": guard.get("mode"),
-                        "confident_done": guard.get("confident_done"),
-                        "uncertain": guard.get("uncertain"),
-                        "reason": guard.get("error_reason"),
-                        "cost_usd": guard.get("cost_usd"),
-                        "latency_ms": guard.get("latency_ms"),
+                        "decision": guard.decision,
+                        "mode": guard.mode,
+                        "threshold": guard.threshold,
+                        "reasons": guard.reasons,
+                        "cost_usd": guard.cost_usd,
+                        "latency_ms": guard.latency_ms,
+                        "error": guard.error_reason,
+                        "backend_warning": guard.backend_warning,
                     }
                 except Exception as e:
                     m["opportunities"].append(f"jev_guard_exception:{type(e).__name__}")

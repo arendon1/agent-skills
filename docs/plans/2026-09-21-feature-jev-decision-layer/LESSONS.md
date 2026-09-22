@@ -161,6 +161,37 @@ de la distribución de entrenamiento, el formato no la arregla.
 **Invariante**: antes de meter un modelo de decisión en un bucle, medir su matriz de
 confusión contra el baseline existente. Si el baseline gana, no se reemplaza.
 
+### L22 — "Instalado" no es "elegido": hace falta una política explícita
+Laya estaba instalada y cableada, pero `active_backend()` devolvía `openrouter`: el
+auto-detect solo la prefería si estaba *corriendo*, y no corría. Teníamos la
+capacidad sin ninguna garantía de uso.
+
+**La solución es política, no memoria**: `jev.json → backend_policy` da un orden de
+preferencia POR PRESET; el resolver prueba cada backend y usa el primero
+DISPONIBLE; y la traza (`backend_trace`, `backend_warning`) sale en la respuesta
+para que "se prefirió Laya y no estaba" se vea en vez de caer en silencio.
+
+**Invariante**: una capacidad que depende de que alguien se acuerde no está
+implementada. Ponerla en configuración, y hacer visible el motivo del fallback.
+
+### L23 — Factorizar lo duplicado antes de que derive
+`classify` y `decide` construían las preguntas con el mismo bloque copiado, y ambos
+recortaban el preset a `(type, instructions)` — perdiendo `options` y `range_max`.
+Eso rompía **4 de los 6 presets** con "options required". Los tests no lo vieron
+porque solo ejercitaban `slide_done_v1` (dos `noul`, sin opciones).
+
+**Invariante**: un test que ejercita UN preset no cubre el CLI. Parametrizar sobre
+todos los presets. Y factorizar el bloque compartido en un helper — la copia es la
+que deriva.
+
+### L24 — Verificar el archivo tras un lote de edits que falla
+Segunda vez en la sesión: un lote de edits falló y asumí que los anteriores se
+habían aplicado. `walk_deck` quedó con acceso mixto (`guard.get` en el `if`,
+atributo en el `elif`) y el bloque de fallback nunca se cambió — visible solo al
+grepear el archivo entero. **Invariante**: tras un lote que reporta fallo, releer
+todas las ocurrencias del símbolo tocado, no confiar en el "successfully replaced"
+de otros edits del mismo lote.
+
 ## Decisiones de diseño registradas
 
 - **El backend por defecto es el host ya autorizado.** El orden de auto-detección pone

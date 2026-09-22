@@ -134,6 +134,42 @@ A single fixed threshold across backends produces systematic false negatives.
 `jev.json → thresholds_by_backend` resolves them per backend, and `decide`
 applies the right one automatically. Override per call with `--threshold`.
 
+## Backend policy — how Laya actually gets used
+
+Having Laya installed is not the same as Laya being *chosen*. `decide` resolves the
+backend from `jev.json → backend_policy`, which is an **ordered preference list per
+preset**. It probes each entry and uses the first one actually available:
+
+```json
+"backend_policy": {
+  "default":          ["laya", "openrouter", "vercel", "typesafe", "fallback"],
+  "slide_done_v1":    ["laya", "openrouter", "fallback"],
+  "ai_dimensions_v1": ["openrouter", "vercel", "typesafe", "fallback"]
+}
+```
+
+- **Available** means: a key is present, or (for Laya) `GET /health` answers.
+- **`ai_dimensions_v1` deliberately excludes Laya** — measured, it inverts that task.
+- The chosen path ships in the output as `backend_trace`, so *"Laya was preferred
+  but wasn't running"* is visible instead of silent.
+
+```bash
+# Sin --backend, manda la política del preset:
+python jev_cli.py decide --state "..." --preset slide_done_v1
+# -> {"mode": "openrouter", "backend_trace": [{"backend":"laya","available":false}, ...],
+#     "backend_warning": "laya_preferida_pero_no_corria — se usó openrouter"}
+
+# Arrancar Laya si la política la prefiere y no responde (nunca implícito:
+# levanta un proceso de ~3.7 GB):
+python jev_cli.py decide --state "..." --preset slide_done_v1 --auto-laya
+JEV_AUTO_LAYA=1 python jev_cli.py decide ...   # equivalente por env
+```
+
+**So the guarantee is policy, not memory.** The preset decides the preference order;
+the resolver picks the first available; the trace makes the fallback auditable. If
+you want Laya to actually run for a batch, either start it once
+(`python jev_cli.py laya up`) or pass `--auto-laya`.
+
 ## Laya on-demand (the no-egress lane)
 
 Laya is a library, not a server. Two scripts turn it into an ephemeral service

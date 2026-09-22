@@ -157,3 +157,82 @@ def test_cli_threshold_comes_from_config_per_backend():
     assert threshold_for("typesafe") == 0.95
     assert threshold_for("openrouter") == 0.75
     assert threshold_for("unknown_backend") is None
+
+
+# --------------------------------------------------------------------------- #
+# REGRESIÓN: el CLI construía las preguntas como (type, instructions) y perdía
+# `options` / `range_max` — rompía 4 de los 6 presets con "options required".
+# --------------------------------------------------------------------------- #
+ALL_PRESETS = [
+    "slide_done_v1", "find_words_drag_v1", "course_closed_v1",
+    "render_gate_v1", "ai_dimensions_v1", "triage_quality_v1",
+]
+
+
+@pytest.mark.parametrize("preset", ALL_PRESETS)
+def test_every_preset_survives_the_cli(preset):
+    p = _run("decide", "--state", "estado de prueba", "--preset", preset,
+             "--backend", "fallback")
+    assert p.returncode in (0, 1, 3), f"{preset} crasheó:\n{p.stderr}"
+    d = json.loads(p.stdout)
+    assert d["decision"] in ("pass", "fail", "uncertain")
+    assert d["answers"], f"{preset} no devolvió respuestas"
+
+
+@pytest.mark.parametrize("preset", ALL_PRESETS)
+def test_choice_and_score_questions_keep_their_metadata(preset):
+    """El dict del preset debe llegar COMPLETO, no recortado."""
+    from jev_cli import build_questions
+    import argparse
+    q = build_questions(argparse.Namespace(preset=preset, question=[]))
+    for k, v in q.items():
+        if v["type"] == "choice":
+            assert v.get("options") or v.get("criteria"), f"{preset}.{k}: choice sin opciones"
+        if v["type"] == "score":
+            assert v.get("range_max"), f"{preset}.{k}: score sin range_max"
+
+
+# --------------------------------------------------------------------------- #
+# Política de backend — "usá Laya cuando corresponda"
+# --------------------------------------------------------------------------- #
+def test_backend_policy_prefers_laya_for_guardrails():
+    from jev_cli import resolve_backend
+    import jev_cli
+    orig = jev_cli.probe_backend
+    jev_cli.probe_backend = lambda n: n == "laya"      # simulamos Laya viva
+    try:
+        chosen, trace = resolve_backend("slide_done_v1")
+        assert chosen == "laya"
+        assert trace[0] == {"backend": "laya", "available": True}
+    finally:
+        jev_cli.probe_backend = orig
+
+
+def test_backend_policy_falls_through_and_leaves_a_trace():
+    from jev_cli import resolve_backend
+    import jev_cli
+    orig = jev_cli.probe_backend
+    jev_cli.probe_backend = lambda n: n == "openrouter"        # Laya apagada
+    try:
+        chosen, trace = resolve_backend("slide_done_v1")
+        assert chosen == "openrouter"
+        assert trace[0] == {"backend": "laya", "available": False}
+        assert any(t["backend"] == "openrouter" and t["available"] for t in trace)
+    finally:
+        jev_cli.probe_backend = orig
+
+
+def test_backend_policy_excludes_laya_for_stylistic_judgement():
+    """ai_dimensions_v1 no va con Laya (medido: salía invertido)."""
+    from jev_cli import _load_thresholds  # noqa: F401  (fuerza el import del módulo)
+    import jev_cli
+    from jev_client import _load_config
+    policy = (_load_config() or {}).get("backend_policy", {})
+    assert "laya" not in policy.get("ai_dimensions_v1", [])
+    assert policy.get("slide_done_v1", [])[:1] == ["laya"]
+
+
+def test_probe_backend_reports_fallback_available():
+    from jev_cli import probe_backend
+    assert probe_backend("fallback") is True
+    assert probe_backend("no_existe") is False

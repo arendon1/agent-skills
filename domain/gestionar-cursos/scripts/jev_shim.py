@@ -91,6 +91,10 @@ class GuardVerdict:
     preset: str | None = None
     error_reason: str | None = None
     raw: dict | None = None
+    # Procedencia del backend: qué se probó y qué se eligió. Permite auditar
+    # "Laya se prefirió y no corría" en vez de asumirlo.
+    backend_trace: list[dict] = field(default_factory=list)
+    backend_warning: str | None = None
 
     @property
     def confident_done(self) -> bool:
@@ -160,6 +164,8 @@ def _run_cli(state: str, preset: str, backend: str | None = None,
         preset=preset,
         error_reason=v.get("error"),
         raw=v,
+        backend_trace=v.get("backend_trace") or [],
+        backend_warning=v.get("backend_warning"),
     )
 
 

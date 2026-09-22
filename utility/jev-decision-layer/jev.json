@@ -28,6 +28,20 @@
     "laya": 0.0,
     "fallback": 0.0
   },
+  "backend_policy": {
+    "_nota": "Que backend PREFERIR por preset, en orden. El resolver prueba cada uno y usa el primero DISPONIBLE (clave presente / servidor Laya respondiendo). Si ninguno, cae a 'fallback' y decide devuelve 'uncertain' — nunca un pass falso. Con JEV_AUTO_LAYA=1 arranca Laya si la politica la prefiere y no esta corriendo.",
+    "default": ["laya", "openrouter", "vercel", "typesafe", "fallback"],
+    "slide_done_v1": ["laya", "openrouter", "fallback"],
+    "find_words_drag_v1": ["laya", "openrouter", "fallback"],
+    "course_closed_v1": ["laya", "openrouter", "fallback"],
+    "render_gate_v1": ["laya", "openrouter", "fallback"],
+    "triage_quality_v1": ["laya", "openrouter", "fallback"],
+    "ai_dimensions_v1": ["openrouter", "vercel", "typesafe", "fallback"]
+  },
+  "laya": {
+    "python": "~/.cache/laya-probe/.venv/bin/python",
+    "port_base": 8791
+  },
   "thresholds_by_backend": {
     "_nota": "El umbral es propiedad del BACKEND, no del preset: la escala de probabilidad difiere entre un System One calibrado y un LLM restringido por esquema. PROVISIONAL — calibrar contra etiquetas reales antes de confiar en producción. Medición 2026-09-21: Laya dio 0.5546 en un slide inequivocamente completo y 0.0011 en uno parcial.",
     "vercel": {

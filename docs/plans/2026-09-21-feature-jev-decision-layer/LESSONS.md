@@ -107,6 +107,26 @@ probabilidades, sus ESCALAS no son comparables sin verificación. El umbral va e
 config por backend, y el veredicto `uncertain` cubre el caso "no hay umbral para
 este backend".
 
+### L16 — Un modelo de decisión NO es un juez general; es un motor de verificación de estado
+El preset `ai_dimensions_v1` (juicio estilístico: "¿este texto abusa de em-dashes?")
+aplicado a Laya dio el resultado **INVERTIDO**: slop = 32/100 "likely_human", prosa
+humana real = 62/100 "likely_ai". En cambio `slide_done_v1` (verificación de estado:
+"¿este slide llegó al máximo puntaje?") dio 6/7 correcto. La base de Laya es
+ModernBERT, entrenada con RLCD sobre tareas de decisión — no sobre estética.
+
+**Invariante**: antes de prometer un preset contra un backend nuevo, verificar que
+la pregunta caiga dentro de su distribución de entrenamiento. Las preguntas de
+**propiedad concreta y comprobable** (tipo NLI) funcionan; las de **juicio
+subjetivo** no. Un preset diseñado para un modelo imaginario no transfiere.
+
+### L17 — La serialización del estado es la mayor palanca de calidad
+El caso "Blanks completo" dio 0.210 (rechazo, falso negativo) con un texto que
+decía "feedback reports 4 of 4 correct". Al añadir las señales explícitas
+("every question has been answered and the slide is complete", "the maximum"),
+subió a **0.737** y pasó. **Invariante**: el guardarraíl vale lo que vale la
+descripción del estado. Serializar los CUES que el modelo necesita (exhaustividad,
+progreso, máximo alcanzado) no es cosmética — es la diferencia entre 0.21 y 0.74.
+
 ## Decisiones de diseño registradas
 
 - **El backend por defecto es el host ya autorizado.** El orden de auto-detección pone
@@ -114,6 +134,12 @@ este backend".
   seguridad, no una preferencia. Un host nuevo solo entra con key explícita.
 - **`reasoning: off` es default en la ruta OpenRouter**, con `JEV_OPENROUTER_REASONING=1`
   para revertir cuando la calidad importe más que la latencia.
+- **Laya es el backend por defecto para los guardarraíles.** Medido contra
+  OpenRouter sobre los mismos 7 casos: 6/7 vs 5/7, 712ms vs 14173ms, $0 vs
+  $0.000124. Y su error fue un rechazo seguro, mientras el de OpenRouter fue un
+  **falso positivo** — la dirección peligrosa para un guardarraíl.
+- **Los ejemplos viven en `examples/`** (`slide_guardrail_demo.py` es el que
+  funciona; `ai_check_demo.py` documenta el caso que NO funciona con Laya).
 - **`decide` es el verbo de los guardarraíles, no `classify`.** `decide` aplica la
   regla del preset con el umbral del backend que sirvió la llamada, y devuelve
   `pass`/`fail`/`uncertain`. `classify` solo devuelve números crudos.

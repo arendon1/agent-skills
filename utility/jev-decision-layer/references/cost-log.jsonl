@@ -1,2 +1,2 @@
-{"ts":"2026-09-21T17:19:45","request_id":"5cb3ce14c309","mode":"fallback","model":"fallback-heuristic","tokens_in":0,"cost_usd":0.0,"latency_ms":0,"questions":2,"error":null}
-{"ts":"2026-09-21T17:19:45","request_id":"0f03a20eeea2","mode":"fallback","model":"fallback-heuristic","tokens_in":0,"cost_usd":0.0,"latency_ms":0,"questions":2,"error":null}
+{"ts":"2026-09-21T21:20:18","request_id":"89df13704398","mode":"fallback","model":"fallback-heuristic","tokens_in":0,"cost_usd":0.0,"latency_ms":0,"questions":2,"error":null}
+{"ts":"2026-09-21T21:20:19","request_id":"ee9c8550d104","mode":"fallback","model":"fallback-heuristic","tokens_in":0,"cost_usd":0.0,"latency_ms":0,"questions":2,"error":null}

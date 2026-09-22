@@ -127,6 +127,40 @@ subió a **0.737** y pasó. **Invariante**: el guardarraíl vale lo que vale la
 descripción del estado. Serializar los CUES que el modelo necesita (exhaustividad,
 progreso, máximo alcanzado) no es cosmética — es la diferencia entre 0.21 y 0.74.
 
+### L18 — Una clasificación que implica una acción puede validarse contra el mundo
+En el experimento de navegación CDP, Laya clasificó la lista de cursos como
+`course_page` (conf 0.56); el agente clickeó `.activity.modtype_hvp`, el selector no
+existía y el run murió. Con una guarda de **precondición** —verificar que el selector
+de la acción elegida exista en el DOM— el agente cae al heurístico para ese paso y
+completa el flujo. Rescató el run dos veces.
+
+**Invariante**: antes de ejecutar una acción derivada de una clasificación, validar
+su precondición contra la realidad. Es más barato y más fiable que pedirle al modelo
+que sea más preciso.
+
+### L19 — La compuerta de confianza solo va en acciones irreversibles
+Aplicada a `click`, bloquea clasificaciones **correctas** pero inseguras (`h5p_ready`
+con 0.39 quedó en `wait` para siempre). Aplicada a `stop`, evita cerrar un flujo en
+falso. **Invariante**: gatear por confianza las acciones terminales; para las
+reversibles, validar la precondición.
+
+### L20 — `</script>` dentro de un template literal rompe el script externo
+El fixture embebía un `<script>` dentro de un template literal JS. El parser HTML no
+conoce los template literals: cerró el `<script>` exterior ahí. El DOM quedó con el
+código JS como texto y el clasificador leyó basura. Además, los `<script>` insertados
+por `innerHTML` **no se ejecutan** — el timer del fixture nunca disparaba.
+
+**Invariante**: escapar el cierre de script dentro de un template literal, y no
+confiar en que `innerHTML` ejecute scripts.
+
+### L21 — Fuera de su distribución, ningún formato de serialización rescata al modelo
+Clasificación de estado de página: Laya 3/5 vs heurística 5/5. Probé el estado en
+`clave=valor` y en lenguaje natural — el NL fue **peor**. Cuando la tarea está fuera
+de la distribución de entrenamiento, el formato no la arregla.
+
+**Invariante**: antes de meter un modelo de decisión en un bucle, medir su matriz de
+confusión contra el baseline existente. Si el baseline gana, no se reemplaza.
+
 ## Decisiones de diseño registradas
 
 - **El backend por defecto es el host ya autorizado.** El orden de auto-detección pone
@@ -134,6 +168,12 @@ progreso, máximo alcanzado) no es cosmética — es la diferencia entre 0.21 y 
   seguridad, no una preferencia. Un host nuevo solo entra con key explícita.
 - **`reasoning: off` es default en la ruta OpenRouter**, con `JEV_OPENROUTER_REASONING=1`
   para revertir cuando la calidad importe más que la latencia.
+- **Laya sirve para VERIFICACIÓN DE PROPIEDAD CONCRETA, no para clasificación
+  abierta.** Con el mismo modelo: guardarraíl de slides 6/7 (sirve) vs clasificación
+  de estado de página 3/5 (no sirve; el heurístico hace 5/5).
+- **Los ejemplos viven en `examples/`**: `slide_guardrail_demo.py` (funciona),
+  `browser_nav/` (experimento con resultado negativo, documentado entero),
+  `ai_check_demo.py` (el caso que NO funciona con Laya).
 - **Laya es el backend por defecto para los guardarraíles.** Medido contra
   OpenRouter sobre los mismos 7 casos: 6/7 vs 5/7, 712ms vs 14173ms, $0 vs
   $0.000124. Y su error fue un rechazo seguro, mientras el de OpenRouter fue un

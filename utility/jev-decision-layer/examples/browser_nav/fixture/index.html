@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Aula Virtual — fixture de navegación</title>
+<style>
+  body { font-family: -apple-system, sans-serif; margin: 0; background: #f4f6f8; color: #1f2937; }
+  .navbar { background: #0b5f8a; color: #fff; padding: 12px 20px; font-weight: 600; }
+  .container { max-width: 900px; margin: 24px auto; padding: 0 20px; }
+  .card { background: #fff; border: 1px solid #d8dee6; border-radius: 8px; padding: 20px; margin-bottom: 14px; }
+  .course-list .course-item { display: block; padding: 14px; border: 1px solid #d8dee6; border-radius: 6px; margin-bottom: 10px; text-decoration: none; color: #0b5f8a; }
+  .activity { display: block; padding: 12px; border-left: 4px solid #0b5f8a; background: #f8fafc; margin-bottom: 8px; text-decoration: none; color: #0b5f8a; }
+  .errorbox { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; padding: 16px; border-radius: 6px; }
+  .h5p-spinner { width: 40px; height: 40px; border: 4px solid #cbd5e1; border-top-color: #0b5f8a; border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .h5p-content { background: #eef6fb; border: 1px dashed #0b5f8a; border-radius: 6px; padding: 24px; }
+  .pill { display: inline-block; background: #e0f2fe; color: #075985; border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="navbar">Aula Virtual — fixture de navegación</div>
+<div class="container" id="app"></div>
+
+<script>
+// Fixture que simula los estados por los que pasa un flujo de curso real.
+// Cada estado expone DOM distinto y ofrece el enlace que avanza al siguiente.
+const STATES = {
+  login: () => `
+    <div class="card">
+      <h2>Iniciar sesión</h2>
+      <p id="login-prompt">Usted no se ha identificado. Debe iniciar sesión para continuar.</p>
+      <form class="loginform">
+        <input type="text" name="username" placeholder="Usuario">
+        <input type="password" name="password" placeholder="Contraseña">
+        <button type="submit">Acceder</button>
+      </form>
+    </div>`,
+
+  courses: () => `
+    <div class="card course-list">
+      <h2>Mis cursos</h2>
+      <a class="course-item" href="?s=course&course=16564">Modelos de Simulación</a>
+      <a class="course-item" href="?s=course&course=2608B04G4">Humanidades III</a>
+      <a class="course-item" href="?s=error">Cálculo Diferencial (roto)</a>
+    </div>`,
+
+  course: (p) => `
+    <div class="card">
+      <h2>Curso ${p.get('course') || '16564'}</h2>
+      <span class="pill">4 contenidos interactivos</span>
+      <div class="course-content" style="margin-top:16px">
+        <a class="activity modtype_hvp" href="?s=h5p_loading&hvp=746509">H5P: Cuestionario de la Unidad 1</a>
+        <a class="activity modtype_hvp" href="?s=h5p_loading&hvp=774622">H5P: Actividad de refuerzo</a>
+        <a class="activity modtype_forum" href="?s=error">Foro evaluable</a>
+      </div>
+    </div>`,
+
+  h5p_loading: () => `
+    <div class="card">
+      <h2>Cargando contenido interactivo…</h2>
+      <div class="h5p-spinner"></div>
+      <iframe class="h5p-iframe" srcdoc="<body style='margin:0;background:#fff'><div style='padding:20px;font-family:sans-serif;color:#94a3b8'>Cargando…</div></body>" width="100%" height="80"></iframe>
+    </div>
+    <p style="color:#64748b">El iframe existe pero el contenido todavía no está listo.</p>`,
+
+  h5p_ready: () => `
+    <div class="card">
+      <h2>Contenido interactivo listo</h2>
+      <div class="h5p-content">Presentación de diapositivas — 12 diapositivas</div>
+      <iframe class="h5p-iframe" srcdoc="<body style='margin:0'><div class='h5p-content' style='padding:24px;background:#eef6fb'><b>H5P.CoursePresentation</b><p>Slide 1 de 12</p></div></body>" width="100%" height="120"></iframe>
+    </div>
+    <a class="activity" href="?s=done">Resolver contenido</a>`,
+
+  error: () => `
+    <div class="card">
+      <div class="errorbox">
+        <b>Error de conexión</b><br>No se pudo cargar la actividad. Intente nuevamente.
+      </div>
+    </div>
+    <a class="activity" href="?s=courses">Volver a mis cursos</a>`,
+
+  done: () => `
+    <div class="card">
+      <h2>Contenido resuelto</h2>
+      <p class="alert alert-success">Calificación: 10,00 / 10,00</p>
+      <a class="activity" href="?s=courses">Volver a mis cursos</a>
+    </div>`
+};
+
+const p = new URLSearchParams(location.search);
+const s = p.get('s') || 'login';
+document.getElementById('app').innerHTML = (STATES[s] || STATES.error)(p);
+document.title = 'Aula Virtual — ' + s;
+
+// OJO: los <script> insertados vía innerHTML NO se ejecutan (regla del parser HTML).
+// Por eso el avance temporal va acá, en el script principal, y no dentro del template.
+if (s === 'h5p_loading') {
+  setTimeout(() => { location.search = '?s=h5p_ready&hvp=' + (p.get('hvp') || '746509'); }, 2500);
+}
+</script>
+</body>
+</html>

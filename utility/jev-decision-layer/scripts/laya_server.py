@@ -55,9 +55,13 @@ def to_laya_questions(jev_questions: dict) -> dict:
             "instructions": q.get("instructions", ""),
         }
         if t == "choice":
-            opts = q.get("options") or []
-            # Laya quiere {opción: descripción}; sin descripción, la opción es su propia descripción.
-            entry["criteria"] = {o: o for o in opts}
+            crit = q.get("criteria")
+            if isinstance(crit, dict) and crit:
+                entry["criteria"] = crit
+            else:
+                opts = q.get("options") or []
+                # Laya quiere {opción: descripción}; sin descripción, la opción es su propia descripción.
+                entry["criteria"] = {o: o for o in opts}
         elif t == "score":
             rng = q.get("range") or [1, q.get("range_max") or 5]
             n = int(rng[1]) - int(rng[0]) + 1

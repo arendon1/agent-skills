@@ -349,11 +349,21 @@ class JEV:
             raise ValueError(f"question[{key}]: unknown type '{type_}'")
         q = {"type": type_, "instructions": instr}
         if type_ == "choice":
-            if not opts:
+            if isinstance(opts, dict) and opts:
+                # Forma con criterios: {opción: descripción}. Es lo que Laya espera
+                # en su API nativa, y mejora mucho la discriminación frente a una
+                # lista de etiquetas peladas (medido: 0.96 conf en una clase
+                # equivocada con etiquetas solas).
+                if len(opts) > 255:
+                    raise ValueError(f"question[{key}] (choice): max 255 options")
+                q["options"] = list(opts.keys())
+                q["criteria"] = dict(opts)
+            elif opts:
+                if len(opts) > 255:
+                    raise ValueError(f"question[{key}] (choice): max 255 options")
+                q["options"] = list(opts)
+            else:
                 raise ValueError(f"question[{key}] (choice): options required")
-            if len(opts) > 255:
-                raise ValueError(f"question[{key}] (choice): max 255 options")
-            q["options"] = list(opts)
         elif type_ == "score":
             # In tuple sugar, slot 3 maps to range_max for score
             actual_rng = rng if rng is not None else opts
@@ -426,6 +436,7 @@ class JEV:
             "questions": {
                 k: {"type": v["type"], "instructions": v["instructions"]}
                 | ({"options": v["options"]} if v["type"] == "choice" else {})
+                | ({"criteria": v["criteria"]} if v.get("criteria") else {})
                 | ({"range": [1, v["range_max"]]} if v["type"] == "score" else {})
                 for k, v in questions.items()
             },

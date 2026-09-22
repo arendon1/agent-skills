@@ -192,6 +192,34 @@ grepear el archivo entero. **Invariante**: tras un lote que reporta fallo, relee
 todas las ocurrencias del símbolo tocado, no confiar en el "successfully replaced"
 de otros edits del mismo lote.
 
+### L25 — `tsc --noEmit` en verde puede no haber chequeado nada
+El `include` del tsconfig de las extensiones listaba `provider-quota`, `model-router`,
+`antigravity-worker`, `agent-pm` y `tests` — **no `jev/`**. Así que `npx tsc --noEmit`
+daba `exit 0` sin haber mirado una sola línea de la extensión nueva. El primer
+type-check real encontró 4 errores.
+
+**Invariante**: un chequeo verde sobre un conjunto vacío es indistinguible de uno
+verde sobre el código. Verificar que el archivo nuevo está en el `include` ANTES de
+confiar en el resultado.
+
+### L26 — Una dependencia anidada resuelve en runtime pero no en los tests
+`@earendil-works/pi-ai` vive dentro de `pi-coding-agent
+ode_modules/`. Dentro de pi
+resuelve; desde el directorio de extensiones no — ni para `tsc` ni para `tsx`. Los
+intentos de arreglarlo por configuración fallaron: un `paths` en tsconfig apuntando
+al `.d.ts` hizo que `tsx` intentara cargar el `.d.ts` como módulo y siguiera sus
+imports internos.
+
+**Invariante**: si un módulo vive anidado y solo existe en un runtime, y su
+implementación es de 4 líneas verificables, copiarla es más robusto que una
+configuración que arregla un cargador y rompe el otro.
+
+### L27 — La verificación “carga en pi” no sale de `pi list`
+`pi list` lista PAQUETES, no los directorios auto-descubiertos. La verificación
+determinista y gratis es mockear el bus: llamar el `default export` con un objeto
+`{registerTool, registerCommand}` y afirmar qué se registró. Eso cubre el modo de
+falla silenciosa real — una extensión cargada que no registra nada.
+
 ## Decisiones de diseño registradas
 
 - **El backend por defecto es el host ya autorizado.** El orden de auto-detección pone

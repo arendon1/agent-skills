@@ -4,6 +4,7 @@
       "name": "process",
       "skills": [
         "./process/agents-pm",
+        "./process/ai-check",
         "./process/build",
         "./process/check",
         "./process/debug",
@@ -25,6 +26,7 @@
         "./process/teach",
         "./process/to-questionnaire",
         "./process/triage",
+        "./process/upfront-dispatch",
         "./process/verify",
         "./process/wait-what"
       ]
@@ -55,6 +57,7 @@
         "./utility/caveman",
         "./utility/check-subs",
         "./utility/get-docs",
+        "./utility/jev-decision-layer",
         "./utility/skill-add",
         "./utility/skill-find",
         "./utility/skill-forge"

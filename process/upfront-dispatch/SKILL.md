@@ -198,18 +198,25 @@ resolving which backend actually answers.
 Resolution cascade used by the canonical implementation (degrades down the
 list, never throws):
 
-| Tier | Latency | Cost / call | Calibrated? |
-|---|---|---|---|
-| Local server (Apache 2.0 model, self-hosted) | ~30-100ms | $0 | yes |
-| Free fallback API (already-authorized host) | ~1.6s | ~$0.00001 | no |
-| Commercial typed-decision API (key-gated) | ~200-300ms | ~$0.00002 | claimed |
-| Heuristic fallback (no credentials) | <1ms | $0 | no |
+| Tier | Latency | Cost / call | Calibrated? | Practical role |
+|---|---|---|---|---|
+| Local server (Apache 2.0 model, self-hosted) | ~30-100ms | $0 | yes | optimization — nice when present |
+| **Free fallback API (already-authorized host)** | **~1.6s** | **~$0.00001** | **no** | **the de facto primary tier** |
+| Commercial typed-decision API (key-gated) | ~200-300ms | ~$0.00002 | claimed | optional upgrade if calibration matters |
+| Heuristic fallback (no credentials) | <1ms | $0 | no | last-resort, treat output as advisory |
 
-Every tier returns typed answers — only calibration quality differs. If even
-the heuristic tier is missing the seam (deployment never ran the bootstrap),
-the MUST fail-open rule above takes over: classify as `main_loop_direct`
-and proceed. The agent operator sees no skill failure; only the lane choice
-reflects the absence.
+**Practical stance (revised 2026-09-27):** the deterministic rule above does
+the actual classification; the primitive only supplies the signal that drives
+it. With six batched noul/choice/score questions, the rule is robust to
+moderate calibration drift — the threshold 0.70 was chosen to absorb it.
+That makes the **free fallback API tier the effective primary tier** on any
+device with the API key (which is the most common cross-device case):
+~$0.00001 per call, ~1.6s latency, acceptable for an upfront gate that
+fires once per task. Local server is an optimization to reach for on a
+workstation, never a prerequisite. Heuristic fallback and missing-seam
+fail-open exist for genuinely offline or restricted deployments; on those,
+the MUST fail-open rule above takes over and the lane becomes
+`main_loop_direct`.
 
 ## Out of scope
 

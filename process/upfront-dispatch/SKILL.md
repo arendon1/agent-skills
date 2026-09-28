@@ -184,6 +184,32 @@ path (free locally).
   (the cross-harness adapter maps behavior to tools).
 - MUST NOT modify any other skill, the routing policy, or the post-hoc
   dispatcher config — complement them.
+- MUST fail open to `main_loop_direct` when the decision primitive is
+  unavailable or returns no usable answer. Treat the absence of the
+  classifier the same as `inline_justificado` and proceed — never hang a
+  turn on a missing seam.
+
+## Deployment notes (for cross-device portability)
+
+This skill is coupled to **one** runtime seam: a decision-primitive backend
+must be reachable on the device. The harness adapter is responsible for
+resolving which backend actually answers.
+
+Resolution cascade used by the canonical implementation (degrades down the
+list, never throws):
+
+| Tier | Latency | Cost / call | Calibrated? |
+|---|---|---|---|
+| Local server (Apache 2.0 model, self-hosted) | ~30-100ms | $0 | yes |
+| Free fallback API (already-authorized host) | ~1.6s | ~$0.00001 | no |
+| Commercial typed-decision API (key-gated) | ~200-300ms | ~$0.00002 | claimed |
+| Heuristic fallback (no credentials) | <1ms | $0 | no |
+
+Every tier returns typed answers — only calibration quality differs. If even
+the heuristic tier is missing the seam (deployment never ran the bootstrap),
+the MUST fail-open rule above takes over: classify as `main_loop_direct`
+and proceed. The agent operator sees no skill failure; only the lane choice
+reflects the absence.
 
 ## Out of scope
 
@@ -194,5 +220,8 @@ path (free locally).
 - **Panel adversarial opinions**: the post-classification panel belongs in
   the routing policy, not here.
 - **Post-hoc behavior**: belong to the post-hoc dispatcher, not this skill.
-- **Local-only mode**: the decision primitive is a contracted seam. The
-  adapter invokes whatever it has (local + free + paid fallback).
+- **Calibrating the 0.70 threshold per backend**: the post-classification
+  calibration regime lives in the routing policy, not this skill. Adjust
+  there, not here.
+- **Picking a specific backend**: the cross-harness adapter resolves the
+  seam; this skill never names one.
